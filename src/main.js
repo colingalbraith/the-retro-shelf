@@ -1,7 +1,7 @@
 "use strict";
 // The Retro Shelf desktop app: one window showing index.html over the arcade:// protocol, a backend in this
 // process, and RetroArch (bundled in Resources/emulators) launched for each game.
-const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu } = require("electron");
+const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu, screen } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { Backend } = require("./backend");
@@ -17,12 +17,15 @@ if (HOME) app.setPath("userData", path.join(HOME, "data"));
 const DOCS = HOME ? path.join(HOME, "The Retro Shelf") : path.join(app.getPath("documents"), "The Retro Shelf");
 // The app used to be called Arcade: the first time, move its settings and games folders to the new name
 // (before the single-instance lock below creates the new settings folder)
+let OLD_GAMES = null;
 if (!HOME) {
   const move = (from, to, signs) => {
-    try { if (signs.some(f => fs.existsSync(path.join(from, f))) && !fs.existsSync(to)) fs.renameSync(from, to); } catch {}
+    try { if (signs.some(f => fs.existsSync(path.join(from, f))) && !fs.existsSync(to)) { fs.renameSync(from, to); return true; } } catch {}
+    return false;
   };
   move(path.join(app.getPath("appData"), "Arcade"), app.getPath("userData"), ["settings.json", "state.json", "covers", "retroarch"]);
-  move(path.join(app.getPath("documents"), "Arcade"), DOCS, ["Games"]);
+  // games are known by their path, so their play history is moved over to the new paths once the backend is up
+  if (move(path.join(app.getPath("documents"), "Arcade"), DOCS, ["Games"])) OLD_GAMES = path.join(app.getPath("documents"), "Arcade", "Games");
 }
 if (!app.requestSingleInstanceLock()) app.quit();
 const EMU = app.isPackaged ? path.join(process.resourcesPath, "emulators")
@@ -48,11 +51,23 @@ function saveBounds() {
   try { fs.writeFileSync(WINDOW(), JSON.stringify(b)); } catch {}
 }
 
+const DEV_ICON = path.join(__dirname, "..", "build", "icon.png");
+
+/** the saved window spot, unless the screen it was on is gone (a monitor unplugged) */
+function onScreen(b) {
+  if (!b || !b.width || !b.height) return {};
+  const area = screen.getDisplayMatching(b).workArea;
+  const seen = Math.min(b.x + b.width, area.x + area.width) - Math.max(b.x, area.x) >= 120 && Math.min(b.y + b.height, area.y + area.height) - Math.max(b.y, area.y) >= 60;
+  return seen ? b : { width: Math.min(b.width, area.width), height: Math.min(b.height, area.height) };
+}
+
 function createWindow() {
   const saved = loadBounds();
   win = new BrowserWindow({
-    width: 1280, height: 820, ...(saved.bounds || {}), minWidth: 720, minHeight: 520,
+    width: 1280, height: 820, ...onScreen(saved.bounds), minWidth: 720, minHeight: 520,
     title: "The Retro Shelf", backgroundColor: "#1e1c1a", show: false, autoHideMenuBar: true,
+    // installed builds get their icon from the installer; running from source would otherwise show Electron's
+    ...(app.isPackaged ? {} : { icon: DEV_ICON }),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true, sandbox: true, spellcheck: false,
@@ -118,7 +133,7 @@ function gameMenu(id) {
       filters: [{ name: "Pictures", extensions: ["png", "jpg", "jpeg", "webp"] }] });
     if (r.canceled || !r.filePaths[0]) return;
     const [code, res] = backend.setArt(g.id, kind, r.filePaths[0]);
-    send(code === 200 ? { cmd: "refresh" } : { cmd: "error", text: res.error });
+    send(code === 200 ? { cmd: "refresh", focus: g.id } : { cmd: "error", text: res.error });
   };
   const ext = path.extname(g.path).toLowerCase(), sys = backend.cfg.systems;
   const others = Object.keys(sys).filter(s => s !== g.system && (sys[s].exts || []).includes(ext));
@@ -143,11 +158,11 @@ function gameMenu(id) {
       const r = await dialog.showMessageBox(win, { type: "warning", buttons: ["Move to Trash", "Cancel"], defaultId: 1, cancelId: 1,
         message: `Move “${title}” to the Trash?`, detail: "You can get it back from the Trash. Its saves stay where they are." });
       if (r.response !== 0) return;
-      // a disc game with its own folder goes as a whole; otherwise the file and any pictures saved beside it
-      const dir = path.dirname(g.path), sysDir = path.join(backend.romsRoot(), sys[g.system].folder || g.system);
-      const targets = [".cue", ".gdi", ".m3u"].includes(ext) && path.resolve(dir) !== path.resolve(sysDir) ? [dir]
-        : fs.readdirSync(dir).filter(f => f === path.basename(g.path) || f.startsWith(path.parse(g.path).name + ".") && /\.(png|jpe?g|webp)$/i.test(f)).map(f => path.join(dir, f));
-      try { for (const t of targets) await shell.trashItem(t); } catch (e) { send({ cmd: "error", text: "Couldn't move it to the Trash: " + e.message }); }
+      // the game's own files: a disc game's tracks too, and its whole folder when nothing else is in it
+      try {
+        const { folder, files } = backend.gameFiles(g);
+        for (const t of folder ? [folder] : files) await shell.trashItem(t);
+      } catch (e) { send({ cmd: "error", text: "Couldn't move it to the Trash: " + e.message }); }
       backend.scan(); send({ cmd: "refresh" });
     } },
   ];
@@ -182,8 +197,10 @@ app.on("web-contents-created", (_, wc) => {
 });
 
 app.whenReady().then(() => {
+  if (!app.isPackaged && process.platform === "darwin") app.dock.setIcon(DEV_ICON);
   backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion() }, fetchUrl);
   backend.init();
+  if (OLD_GAMES) backend.remapIds(OLD_GAMES);
   backend.on("exit", () => setTimeout(focusApp, 150));
   protocol.handle("arcade", req => {
     const u = new URL(req.url);
@@ -193,6 +210,10 @@ app.whenReady().then(() => {
   ipc();
   menu();
   createWindow();
+  if (backend.setupError) {
+    win.once("ready-to-show", () => dialog.showMessageBox(win, { type: "warning", message: "The Retro Shelf couldn't set up its games folder",
+      detail: `It needs to create "The Retro Shelf" in your Documents folder (${backend.setupError}). Check that it's allowed to use Documents: on a Mac in System Settings → Privacy & Security → Files and Folders, on Windows under Virus & threat protection → Controlled folder access.` }));
+  }
   if (backend.ui.autoCovers) backend.coverJob([...backend.games.keys()]);
 });
 

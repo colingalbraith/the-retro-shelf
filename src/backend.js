@@ -11,6 +11,7 @@ const ra = require("./retroarch");
 const { Importer, sheetFiles } = require("./importer");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
+const SHEETS = [".cue", ".gdi", ".m3u"];
 // box art and game logos, both from the libretro thumbnails project
 const ART = {
   cover: { dir: "Named_Boxarts", sub: "", misses: ".misses.json" },
@@ -73,6 +74,10 @@ function splitArgs(s) {
 
 // ---------------------------------------------------------------- titles
 const TAG = /[([]([^)\]]*)[)\]]/g;
+/** a typed or pasted path, without the quotes Windows' "Copy as path" puts around it */
+const unquote = v => String(v).trim().replace(/^(["'])(.*)\1$/, "$2").trim();
+/** a path as the file system compares it: Windows and macOS ignore letter case */
+const pathKey = p => process.platform === "linux" ? path.resolve(p) : path.resolve(p).toLowerCase();
 function gid(p) { return crypto.createHash("sha1").update(p).digest("hex").slice(0, 12); }
 // "Legend of Zelda, The - A Link to the Past (USA)" -> "The Legend of Zelda: A Link to the Past"
 function cleanTitle(stem) {
@@ -150,8 +155,50 @@ class Backend extends EventEmitter {
     this.ra = ra.bundled(this.dirs.emu);
     this.names = { arcade: jload(path.join(this.dirs.app, "data", "arcade-names.json"), {}) };
     this.importer = new Importer(this.cfg.systems);
-    this.firstRun();
+    // a Documents folder the app may not write to (Windows' Controlled folder access, a declined macOS prompt)
+    // shouldn't stop it from opening: it says so instead
+    this.setupError = "";
+    try { this.firstRun(); } catch (e) { this.setupError = e.message; }
     this.scan();
+  }
+
+  /** the games folder moved (the app used to be called Arcade): ids come from paths, so each game's stats follow */
+  remapIds(fromRoot) {
+    const toRoot = this.romsRoot();
+    for (const g of this.games.values()) {
+      const rel = path.relative(toRoot, g.path);
+      if (!rel.startsWith("..") && !path.isAbsolute(rel)) this.moveStats(gid(path.join(fromRoot, rel)), g.id);
+    }
+    this.saveState();
+  }
+
+  /**
+   * Everything on disk that belongs to a game: its file, the files a .cue/.gdi/.m3u lists (and theirs), and pictures
+   * saved beside it under the same name. folder is set when the game has a folder of its own holding nothing else.
+   */
+  gameFiles(g) {
+    const dir = path.dirname(g.path), stem = path.parse(g.path).name, own = new Set();
+    const add = f => {
+      const r = path.resolve(f);
+      if (own.has(r) || !fs.existsSync(r) || path.relative(dir, r).startsWith("..")) return;
+      own.add(r);
+      if (SHEETS.includes(path.extname(r).toLowerCase())) for (const x of sheetFiles(r)) add(x);
+    };
+    add(g.path);
+    for (const f of fs.readdirSync(dir)) if (f.startsWith(stem + ".") && IMG.includes(path.extname(f).toLowerCase())) own.add(path.resolve(dir, f));
+    const sysDir = path.join(this.romsRoot(), this.cfg.systems[g.system].folder || g.system);
+    if (path.resolve(dir) !== path.resolve(sysDir) && !path.relative(sysDir, dir).startsWith("..")) {
+      const rest = [], walk = (d, depth) => {
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+          if (e.name.startsWith(".") || /^(desktop\.ini|thumbs\.db)$/i.test(e.name)) continue;
+          const p = path.resolve(d, e.name);
+          if (e.isDirectory()) { if (depth < 4) walk(p, depth + 1); else rest.push(p); } else if (!own.has(p)) rest.push(p);
+        }
+      };
+      walk(dir, 0);
+      if (!rest.length) return { folder: dir, files: [...own] };
+    }
+    return { folder: null, files: [...own] };
   }
 
   firstRun() {
@@ -213,19 +260,19 @@ class Backend extends EventEmitter {
     const found = new Map(), root = this.romsRoot();
     for (const [name, s] of Object.entries(this.cfg.systems)) {
       const exts = (s.exts || []).map(e => e.toLowerCase()), folder = s.folder || name;
+      // discs listed in an .m3u show up once, as the .m3u, wherever they sit and however their names are written
+      const listed = new Set(), ids = [];
       const walk = (dir, depth) => {
         let ents;
         try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-        // discs listed in an .m3u show up once, as the .m3u
-        const listed = new Set();
         for (const e of ents) if (e.isFile() && e.name.toLowerCase().endsWith(".m3u"))
-          for (const f of sheetFiles(path.join(dir, e.name))) listed.add(path.resolve(f));
+          for (const f of sheetFiles(path.join(dir, e.name))) listed.add(pathKey(f));
         for (const e of ents) {
           if (e.name.startsWith(".")) continue;
           const p = path.join(dir, e.name);
           if (e.isDirectory()) { if (depth < 8) walk(p, depth + 1); continue; }
           const lower = e.name.toLowerCase();
-          if (!exts.some(x => lower.endsWith(x)) || listed.has(path.resolve(p))) continue;
+          if (!exts.some(x => lower.endsWith(x))) continue;
           const stem = path.parse(e.name).name, id = gid(p);
           // arcade files are short codes ("sf2"); the full name is the title and what art is looked up by
           let full = s.names && (this.names[s.names] || {})[stem.toLowerCase()], year = "", pub = "", dev = "", genre = "";
@@ -234,11 +281,13 @@ class Backend extends EventEmitter {
           if (!full) { const md = this.metaFor(folder, look); if (md) [year, pub, dev, genre] = md; }
           let added = 0, size = 0;
           try { const st = fs.statSync(p); added = Math.floor((st.birthtimeMs || st.mtimeMs) / 1000); size = st.size; } catch {}
+          ids.push(id);
           found.set(id, { id, title: cleanTitle(full ? full.split(" / ")[0] : stem), tag: regionTag(look), system: name, path: p, look, year, pub, dev, genre, added, size,
                           cover: this.findCover(p, root, folder), logo: this.findLogo(p, folder), snap: this.findExtra(p, folder, "snap") });
         }
       };
       walk(path.join(root, folder), 0);
+      for (const id of ids) if (listed.has(pathKey(found.get(id).path))) found.delete(id);
     }
     this.games = found;
   }
@@ -368,9 +417,16 @@ class Backend extends EventEmitter {
     const ext = path.extname(src).toLowerCase();
     if (!IMG.includes(ext)) return [400, { error: "Choose a PNG, JPEG or WebP picture." }];
     const stem = path.parse(g.path).name, dir = path.dirname(g.path), name = kind === "cover" ? stem : `${stem}.${kind}`;
-    for (const e of IMG) fs.rmSync(path.join(dir, name + e), { force: true });
-    const dest = path.join(dir, name + ext);
-    fs.copyFileSync(src, dest);
+    const dest = path.join(dir, name + ext), tmp = dest + ".part";
+    try {
+      // copied first: the picture chosen may be one of the ones it replaces
+      fs.copyFileSync(src, tmp);
+      for (const e of IMG) fs.rmSync(path.join(dir, name + e), { force: true });
+      fs.renameSync(tmp, dest);
+    } catch (e) {
+      fs.rmSync(tmp, { force: true });
+      return [500, { error: "Couldn't save the picture: " + e.message }];
+    }
     g[kind] = dest;
     return [200, { ok: true }];
   }
@@ -379,27 +435,31 @@ class Backend extends EventEmitter {
   moveTo(id, system) {
     const g = this.games.get(id), s = this.cfg.systems[system];
     if (!g || !s) return [404, { error: "Unknown game or system." }];
-    const root = this.romsRoot(), destDir = path.join(root, s.folder || system), srcDir = path.dirname(g.path);
-    fs.mkdirSync(destDir, { recursive: true });
-    const sysDir = path.join(root, this.cfg.systems[g.system].folder || g.system);
-    let newPath;
-    // multi-file games live in their own folder; that folder moves whole
-    if (path.resolve(srcDir) !== path.resolve(sysDir) && [".cue", ".gdi", ".m3u"].includes(path.extname(g.path).toLowerCase())) {
-      const to = path.join(destDir, path.basename(srcDir));
-      if (fs.existsSync(to)) return [409, { error: "There's already a game with that name there." }];
-      fs.renameSync(srcDir, to);
-      newPath = path.join(to, path.basename(g.path));
-    } else {
-      const stem = path.parse(g.path).name;
-      newPath = path.join(destDir, path.basename(g.path));
-      if (fs.existsSync(newPath)) return [409, { error: "There's already a game with that name there." }];
-      for (const f of fs.readdirSync(srcDir)) if (f === path.basename(g.path) || f.startsWith(stem + ".") && IMG.includes(path.extname(f).toLowerCase()))
-        fs.renameSync(path.join(srcDir, f), path.join(destDir, f));
+    const destDir = path.join(this.romsRoot(), s.folder || system), srcDir = path.dirname(g.path);
+    try {
+      fs.mkdirSync(destDir, { recursive: true });
+      const { folder, files } = this.gameFiles(g);
+      let newPath;
+      if (folder) {
+        // a game with a folder of its own takes the folder
+        const to = path.join(destDir, path.basename(folder));
+        if (fs.existsSync(to)) return [409, { error: "There's already a game with that name there." }];
+        fs.renameSync(folder, to);
+        newPath = path.join(to, path.relative(folder, g.path));
+      } else {
+        const moves = files.map(f => [f, path.join(destDir, path.relative(srcDir, f))]);
+        if (moves.some(([, to]) => fs.existsSync(to))) return [409, { error: "There's already a game with that name there." }];
+        for (const [from, to] of moves) { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.renameSync(from, to); }
+        newPath = path.join(destDir, path.basename(g.path));
+      }
+      this.moveStats(id, gid(newPath));
+      this.saveState();
+      this.scan();
+      return [200, { ok: true, id: gid(newPath) }];
+    } catch (e) {
+      this.scan();
+      return [500, { error: "Couldn't move it: " + e.message }];
     }
-    this.moveStats(id, gid(newPath));
-    this.saveState();
-    this.scan();
-    return [200, { ok: true, id: gid(newPath) }];
   }
 
   toggleFav(id) {
@@ -526,8 +586,12 @@ class Backend extends EventEmitter {
   }
 
   /** download missing box art and logos for these games, four at a time */
-  coverJob(ids, force) {
-    if (this.cov.running) return false;
+  coverJob(ids, force, queue) {
+    if (this.cov.running) {
+      // asked for while one is running (new games came in): runs after it
+      if (queue) this._covNext = { ids: [...new Set([...(this._covNext ? this._covNext.ids : []), ...ids])], force: !!force || !!(this._covNext && this._covNext.force) };
+      return false;
+    }
     Object.assign(this.cov, { running: true, done: 0, total: 0, found: 0, error: "" });
     (async () => {
       const misses = {};
@@ -574,6 +638,8 @@ class Backend extends EventEmitter {
         this.cov.error = `Cover fetch failed: ${e.message}`;
       } finally {
         this.cov.running = false;
+        const next = this._covNext; this._covNext = null;
+        if (next) this.coverJob(next.ids, next.force);
       }
     })();
     return true;
@@ -610,7 +676,7 @@ class Backend extends EventEmitter {
         const r = await this.importer.copy(items, this.romsRoot(), p => Object.assign(this.imp, p));
         Object.assign(this.imp, r, { error: r.errors[0] || "" });
         this.scan();
-        if (this.ui.autoCovers) this.coverJob([...this.games.keys()]);
+        if (this.ui.autoCovers) this.coverJob([...this.games.keys()], false, true);
       } catch (e) {
         this.imp.error = e.message;
       } finally {
@@ -681,12 +747,12 @@ class Backend extends EventEmitter {
     if (p && typeof p === "object") {
       const r = this.cfg.retroarch;
       if ("roms_dir" in p) {
-        const v = String(p.roms_dir).trim();
+        const v = unquote(p.roms_dir);
         this.paths.roms_dir = !v || path.resolve(v) === this.folders.games ? "" : v;
         this.saveSettings();
       }
-      if ("exe" in p) r.exe = String(p.exe).trim();
-      if ("cores_dir" in p) r.cores_dir = String(p.cores_dir).trim();
+      if ("exe" in p) r.exe = unquote(p.exe);
+      if ("cores_dir" in p) r.cores_dir = unquote(p.cores_dir);
       if ("args" in p) r.args = splitArgs(String(p.args));
       if ("exe" in p || "cores_dir" in p || "args" in p) this.saveUserCfg();
       this.scan();
@@ -826,11 +892,11 @@ class Backend extends EventEmitter {
       case "/api/fav": return j(this.toggleFav(String(d.id || "")));
       case "/api/rescan":
         this.scan();
-        if (this.ui.autoCovers) this.coverJob([...this.games.keys()]);
+        if (this.ui.autoCovers) this.coverJob([...this.games.keys()], false, true);
         return j([200, { count: this.games.size }]);
       case "/api/settings":
         this.applySettings(d);
-        if (d.paths && this.ui.autoCovers) this.coverJob([...this.games.keys()]);
+        if (d.paths && this.ui.autoCovers) this.coverJob([...this.games.keys()], false, true);
         return j([200, this.settingsJson()]);
       case "/api/detect": this.autodetect(); return j([200, this.settingsJson()]);
       case "/api/covers/fetch": {

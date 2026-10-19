@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>The Retro Shelf</title>
 <style>
 @font-face{font-family:"Plex Cond";src:url(/fonts/plex-cond-400.woff2) format("woff2");font-weight:400;font-display:swap}
@@ -69,8 +70,8 @@ button{cursor:pointer}
   transform-style:preserve-3d;transition:transform .5s cubic-bezier(.2,.75,.25,1);transform:translateZ(var(--dz, 0px))}
 .row.face .box{transform:rotateY(-90deg)}
 .card.sel .box{transform:translate3d(var(--px, 0px), var(--py, -14px), 0) translateZ(calc(var(--card) * var(--zs, 1.4))) rotateY(-90deg)}
-.card.sel.flip .box{transform:translate3d(var(--fx, 0px), var(--fy, -22px), 0) translateZ(calc(var(--card) * var(--zf, 2.1))) rotateY(-270deg)}
-.noanim .box,.noanim .card{transition:none!important}
+.card.sel.flip .box{transform:translate3d(var(--fx, 0px), var(--fy, -22px), 0) translateZ(calc(var(--card) * var(--zf, 2.1))) rotateY(90deg)}
+.noanim .box,.noanim .card,.noanim .card::after,.noanim .plate,.noanim .sp b,.noanim .sp{transition:none!important}
 
 /* a lived-in shelf: a box leaning on its neighbor, a small pile lying flat, a little unevenness.
    Picking a box straightens it up (a flat one stands up) before it slides out */
@@ -88,7 +89,7 @@ button{cursor:pointer}
 .card.under .sp{filter:brightness(.75)}
 .stack::after{content:"";position:absolute;left:-2px;right:-2px;top:calc(var(--A) + 1px);height:9px;background:radial-gradient(closest-side,rgba(0,0,0,.6),transparent);pointer-events:none}
 .card.flat{position:absolute;left:0;top:calc(var(--A) + 6px - var(--h));height:var(--h);transform-origin:0 100%;
-  transform:translate(calc(var(--h) + var(--sx, 0px)), calc(var(--lift, 0px) * -1)) rotate(calc(-90deg + var(--wob, 0deg)))}
+  transform:translate(calc(var(--h) + var(--shx, 0px)), calc(var(--lift, 0px) * -1)) rotate(calc(-90deg + var(--wob, 0deg)))}
 .card.flat .box{top:0}
 .card.flat::after{display:none}
 .card.flat.sel{transform:translateX(var(--ux, 0px))}
@@ -334,8 +335,8 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .fld{display:flex;align-items:center;gap:10px}
 .dot{width:9px;height:9px;flex:none}
 .dot.ok{background:#2f7d4f}.dot.bad{background:#c23b22}
-.seg{display:flex;border:1.5px solid var(--ink)}
-.seg button{border:0;background:none;padding:5px 14px;font-weight:600}
+.seg{display:flex;flex:none;border:1.5px solid var(--ink)}
+.seg button{border:0;background:none;padding:5px 14px;font-weight:600;white-space:nowrap}
 .seg button+button{border-left:1.5px solid var(--ink)}
 .seg button.on{background:var(--ink);color:var(--paper)}
 .sw{position:relative;width:22px;height:22px;display:inline-block;flex:none}
@@ -512,7 +513,7 @@ let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], MEDIA = {};
 let UI = {accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines"};
 let PATHS = {}, STATUS = {running: null, covers: {}}, APPINFO = {};
 let q = "", sel = null, focusId = null, firstPaint = true;
-let kbMode = false, padOn = false, offset = 0, io = null, refreshing = false, stopping = false;
+let kbMode = false, padOn = false, offset = 0, io = null, stopping = false;
 const LAUNCH = {open: false, id: null};
 const fxMode = () => HTML.dataset.fx;
 /* what the page can ask of the app (preload.js) */
@@ -590,7 +591,9 @@ function showHintsBriefly() {
   if (!UI.hints) hintT = setTimeout(() => h.classList.add("gone"), 7000);
 }
 let saveT;
-function saveUI() { clearTimeout(saveT); saveT = setTimeout(() => api("/api/settings", {ui: UI}), 400); }
+/* uiEdits counts changes not yet saved: until they are, a library refresh keeps this copy of the settings */
+let uiEdits = 0;
+function saveUI() { const n = ++uiEdits; clearTimeout(saveT); saveT = setTimeout(async () => { await api("/api/settings", {ui: UI}); if (n === uiEdits) uiEdits = 0; }, 400); }
 
 /* spine colors: the cover's main color and a contrasting accent, toned so spines look printed, never neon or muddy.
    Kept between visits so spines appear in their colors right away instead of switching once covers load */
@@ -598,6 +601,16 @@ const PAL = new Map();
 try { for (const [k, v] of JSON.parse(localStorage.getItem("arcade.pal3") || "[]")) PAL.set(k, v); } catch (e) {}
 let palT;
 function savePal() { clearTimeout(palT); palT = setTimeout(() => { try { localStorage.setItem("arcade.pal3", JSON.stringify([...PAL].filter(e => e[1]).slice(-3000))); } catch (e) {} }, 1500); }
+/* each cover's shape, so a box has the right size before its picture has loaded */
+const AFS = new Map();
+try { for (const [k, v] of JSON.parse(localStorage.getItem("arcade.af") || "[]")) AFS.set(k, v); } catch (e) {}
+let afT;
+function saveAf() { clearTimeout(afT); afT = setTimeout(() => { try { localStorage.setItem("arcade.af", JSON.stringify([...AFS].slice(-3000))); } catch (e) {} }, 1500); }
+/* pictures already shown once. When the shelf is redrawn, the old shelf's loaded pictures move to the new one
+   (POOL) instead of loading again, so nothing blinks */
+const SEEN = new Set();
+let POOL = null;
+function takePic(src) { const l = POOL && POOL.get(src); return l && l.length ? l.pop() : null; }
 function hsl(r, g, b) {
   r /= 255; g /= 255; b /= 255;
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
@@ -755,8 +768,8 @@ function spineTitle(c, g) {
   lines.forEach((l, j) => b.appendChild(el("span", j && small ? "st" : "", l)));
   c.style.setProperty("--fk", (fs / card).toFixed(4));
   if (g.lv) {
-    const im = new Image(), key = g.id + ":" + g.lv, known = LOGO.get(key);
-    im.className = "logo"; im.alt = ""; im.decoding = "async"; im.draggable = false;
+    const lsrc = "/logo/" + g.id + "?v=" + g.lv, re = takePic(lsrc), im = re || new Image(), key = g.id + ":" + g.lv, known = LOGO.get(key);
+    if (!re) { im.className = "logo"; im.alt = ""; im.decoding = SEEN.has(lsrc) ? "sync" : "async"; im.draggable = false; }
     /* as long as the space allows and most of the way across the spine (thin cases get small logos, like the real
        ones); only a logo too small to see at all keeps the printed title */
     const place = info => {
@@ -765,9 +778,9 @@ function spineTitle(c, g) {
       im.style.width = "calc(var(--card) * " + (len / card).toFixed(4) + ")";
       b.classList.add("lg"); c._logoL = info.l; logoContrast(c);
     };
+    const measure = () => { SEEN.add(lsrc); if (!known) { const info = logoInfo(im); LOGO.set(key, info); saveLogo(); place(info); } };
     if (known) place(known);
-    im.onload = () => { if (!known) { const info = logoInfo(im); LOGO.set(key, info); saveLogo(); place(info); } };
-    im.src = "/logo/" + g.id + "?v=" + g.lv;
+    if (re) measure(); else { im.onload = measure; im.src = lsrc; }
     b.appendChild(im);
   }
   return b;
@@ -776,7 +789,8 @@ function spineTitle(c, g) {
 /* ---------- data ---------- */
 function ingest(d) {
   G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; MEDIA = d.media || {};
-  UI = d.settings.ui; PATHS = d.settings.paths; APPINFO = d.settings.app || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
+  if (!uiEdits) UI = d.settings.ui;
+  PATHS = d.settings.paths; APPINFO = d.settings.app || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
   applyUI();
 }
 const vis = () => G.filter(g => UI.hidden.indexOf(g.system) < 0 && (!g.hidden || UI.showHidden));
@@ -801,7 +815,7 @@ function sections() {
 function paintVars(c, g) {
   const m = media(g), k = KIND[m] || KIND.cart, h = hash(g.title), lc = LABELS[h % LABELS.length], bd = BANDS[hash(g.system) % BANDS.length];
   const s = c.style;
-  s.setProperty("--hf", k[0]); s.setProperty("--tf", k[1]); s.setProperty("--af", k[2]);
+  s.setProperty("--hf", k[0]); s.setProperty("--tf", k[1]); s.setProperty("--af", (g.cv && AFS.get(g.id + ":" + g.cv)) || k[2]);
   /* how far a box comes out: picked, it turns to show its cover; turned over, it comes closer still. Small boxes come further */
   s.setProperty("--zs", (k[3] * .82).toFixed(2)); s.setProperty("--zf", (k[3] * 1.3).toFixed(2));
   s.setProperty("--lb", lc[0]); s.setProperty("--lf", lc[1]);
@@ -842,14 +856,20 @@ function fillCover(c, g) {
 }
 function loadCover(c, g) {
   if (c._img) return; c._img = true; c._cv = true;
-  const im = new Image(); im.alt = ""; im.decoding = "async";
-  im.onload = () => {
-    const a = im.naturalWidth / im.naturalHeight; if (a > .3 && a < 2.4) c.style.setProperty("--af", a.toFixed(3));
-    const cv = c.querySelector(".cv"); cv.classList.remove("gen"); clear(cv); cv.appendChild(im); stickers(c, g);
+  const src = "/cover/" + g.id + "?v=" + g.cv, re = takePic(src), im = re || new Image();
+  if (!re) { im.alt = ""; im.decoding = SEEN.has(src) ? "sync" : "async"; }
+  const show = () => {
+    im.onload = null; SEEN.add(src);
+    const a = im.naturalWidth / im.naturalHeight, key = g.id + ":" + g.cv;
+    if (a > .3 && a < 2.4) { c.style.setProperty("--af", a.toFixed(3)); if (AFS.get(key) !== a.toFixed(3)) { AFS.set(key, a.toFixed(3)); saveAf(); } }
+    const cv = c.querySelector(".cv"); if (!cv) return;
+    cv.classList.remove("gen"); clear(cv); cv.appendChild(im); stickers(c, g);
     paintSpine(c, g, im);
   };
-  im.onerror = () => { c._bad = true; c._cv = false; fillCover(c, g); };
-  im.src = "/cover/" + g.id + "?v=" + g.cv;
+  if (re) { show(); return; }
+  im.onload = show;
+  im.onerror = () => { c._bad = true; c._cv = false; c._img = false; fillCover(c, g); };
+  im.src = src;
 }
 function stickers(c, g) {
   c.querySelectorAll(".stk").forEach(s => s.remove());
@@ -921,13 +941,13 @@ function fitBack(bk, inn) {
 }
 function hookSlot(c) {
   c.addEventListener("focus", () => select(c));
-  c.onmouseenter = () => { if (!kbMode && sel !== c) c.focus({preventScroll: true}); };
+  c.onmouseenter = () => { if (!kbMode && !scrolling && sel !== c) c.focus({preventScroll: true}); };
 }
 function slot(g, face, i) {
   const c = el("div", "card"); c.tabIndex = 0; c.dataset.id = g.id; paintVars(c, g);
   if (i < 80) c.style.setProperty("--i", i);
   c.appendChild(box(c, g)); stickers(c, g);
-  if (face) fillCover(c, g); else if (g.cv && io) io.observe(c);
+  if (face || (g.cv && SEEN.has("/cover/" + g.id + "?v=" + g.cv))) fillCover(c, g); else if (g.cv && io) io.observe(c);
   hookSlot(c);
   c.onclick = e => { if (e.target.closest("button")) return; if (sel !== c) c.focus({preventScroll: true}); else flip(); };
   c.ondblclick = e => { if (!e.target.closest("button")) play(g); };
@@ -946,14 +966,17 @@ function manual() {
 /* ---------- shelves ---------- */
 function renderShelves(keep) {
   const root = $("#shelves"), st = root.scrollTop, wasFlip = sel && sel.classList.contains("flip");
-  const keepSec = sel ? sel.dataset.group : null;
+  const keepSec = sel ? sel.dataset.group : null, keepAt = keep ? slots().findIndex(x => x.dataset.id === keep) : -1;
   if (io) io.disconnect();
+  POOL = new Map();
+  $$("img", root).forEach(im => { const k = im.getAttribute("src"); if (k && im.complete && im.naturalWidth) (POOL.get(k) || POOL.set(k, []).get(k)).push(im); });
   clear(root); sel = null;
   if (firstPaint) { root.classList.add("settle"); setTimeout(() => root.classList.remove("settle"), 1800); }
+  else root.classList.remove("settle");
   firstPaint = false;
   const secs = sections(); let n = 0, row = null, face = null;
   CARDPX = cardPx();
-  if (!secs.length) { root.appendChild(emptyShelf()); light(); return; }
+  if (!secs.length) { POOL = null; root.appendChild(emptyShelf()); light(); return; }
   secs.forEach(S => {
     if (!row || face !== S.face) { const sc = el("section", "sec"); row = el("div", "row" + (S.face ? " face" : "")); sc.appendChild(row); root.appendChild(sc); face = S.face; }
     else row.appendChild(el("div", "bookend"));
@@ -971,7 +994,7 @@ function renderShelves(keep) {
         if (!stack) { stack = el("div", "stack"); stack.dataset.group = S.key; tail.appendChild(stack); }
         const d = boxPx(c, g);
         c.classList.add("flat"); c.dataset.tw = d.t;
-        c.style.setProperty("--lift", lift.toFixed(1) + "px"); c.style.setProperty("--sx", (hg >>> 6) % 9 + "px");
+        c.style.setProperty("--lift", lift.toFixed(1) + "px"); c.style.setProperty("--shx", (hg >>> 6) % 9 + "px");
         c.style.setProperty("--wob", (((hg >>> 2) % 5) - 2) * .7 + "deg");
         lift += d.t; stackW = Math.max(stackW, d.h + 12);
         stack.appendChild(c); return;
@@ -995,10 +1018,20 @@ function renderShelves(keep) {
   root.scrollTop = keep ? st : 0;
   let c = null;
   if (keep) c = (keepSec && document.querySelector('#shelves .card[data-group="' + CSS.escape(keepSec) + '"][data-id="' + keep + '"]')) || document.querySelector('#shelves .card[data-id="' + keep + '"]');
+  /* the kept game is gone (hidden, moved, trashed): its neighbor takes its place, not the first box on the wall */
+  if (!c && keepAt >= 0) { const all = slots(); c = all[Math.min(keepAt, all.length - 1)]; }
   c = c || document.querySelector("#shelves .card");
-  if (!c) return;
-  if (LAUNCH.open || isOpen("settings") || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
-  if (wasFlip && c.dataset.id === keep) { root.classList.add("noanim"); flip(true); void c.offsetWidth; requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("noanim"))); }
+  if (!c) { POOL = null; return; }
+  /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
+  const same = keep && c.dataset.id === keep;
+  if (same) root.classList.add("noanim");
+  if (LAUNCH.open || ["settings", "ren", "imp", "getg", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (same) {
+    if (wasFlip && !c.classList.contains("flip")) flip(true);
+    void c.offsetWidth; markUnder();
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("noanim")));
+  }
+  POOL = null;
 }
 /* a group narrower than its name plate gets a little extra shelf so plates never overlap. Only the part of the
    group on the plate's own line counts: a group that wraps onto the next shelf is already wide enough */
@@ -1043,11 +1076,15 @@ function select(c) {
   if (/\b(flat|lean)\b/.test(c.className)) setTimeout(light, 470);
   $$("#shelves .card.under").forEach(x => x.classList.remove("under"));
   setTimeout(markUnder, 520);
+  /* turned over stays on while moving from game to game, until it's turned back */
+  if (backMode && !c._manual && !c.classList.contains("flip")) flip(true);
 }
+let backMode = false;
 function flip(force) {
   if (!sel || sel._manual) return;
   const g = byId.get(sel.dataset.id); if (!g) return;
   const on = force === true ? true : !sel.classList.contains("flip");
+  if (force !== true) backMode = on;
   if (on) { fillBack(sel, g); placeFlip(sel); }
   sel.classList.toggle("flip", on); light(); if (force !== true) beep(on ? 600 : 420, .05);
   setTimeout(markUnder, 520);
@@ -1101,7 +1138,7 @@ async function findCover(id) {
   const r = await api("/api/covers/fetch", {id, force: true});
   if (r.data.reason) return toast(r.data.reason, true);
   if (r.data.started === false) return toast("Cover search is already running.");
-  singleSearch = true; toast("Looking for cover art…");
+  singleSearch = true; lastRun = true; toast("Looking for cover art…");
 }
 async function rescan() {
   busy(true); await api("/api/rescan", {}); await refresh(true); busy(false); toast("Found " + G.length + " games");
@@ -1111,9 +1148,14 @@ async function rescan() {
 /* ---------- adding games (desktop app): drop files or pick them, the app sorts them by system ---------- */
 const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
 async function addGames() { const ps = await APP.pickGames(); if (ps && ps.length) importPaths(ps); }
+let importing = false;
 async function importPaths(paths) {
   if (!paths.length) return;
-  if (STATUS.import && STATUS.import.running) return toast("Still adding the last batch. One moment.");
+  if (importing || (STATUS.import && STATUS.import.running)) return toast("Still adding the last batch. One moment.");
+  importing = true;
+  try { await importBatch(paths); } finally { importing = false; }
+}
+async function importBatch(paths) {
   busy(true); const r = await api("/api/import/check", {paths}); busy(false);
   if (!r.ok) return toast(r.data.error || "Couldn't read those files.", true);
   const items = r.data.items, fresh = items.filter(i => !i.exists);
@@ -1224,11 +1266,11 @@ function onExit(prev) {
 }
 
 /* ---------- polling + refresh ---------- */
-let lastFound = 0, lastRun = false, singleSearch = false;
+let lastFound = 0, lastRun = false, singleSearch = false, lastRunning = null;
 async function poll() {
   const r = await api("/api/status"); if (!r.ok) return;
   const s = r.data; offset = s.now * 1000 - Date.now();
-  const prev = STATUS.running; STATUS.running = s.running; STATUS.covers = s.covers; STATUS.exit = s.exit; STATUS.import = s.import;
+  const prev = lastRunning; lastRunning = s.running; STATUS.running = s.running; STATUS.covers = s.covers; STATUS.exit = s.exit; STATUS.import = s.import;
   importProgress(s.import);
   if (prev && !s.running) onExit(prev);
   if (!prev && s.running && !LAUNCH.open) showLaunch(byId.get(s.running.id));
@@ -1238,15 +1280,30 @@ async function poll() {
   lastFound = c.found; lastRun = c.running;
   updateCoverUI(); updatePill();
 }
-async function refresh(force) {
-  if (refreshing) return; refreshing = true;
-  try {
-    const r = await api("/api/library"); if (!r.ok) return;
-    const sig = () => G.map(g => g.id + ":" + g.cv + ":" + g.last + ":" + g.plays).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf;
-    const before = sig();
-    ingest(r.data);
-    if (force || sig() !== before) renderShelves(focusId);
-  } finally { refreshing = false; }
+/* a game got new cover art or a logo: rebuild just its boxes, in place */
+function redrawArt(g) {
+  $$('#shelves .card[data-id="' + g.id + '"]').forEach(c => {
+    const old = c.querySelector(".box"); if (!old) return;
+    c._img = c._cv = c._bad = false; paintVars(c, g);
+    old.replaceWith(box(c, g)); stickers(c, g);
+    if (c.closest(".row.face") || c === sel) fillCover(c, g); else if (g.cv) loadCover(c, g);
+    if (c === sel && c.classList.contains("flip")) fillBack(c, g);
+  });
+}
+let refreshP = null, refreshNext = null;
+function refresh(force) {
+  if (!refreshP) { refreshP = loadLibrary(force).finally(() => { refreshP = null; }); return refreshP; }
+  if (!refreshNext) { const q = refreshNext = {force: !!force}, run = () => { refreshNext = null; return refresh(q.force); }; q.p = refreshP.then(run, run); }
+  else refreshNext.force = refreshNext.force || !!force;
+  return refreshNext.p;
+}
+async function loadLibrary(force) {
+  const r = await api("/api/library"); if (!r.ok) return;
+  const sig = () => G.map(g => [g.id, g.cv ? 1 : 0, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden;
+  const before = sig(), art = new Map(G.map(g => [g.id, g.cv + "/" + g.lv]));
+  ingest(r.data);
+  if (force || sig() !== before) renderShelves(focusId);
+  else G.forEach(g => { if (art.get(g.id) !== g.cv + "/" + g.lv) redrawArt(g); });
 }
 
 /* ---------- rename ---------- */
@@ -1434,12 +1491,24 @@ $("#lhide").onclick = hideLaunch;
 $("#lstop").onclick = async () => { stopping = true; await api("/api/stop", {}); };
 $("#nowpill").onclick = () => { if (STATUS.running) showLaunch(byId.get(STATUS.running.id)); };
 $("#qtape").onclick = () => { $("#q").focus(); paintQ(); };
-$("#shelves").addEventListener("scroll", () => requestAnimationFrame(light), {passive: true});
+/* while the shelf scrolls under a still pointer, the boxes passing under it stay put; once it stops, the one
+   under the pointer comes out */
+let scrolling = false, scrollT = 0, mouseAt = null;
+function scrollingNow() { scrolling = true; clearTimeout(scrollT); scrollT = setTimeout(scrollDone, 260); }
+function scrollDone() {
+  clearTimeout(scrollT); scrolling = false;
+  if (kbMode || !mouseAt) return;
+  const hit = document.elementFromPoint(mouseAt[0], mouseAt[1]), c = hit && hit.closest("#shelves .card");
+  if (c && c !== sel) c.focus({preventScroll: true});
+}
+$("#shelves").addEventListener("wheel", scrollingNow, {passive: true, capture: true});
+$("#shelves").addEventListener("scroll", () => { requestAnimationFrame(light); scrollingNow(); }, {passive: true});
 window.addEventListener("resize", () => { if (CARDPX && cardPx() !== CARDPX) renderShelves(focusId); else { fitPlates(); light(); } });
-document.addEventListener("mousemove", () => setKb(false));
+document.addEventListener("mousemove", e => { mouseAt = [e.clientX, e.clientY]; setKb(false); });
 document.addEventListener("keydown", e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key;
+  if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
   if (isOpen("welcome")) { if (k === "Escape" || k === "Enter") closeWelcome(); return; }
@@ -1476,13 +1545,14 @@ function renderHints() {
 }
 window.addEventListener("gamepadconnected", () => { padOn = true; renderHints(); showHintsBriefly(); });
 setInterval(() => {
-  const gp = navigator.getGamepads && navigator.getGamepads()[0]; if (!gp) return;
+  const gp = navigator.getGamepads && Array.prototype.find.call(navigator.getGamepads(), p => p && p.connected); if (!gp) return;
   const bt = i => gp.buttons[i] && gp.buttons[i].pressed;
   const n = {l: bt(14) || gp.axes[0] < -.6, r: bt(15) || gp.axes[0] > .6, u: bt(12) || gp.axes[1] < -.6, d: bt(13) || gp.axes[1] > .6, a: bt(0), b: bt(1), x: bt(2), y: bt(3), lb: bt(4), rb: bt(5), st: bt(9)};
   if (!document.hasFocus()) { pad = n; return; }
   const any = Object.keys(n).some(k => n[k]); if (any) { setKb(true); if (!padOn) { padOn = true; renderHints(); showHintsBriefly(); } }
   const press = k => n[k] && !pad[k];
   if (isOpen("imp")) { if (press("b")) $("#icancel").click(); }
+  else if (isOpen("ren")) { if (press("b")) closeRename(); }
   else if (isOpen("welcome")) { if (press("a") || press("b")) closeWelcome(); }
   else if (isOpen("getg")) { if (press("b")) closeGetGames(); }
   else if (isOpen("settings")) { if (press("b")) closeSettings(); }
@@ -1524,7 +1594,7 @@ $("#lhint").textContent = "Hold Start or press Esc to come back here.";
 function hideSplash() { const s = $("#splash"); s.classList.add("out"); setTimeout(() => s.remove(), 450); }
 (async function boot() {
   const t0 = Date.now();
-  io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const g = byId.get(e.target.dataset.id); if (g) loadCover(e.target, g); io.unobserve(e.target); } }), {root: $("#shelves"), rootMargin: "400px"});
+  io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const g = byId.get(e.target.dataset.id); if (g) loadCover(e.target, g); io.unobserve(e.target); } }), {root: $("#shelves"), rootMargin: "1200px 0px"});
   renderHints(); applyUI();
   const fonts = document.fonts ? Promise.all(["600 12px", "400 12px"].map(f => document.fonts.load(f + ' "Plex Cond"'))).catch(() => {}) : null;
   let r = await api("/api/library");
