@@ -1,0 +1,85 @@
+name: Build installers
+
+# Builds The-Retro-Shelf-<version>-mac.dmg (universal) and The-Retro-Shelf-Setup-<version>.exe.
+# Run it by hand from the Actions tab, or push a tag like v0.1.0 to also get a draft release.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: mac
+          - os: windows-latest
+            target: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - name: Cache emulator downloads
+        uses: actions/cache@v4
+        with:
+          path: vendor/.cache
+          key: emulators-${{ matrix.target }}-${{ hashFiles('config.json', 'scripts/fetch-emulators.mjs') }}
+
+      - name: Fetch RetroArch and cores
+        run: node scripts/fetch-emulators.mjs ${{ matrix.target }}
+
+      - name: Build
+        run: npx electron-builder --${{ matrix.target }} --publish never
+        env:
+          # macOS builds are ad-hoc signed (identity "-" in package.json) until a Developer ID is set up
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: the-retro-shelf-${{ matrix.target }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      # a draft, so nothing is public until you press Publish on the release page; 0.x versions are marked pre-release
+      - name: Create draft release
+        run: |
+          cat > notes.md <<'NOTES'
+          **Mac** (Apple silicon and Intel): download the `.dmg`, open it and drag The Retro Shelf to Applications.
+          The app isn't notarized yet, so the first time macOS will refuse to open it: go to
+          System Settings → Privacy & Security, scroll down and click **Open Anyway**.
+
+          **Windows** (10 and 11): download and run the `Setup .exe`. If SmartScreen appears, click
+          **More info → Run anyway**.
+
+          No games are included. See the README for where to get games legally.
+          NOTES
+          flags=(--draft)
+          [[ "$GITHUB_REF_NAME" == v0.* ]] && flags+=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" "${flags[@]}" \
+            --title "The Retro Shelf $GITHUB_REF_NAME" --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}

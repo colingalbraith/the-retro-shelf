@@ -1,0 +1,5 @@
+node_modules/
+dist/
+# downloaded emulators: recreate with `npm run fetch:mac` / `npm run fetch:win`
+vendor/
+.DS_Store

@@ -1,0 +1,111 @@
+{
+  "name": "the-retro-shelf",
+  "productName": "The Retro Shelf",
+  "version": "0.1.0",
+  "description": "Your retro game collection as boxes on a shelf. Emulators built in, games not included.",
+  "author": "Colin Galbraith",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/colingalbraith/the-retro-shelf",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/colingalbraith/the-retro-shelf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/colingalbraith/the-retro-shelf/issues"
+  },
+  "keywords": [
+    "retro",
+    "emulator",
+    "frontend",
+    "launcher",
+    "retroarch",
+    "libretro",
+    "game-library",
+    "electron"
+  ],
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.mjs",
+    "fetch:mac": "node scripts/fetch-emulators.mjs mac",
+    "fetch:win": "node scripts/fetch-emulators.mjs win",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "7zip-bin": "5.2.0",
+    "electron": "44.5.1",
+    "electron-builder": "26.16.1"
+  },
+  "build": {
+    "appId": "com.colingalbraith.theretroshelf",
+    "productName": "The Retro Shelf",
+    "copyright": "The Retro Shelf contributors",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "index.html",
+      "licenses.html",
+      "fonts/**",
+      "config.json",
+      "data/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/${os}",
+        "to": "emulators"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.games",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "x64ArchFiles": "Contents/Resources/emulators/**",
+      "extendInfo": {
+        "NSHumanReadableCopyright": "Emulators: RetroArch and libretro cores (see Licenses)"
+      }
+    },
+    "dmg": {
+      "title": "The Retro Shelf",
+      "artifactName": "The-Retro-Shelf-${version}-mac.dmg"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "The Retro Shelf",
+      "artifactName": "The-Retro-Shelf-Setup-${version}.exe"
+    }
+  }
+}

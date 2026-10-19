@@ -1,0 +1,208 @@
+{
+  "systems": {
+    "NES": {
+      "folder": "nes",
+      "exts": [
+        ".nes",
+        ".zip",
+        ".7z"
+      ],
+      "core": "fceumm_libretro",
+      "thumbs": "Nintendo - Nintendo Entertainment System",
+      "media": "cart"
+    },
+    "SNES": {
+      "folder": "snes",
+      "exts": [
+        ".sfc",
+        ".smc",
+        ".zip",
+        ".7z"
+      ],
+      "core": "snes9x_libretro",
+      "thumbs": "Nintendo - Super Nintendo Entertainment System",
+      "media": "wide"
+    },
+    "Game Boy": {
+      "folder": "gb",
+      "exts": [
+        ".gb",
+        ".gbc",
+        ".zip",
+        ".7z"
+      ],
+      "core": "gambatte_libretro",
+      "thumbs": [
+        "Nintendo - Game Boy",
+        "Nintendo - Game Boy Color"
+      ],
+      "media": "mini"
+    },
+    "GBA": {
+      "folder": "gba",
+      "exts": [
+        ".gba",
+        ".zip",
+        ".7z"
+      ],
+      "core": "mgba_libretro",
+      "thumbs": "Nintendo - Game Boy Advance",
+      "media": "mini"
+    },
+    "Genesis": {
+      "folder": "genesis",
+      "exts": [
+        ".md",
+        ".gen",
+        ".smd",
+        ".bin",
+        ".zip"
+      ],
+      "core": "genesis_plus_gx_libretro",
+      "thumbs": "Sega - Mega Drive - Genesis",
+      "media": "cart"
+    },
+    "Master System": {
+      "folder": "sms",
+      "exts": [
+        ".sms",
+        ".gg",
+        ".zip"
+      ],
+      "core": "genesis_plus_gx_libretro",
+      "thumbs": [
+        "Sega - Master System - Mark III",
+        "Sega - Game Gear"
+      ],
+      "media": "cart"
+    },
+    "PC Engine": {
+      "folder": "pce",
+      "exts": [
+        ".pce",
+        ".cue",
+        ".chd",
+        ".zip"
+      ],
+      "core": "mednafen_pce_fast_libretro",
+      "thumbs": "NEC - PC Engine - TurboGrafx 16",
+      "media": "card"
+    },
+    "Atari 2600": {
+      "folder": "atari2600",
+      "exts": [
+        ".a26",
+        ".bin",
+        ".zip"
+      ],
+      "core": "stella_libretro",
+      "thumbs": "Atari - 2600",
+      "media": "cart"
+    },
+    "N64": {
+      "folder": "n64",
+      "exts": [
+        ".z64",
+        ".n64",
+        ".v64",
+        ".zip"
+      ],
+      "core": "mupen64plus_next_libretro",
+      "thumbs": "Nintendo - Nintendo 64",
+      "media": "wide"
+    },
+    "PS1": {
+      "folder": "ps1",
+      "exts": [
+        ".cue",
+        ".chd",
+        ".pbp",
+        ".m3u"
+      ],
+      "core": "pcsx_rearmed_libretro",
+      "thumbs": "Sony - PlayStation",
+      "media": "cd"
+    },
+    "Dreamcast": {
+      "folder": "dreamcast",
+      "exts": [
+        ".gdi",
+        ".cdi",
+        ".chd"
+      ],
+      "core": "flycast_libretro",
+      "thumbs": "Sega - Dreamcast",
+      "media": "cd"
+    },
+    "DS": {
+      "folder": "nds",
+      "exts": [
+        ".nds",
+        ".dsi",
+        ".zip",
+        ".7z"
+      ],
+      "core": "melondsds_libretro",
+      "thumbs": "Nintendo - Nintendo DS",
+      "media": "mini"
+    },
+    "PSP": {
+      "folder": "psp",
+      "exts": [
+        ".iso",
+        ".cso",
+        ".pbp"
+      ],
+      "core": "ppsspp_libretro",
+      "thumbs": "Sony - PlayStation Portable",
+      "media": "umd"
+    },
+    "Arcade": {
+      "folder": "arcade",
+      "exts": [
+        ".zip"
+      ],
+      "core": "fbneo_libretro",
+      "names": "arcade",
+      "thumbs": [
+        "FBNeo - Arcade Games",
+        "MAME"
+      ],
+      "media": "board"
+    },
+    "GameCube/Wii": {
+      "folder": "gc",
+      "exts": [
+        ".iso",
+        ".rvz",
+        ".gcm",
+        ".gcz",
+        ".ciso",
+        ".wbfs"
+      ],
+      "core": "dolphin_libretro",
+      "thumbs": [
+        "Nintendo - GameCube",
+        "Nintendo - Wii"
+      ],
+      "media": "dvd"
+    },
+    "PS2": {
+      "folder": "ps2",
+      "exts": [
+        ".iso",
+        ".chd",
+        ".cso"
+      ],
+      "emulator": [
+        "pcsx2-qt",
+        "-batch",
+        "-fullscreen",
+        "--",
+        "{rom}"
+      ],
+      "thumbs": "Sony - PlayStation 2",
+      "media": "dvd"
+    }
+  }
+}

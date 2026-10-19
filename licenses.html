@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Retro Shelf · Licenses</title>
+<style>
+@font-face{font-family:"Plex Cond";src:url(/fonts/plex-cond-400.woff2) format("woff2");font-weight:400}
+@font-face{font-family:"Plex Cond";src:url(/fonts/plex-cond-700.woff2) format("woff2");font-weight:700}
+@font-face{font-family:"Plex Mono";src:url(/fonts/plex-mono-400.woff2) format("woff2");font-weight:400}
+:root{--paper:#ece6d6;--ink:#1c1916;--ink2:#5f584d;--disp:"Plex Cond","Arial Narrow",sans-serif;--mono:"Plex Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--disp);padding:28px 34px 40px}
+h1{margin:0 0 4px;font:700 32px/1 var(--disp);padding-bottom:12px;border-bottom:3px solid var(--ink)}
+h2{margin:28px 0 6px;font:700 19px/1.2 var(--disp);border-bottom:1px solid var(--ink);padding-bottom:6px}
+p{margin:8px 0;color:var(--ink2)}
+a{color:var(--ink)}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+td,th{text-align:left;padding:6px 8px 6px 0;border-bottom:1px solid rgba(28,25,22,.14);vertical-align:top}
+th{font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+td.m{font:12.5px var(--mono)}
+.nc{font-weight:700}
+</style>
+</head>
+<body>
+<h1>Licenses</h1>
+<p>The Retro Shelf is free software and comes with no games. It bundles these free and open-source programs, unchanged, each under its own license. Their source code is available at the links below.</p>
+
+<h2>RetroArch <span id="rav"></span></h2>
+<p>The emulator frontend that runs every game. GNU General Public License v3. Source: <a href="https://github.com/libretro/RetroArch">github.com/libretro/RetroArch</a>. Built by the libretro team.</p>
+
+<h2>Emulator cores</h2>
+<p>Downloaded from the libretro buildbot. Cores marked <span class="nc">Non-commercial</span> may be shared freely but not sold, so The Retro Shelf must stay free.</p>
+<table><thead><tr><th>System</th><th>Core</th><th>License</th><th>Version</th></tr></thead><tbody id="cores"></tbody></table>
+
+<h2>Dolphin system files</h2>
+<p>The GameCube/Wii core uses Dolphin's Sys folder. GNU General Public License v2 or later. Source: <a href="https://github.com/libretro/dolphin">github.com/libretro/dolphin</a>.</p>
+
+<h2>Electron and Chromium</h2>
+<p>The app window. Electron is MIT licensed; Chromium's licenses are listed in LICENSES.chromium.html inside the app.</p>
+
+<h2>IBM Plex</h2>
+<p>IBM Plex Sans Condensed and IBM Plex Mono, SIL Open Font License 1.1.</p>
+
+<h2>Cover art</h2>
+<p>Box art is downloaded from the libretro thumbnails project, <a href="https://github.com/libretro-thumbnails/libretro-thumbnails">github.com/libretro-thumbnails</a>.</p>
+
+<script>
+const REPO = {
+  fceumm_libretro: "libretro/libretro-fceumm", snes9x_libretro: "libretro/snes9x", gambatte_libretro: "libretro/gambatte-libretro",
+  mgba_libretro: "libretro/mgba", genesis_plus_gx_libretro: "libretro/Genesis-Plus-GX", mednafen_pce_fast_libretro: "libretro/beetle-pce-fast-libretro",
+  stella_libretro: "stella-emu/stella", mupen64plus_next_libretro: "libretro/mupen64plus-libretro-nx", pcsx_rearmed_libretro: "libretro/pcsx_rearmed",
+  flycast_libretro: "flyinghead/flycast", melondsds_libretro: "JesseTG/melonds-ds", ppsspp_libretro: "hrydgard/ppsspp",
+  fbneo_libretro: "libretro/FBNeo", dolphin_libretro: "libretro/dolphin"
+};
+fetch("/api/licenses").then(r => r.json()).then(d => {
+  if (d.retroarch) document.getElementById("rav").textContent = d.retroarch;
+  const tb = document.getElementById("cores"), seen = new Set();
+  for (const c of d.cores) {
+    const tr = document.createElement("tr"), add = (t, cls) => { const td = document.createElement("td"); if (cls) td.className = cls; td.append(t); tr.append(td); return td; };
+    add(c.system);
+    const repo = REPO[c.core];
+    if (repo) { const a = document.createElement("a"); a.href = "https://github.com/" + repo; a.textContent = c.name; add(a); } else add(c.name);
+    add(c.license || "see source", /non-commercial/i.test(c.license) ? "nc" : "");
+    add(c.version, "m");
+    tb.append(tr); seen.add(c.core);
+  }
+});
+document.addEventListener("click", e => { const a = e.target.closest("a[href^='https://']"); if (a) { e.preventDefault(); window.open(a.href); } });
+</script>
+</body>
+</html>
