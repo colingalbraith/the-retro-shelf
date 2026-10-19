@@ -5,7 +5,7 @@
 //   node scripts/fetch-emulators.mjs mac   -> vendor/mac/{RetroArch.app,cores,info,dolphin-Sys}
 //   node scripts/fetch-emulators.mjs win   -> vendor/win/{RetroArch,cores,info,dolphin-Sys}
 //
-// Cores come from config.json (every system with a "core"). Downloads are cached in vendor/.cache.
+// Cores come from src/config.json (every system with a "core"). Downloads are cached in vendor/.cache.
 // No games are downloaded, ever.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -31,7 +31,7 @@ const SEVEN = require("7zip-bin").path7za;
 // npm doesn't always keep the executable bit on 7zip-bin's binary
 try { fs.chmodSync(SEVEN, 0o755); } catch {}
 
-const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "config.json"), "utf8"));
+const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "config.json"), "utf8"));
 const CORES = [...new Set(Object.values(cfg.systems).map(s => s.core).filter(Boolean))].sort();
 
 // RetroArch extras we never use: the game database, cheats, shaders, touch overlays, and so on.

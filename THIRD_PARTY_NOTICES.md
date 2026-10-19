@@ -50,7 +50,7 @@ MIT License. Electron bundles Chromium, Node.js and other components; their noti
 
 ## IBM Plex
 
-IBM Plex Sans Condensed and IBM Plex Mono, SIL Open Font License 1.1 (`fonts/OFL.txt`).
+IBM Plex Sans Condensed and IBM Plex Mono, SIL Open Font License 1.1 (`src/fonts/OFL.txt`).
 
 ## GPL source availability
 

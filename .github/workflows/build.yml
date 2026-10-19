@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/.cache
-          key: emulators-${{ matrix.target }}-${{ hashFiles('config.json', 'scripts/fetch-emulators.mjs') }}
+          key: emulators-${{ matrix.target }}-${{ hashFiles('src/config.json', 'scripts/fetch-emulators.mjs') }}
 
       - name: Fetch RetroArch and cores
         run: node scripts/fetch-emulators.mjs ${{ matrix.target }}

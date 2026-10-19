@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Builds data/meta/<system folder>.json: game name -> [year, publisher, developer, genre], from the metadata
+// Builds src/data/meta/<system folder>.json: game name -> [year, publisher, developer, genre], from the metadata
 // lists in libretro-database (matched by the same No-Intro / Redump names that game files and cover art use).
 // Shipped with the app, so the back of a box needs no lookups.
 //   node scripts/fetch-metadata.mjs
@@ -11,8 +11,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BASE = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat";
 const FIELDS = ["releaseyear", "publisher", "developer", "genre"];
 
-const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "config.json"), "utf8"));
-const outDir = path.join(ROOT, "data", "meta");
+const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "config.json"), "utf8"));
+const outDir = path.join(ROOT, "src", "data", "meta");
 fs.mkdirSync(outDir, { recursive: true });
 
 async function dat(field, system) {

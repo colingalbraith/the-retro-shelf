@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
-const { cleanTitle, regionTag, norm } = createRequire(import.meta.url)("../electron/backend.js");
+const { cleanTitle, regionTag, norm } = createRequire(import.meta.url)("../src/backend.js");
 
 test("file names become readable titles", () => {
   assert.equal(cleanTitle("Super Mario World (USA)"), "Super Mario World");

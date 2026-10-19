@@ -7,8 +7,8 @@ import zlib from "node:zlib";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { Importer } = require("../electron/importer.js");
-const config = require("../config.json");
+const { Importer } = require("../src/importer.js");
+const config = require("../src/config.json");
 
 let dir;
 const file = (name, size, patches = []) => {

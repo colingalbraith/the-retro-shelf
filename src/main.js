@@ -182,7 +182,7 @@ app.on("web-contents-created", (_, wc) => {
 });
 
 app.whenReady().then(() => {
-  backend = new Backend({ app: path.join(__dirname, ".."), data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion() }, fetchUrl);
+  backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion() }, fetchUrl);
   backend.init();
   backend.on("exit", () => setTimeout(focusApp, 150));
   protocol.handle("arcade", req => {

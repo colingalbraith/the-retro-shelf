@@ -23,7 +23,7 @@
     "game-library",
     "electron"
   ],
-  "main": "electron/main.js",
+  "main": "src/main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
@@ -47,12 +47,7 @@
       "buildResources": "build"
     },
     "files": [
-      "electron/**",
-      "index.html",
-      "licenses.html",
-      "fonts/**",
-      "config.json",
-      "data/**",
+      "src/**",
       "package.json"
     ],
     "extraResources": [

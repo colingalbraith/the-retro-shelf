@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 
-const ra = createRequire(import.meta.url)("../electron/retroarch.js");
+const ra = createRequire(import.meta.url)("../src/retroarch.js");
 
 test("the RetroArch config keeps what people set and enforces what the app needs", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-cfg-"));
