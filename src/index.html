@@ -189,7 +189,7 @@ button{cursor:pointer}
 .gen .ft{margin-top:auto;padding:0 8% 7%;font:600 calc(var(--cw) * .05)/1 var(--disp);letter-spacing:.06em;opacity:.7}
 
 /* back cover: your record with the game */
-.bk{display:flex;flex-direction:column;background:var(--paper);color:var(--ink);font-size:calc(min(var(--cw), var(--h) * .8) * .066)}
+.bk{display:flex;flex-direction:column;background:var(--paper);color:var(--ink);font-size:calc(min(var(--cw), var(--h) * .8) * .066 * var(--fit, 1))}
 .bk .bt{flex:none;height:6%;background:var(--sb)}
 .bk .in{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;padding:7% 8% 6%}
 .bk h4{margin:0 22% 0 0;font:700 1.5em/1.02 var(--disp)}
@@ -212,7 +212,7 @@ button{cursor:pointer}
 /* tall and small backs: a shorter picture and the record on one line; the full record shows on wide backs */
 .card:not([data-m=wide]) .bk .in{padding:6% 7% 5%}
 .card:not([data-m=wide]) .bk h4{font-size:1.35em}
-.card:not([data-m=wide]) .bk .pic{aspect-ratio:2/1;margin-bottom:.6em}
+.card:not([data-m=wide]) .bk .pic{aspect-ratio:2/1;margin-bottom:.6em;flex:0 1 auto;min-height:0}
 .card:not([data-m=wide]) .bk :is(dl,.file,.fine){display:none}
 .card:not([data-m=wide]) .bk .ms{display:block}
 .card:is([data-m=mini],[data-m=cd],[data-m=card]) .bk .pic{aspect-ratio:5/2}
@@ -361,8 +361,8 @@ input[type=range]{width:200px;accent-color:var(--ink)}
 #getg{position:fixed;top:0;left:0;right:0;bottom:0;z-index:125;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;transition:opacity .18s,visibility .18s}
 #getg.show{opacity:1;visibility:visible}
 html:not([data-fx="off"]) #getg.show .panel{animation:rise .22s ease}
-#gbody .lead{margin:16px 0 0;color:var(--ink2);line-height:1.5}
-#gbody h3{margin:26px 0 2px;padding-bottom:8px;border-bottom:1px solid var(--ink);font:700 20px/1.1 var(--disp)}
+#gbody .lead{margin:16px 0 6px;color:var(--ink2);line-height:1.5}
+#gbody .legal{margin:16px 0 0;font-size:13px;line-height:1.45;color:var(--ink2)}
 .links{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
 .links a{color:var(--ink);font-weight:600;text-decoration:none;border-bottom:1.5px solid var(--acc);white-space:nowrap}
 .links a::after{content:" ↗";font-weight:400;color:var(--ink2)}
@@ -462,18 +462,16 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   <div class="panel" role="dialog" aria-label="Getting games">
     <div class="phead"><div><small>Retro Shelf manual</small><h2>Getting games</h2></div><button id="gclose" class="btn primary">Done<kbd>Esc</kbd></button></div>
     <div id="gbody">
-      <p class="lead">The Retro Shelf doesn't come with games, and it doesn't point to sites that hand out copies of commercial games. Downloading those is against the law in most countries even if you own the original, because the copy you download isn't yours. These are the ways to do it right.</p>
-      <h3>Copy games you own</h3>
-      <div class="row2"><div class="rl"><b>Cartridges</b><span>Plug a cartridge into a reader and copy it to your computer, then drag the file onto the shelf. Readers exist for NES, SNES, N64, Genesis, Game Boy and GBA.</span></div>
-        <div class="links"><a href="https://www.epilogue.co" target="_blank" rel="noopener">GB Operator</a><a href="https://www.retrode.com" target="_blank" rel="noopener">Retrode</a><a href="https://github.com/sanni/cartreader" target="_blank" rel="noopener">Open Source Cartridge Reader</a></div></div>
-      <div class="row2"><div class="rl"><b>Discs</b><span>PlayStation, PS2, PSP and Dreamcast discs can be copied with a computer's disc drive or the console itself; GameCube and Wii discs with a Wii.</span></div>
-        <div class="links"><a href="https://dumping.guide" target="_blank" rel="noopener">Dumping guides</a><a href="https://wiibrew.org/wiki/CleanRip" target="_blank" rel="noopener">CleanRip for Wii</a></div></div>
-      <h3>Free games, made to be shared</h3>
-      <div class="row2"><div class="rl"><b>Homebrew</b><span>New games for old consoles, given away by the people who made them. Download, then drag onto the shelf.</span></div>
-        <div class="links"><a href="https://hh.gbdev.io" target="_blank" rel="noopener">Homebrew Hub (Game Boy)</a><a href="https://pdroms.de" target="_blank" rel="noopener">PDRoms</a><a href="https://itch.io/search?q=homebrew" target="_blank" rel="noopener">itch.io</a></div></div>
-      <h3>Buy them again</h3>
-      <div class="row2"><div class="rl"><b>Official re-releases</b><span>Many classics are sold again for modern computers and consoles. These play in their own apps, not here.</span></div>
+      <p class="lead">No games come with the app. Here are the legal ways to get some.</p>
+      <div class="row2"><div class="rl"><b>Your cartridges</b><span>A USB cartridge reader copies the game off a cart. Drag the file it saves onto the shelf.</span></div>
+        <div class="links"><a href="https://www.epilogue.co" target="_blank" rel="noopener">GB Operator</a><a href="https://www.retrode.com" target="_blank" rel="noopener">Retrode</a><a href="https://github.com/sanni/cartreader" target="_blank" rel="noopener">Cart Reader</a></div></div>
+      <div class="row2"><div class="rl"><b>Your discs</b><span>PlayStation and PS2 discs work in most PC disc drives. PSP, Dreamcast, GameCube and Wii games are copied with the console itself.</span></div>
+        <div class="links"><a href="https://dumping.guide" target="_blank" rel="noopener">Dumping guide</a><a href="https://wiibrew.org/wiki/CleanRip" target="_blank" rel="noopener">CleanRip (Wii)</a></div></div>
+      <div class="row2"><div class="rl"><b>Homebrew</b><span>People still make new games for old consoles, and lots of them are free.</span></div>
+        <div class="links"><a href="https://hh.gbdev.io" target="_blank" rel="noopener">Homebrew Hub</a><a href="https://pdroms.de" target="_blank" rel="noopener">PDRoms</a><a href="https://itch.io/search?q=homebrew" target="_blank" rel="noopener">itch.io</a></div></div>
+      <div class="row2"><div class="rl"><b>Re-releases</b><span>Lots of old games are still sold today. These run in their own apps, not on the shelf.</span></div>
         <div class="links"><a href="https://www.gog.com" target="_blank" rel="noopener">GOG</a><a href="https://evercade.co.uk" target="_blank" rel="noopener">Evercade</a><a href="https://limitedrungames.com" target="_blank" rel="noopener">Limited Run Games</a></div></div>
+      <p class="legal">There are no links to ROM sites here. Downloading a commercial game is illegal in most countries, even if you own a copy.</p>
     </div>
   </div>
 </div>
@@ -483,9 +481,9 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
 
 <div id="welcome" class="over"><div class="slip"><h2>Welcome to The Retro Shelf</h2>
   <ol>
-    <li><b>Add your games.</b> Drag game files onto this window, or press Add games. Each one goes on the right shelf, cover and all.</li>
-    <li><b>Pick one and play.</b> Arrow keys or a controller to browse, Enter or A to play. In a game, hold Start or press Esc to come back here.</li>
-    <li><b>Turn a box over</b> with Space or Y to see when you last played, your saves and more. Right-click a box to rename it or change its cover.</li>
+    <li><b>Add your games.</b> Drag them onto this window or press Add games. They get sorted by console, and the box art is found for you.</li>
+    <li><b>Play.</b> Browse with the arrow keys or a controller, then press Enter or A. To get back here from a game, hold Start or press Esc.</li>
+    <li><b>Turn a box over</b> with Space or Y to see when you last played and your saves. Right-click a box for more options.</li>
   </ol>
   <div class="btns"><button class="btn primary" id="wadd">Add games…</button><button class="btn" id="wdone">Got it</button></div></div></div>
 
@@ -912,6 +910,14 @@ function fillBack(c, g) {
   if (!g.cv) link("Find cover art", () => findCover(g.id));
   inn.appendChild(fine);
   const bar = el("div", "bar"); bar.appendChild(el("i", "", g.id.slice(0, 8).toUpperCase())); inn.appendChild(bar);
+  fitBack(bk, inn);
+}
+/* everything on the back has to fit the box: the screenshot gives up its room first, then the text gets smaller */
+function fitBack(bk, inn) {
+  const pic = inn.querySelector(".pic"), over = () => inn.scrollHeight > inn.clientHeight + 1;
+  bk.style.removeProperty("--fit");
+  if (pic && pic.clientHeight < pic.clientWidth * .28) pic.remove();
+  for (let f = .95; over() && f >= .7; f -= .05) bk.style.setProperty("--fit", f.toFixed(2));
 }
 function hookSlot(c) {
   c.addEventListener("focus", () => select(c));
