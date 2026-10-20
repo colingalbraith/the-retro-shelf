@@ -1594,12 +1594,14 @@ function renderSettings() {
   const seg = (opts, val, fn) => { const s = el("div", "seg"); opts.forEach(o => { const bt = el("button", o[0] === val ? "on" : "", o[1]); bt.onclick = () => { fn(o[0]); renderSettings(); }; s.appendChild(bt); }); return s; };
   const field = (val, ok, ph) => { const w = el("div", "fld"), i = document.createElement("input"); i.type = "text"; i.value = val || ""; i.placeholder = ph || ""; i.spellcheck = false; w.appendChild(i); w.appendChild(el("i", "dot " + (ok ? "ok" : "bad"))); w.input = i; return w; };
   const mac = /Mac/.test(navigator.platform || navigator.userAgent), win = /Win/.test(navigator.platform || navigator.userAgent);
+  /* the RetroArch path fields (under App) only matter when using your own RetroArch */
+  const own = !PATHS.builtin || UI.ownEmu;
+  let ef = null, cf = null, af = null;
 
   H("Shelves");
   R("Shelf style", "Spines fit hundreds of games on a wall. Covers show every box face-out.", seg([["spines", "Spines"], ["covers", "Covers"]], UI.shelf, v => { UI.shelf = v; saveUI(); renderShelves(focusId); }));
   R("Arrange shelves by", "A shelf for each console, or games grouped by genre, by decade, or by whether you've played them.", seg([["console", "Console"], ["genre", "Genre"], ["decade", "Decade"], ["status", "Played"]], UI.arrange || "console", v => { UI.arrange = v; saveUI(); renderShelves(focusId); }));
   R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
-  R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
   rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
   R("Shelf size", "", rg);
@@ -1612,11 +1614,6 @@ function renderSettings() {
   });
   const ci = document.createElement("input"); ci.type = "color"; ci.value = UI.accent; ci.oninput = () => { UI.accent = ci.value; applyUI(); saveUI(); }; sws.appendChild(ci);
   R("Label tape", "Color of the search and now-playing tape.", sws);
-  R("Animations", "Choose Reduced or Off on older computers.", seg([["full", "Full"], ["reduced", "Reduced"], ["off", "Off"]], UI.fx, v => { UI.fx = v; applyUI(); saveUI(); }));
-  R("Sound", "Short clicks when you move and select.", sw(UI.sound, v => { UI.sound = v; saveUI(); if (v) beep(660); }));
-  R("Always show controls", "Otherwise they show for a few seconds at start.", sw(UI.hints, v => { UI.hints = v; applyUI(); saveUI(); if (!v) showHintsBriefly(); }));
-  const fs = el("button", "btn", "Go fullscreen"); fs.onclick = () => { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else HTML.requestFullscreen && HTML.requestFullscreen(); };
-  R("Fullscreen", mac ? "Or press Ctrl ⌘ F." : "Or press F11.", fs);
 
   H("Library");
   const ab = el("div", "btns"), a1 = el("button", "btn primary", "Add games…"), a2 = el("button", "btn", "Show folder");
@@ -1633,8 +1630,6 @@ function renderSettings() {
     bs.appendChild(rn); bs.appendChild(del);
     R(sh.name, "Your shelf · " + plural(sh.ids.length, "game", "games"), bs);
   });
-  const rf = field(PATHS.roms_dir, PATHS.roms_ok, "roms");
-  R("Games folder", PATHS.roms_ok ? G.length + " games found." : "Folder not found.", rf);
   const chips = el("div", "chips");
   SYSTEMS.forEach(s => { const n = G.filter(g => g.system === s).length; if (!n) return; const hid = UI.hidden.indexOf(s) >= 0; const c = el("button", hid ? "" : "on", s + " " + n);
     c.onclick = () => { UI.hidden = hid ? UI.hidden.filter(x => x !== s) : UI.hidden.concat([s]); saveUI(); renderShelves(focusId); renderSettings(); }; chips.appendChild(c); });
@@ -1642,14 +1637,38 @@ function renderSettings() {
   const nHidden = G.filter(g => g.hidden).length;
   if (nHidden || UI.showHidden) R("Hidden games", plural(nHidden, "game is", "games are") + " hidden. Right-click a box to hide or show it.", sw(!!UI.showHidden, v => { UI.showHidden = v; saveUI(); renderShelves(focusId); renderSettings(); }));
 
-  H("Emulator");
+  R("Download missing covers", "Looks up box art by title on thumbnails.libretro.com. Nothing else is sent.", sw(UI.autoCovers, v => { UI.autoCovers = v; saveUI(); }));
+  const pr = el("div", ""), bar = el("div", "pbar"); bar.id = "cbar"; bar.appendChild(el("i")); pr.appendChild(bar);
+  const row = R("Progress", "", pr); row.querySelector(".rl").appendChild(Object.assign(el("span", ""), {id: "ctext"}));
+  const f1 = el("button", "btn primary", "Fetch covers"); f1.onclick = async () => { const r = await api("/api/covers/fetch", {}); toast(r.data.started ? "Fetching covers…" : "Already running."); };
+  const f2 = el("button", "btn", "Search again"); f2.onclick = async () => { const r = await api("/api/covers/fetch", {force: true}); toast(r.data.started ? "Searching again…" : "Already running."); };
+  const cb = el("div", "btns"); cb.appendChild(f2); cb.appendChild(f1);
+  R("Fetch now", "Search again retries games with no match. Your own art always wins: save Game Name.png next to the ROM.", cb);
+
+  const rf = field(PATHS.roms_dir, PATHS.roms_ok, "roms");
+  R("Games folder", PATHS.roms_ok ? G.length + " games found." : "Folder not found.", rf);
+  const sv = el("button", "btn primary", "Save and scan");
+  sv.onclick = async () => {
+    busy(true);
+    const paths = {roms_dir: rf.input.value};
+    if (own) Object.assign(paths, {exe: ef.input.value, cores_dir: cf.input.value, args: af.input.value});
+    const r = await api("/api/settings", {paths});
+    if (r.ok) PATHS = r.data.paths; await refresh(true); busy(false); renderSettings(); toast("Saved. " + G.length + " games found.");
+  };
+  const rs = el("button", "btn", "Scan for new games"); rs.onclick = rescan;
+  const bt = el("div", "btns");
+  bt.appendChild(rs); bt.appendChild(sv); R("Apply", "After changing the games folder.", bt);
+
+
   if (PATHS.builtin) {
-    const bi = PATHS.builtin, ok = el("div", "fld"); ok.appendChild(el("i", "dot " + (PATHS.own ? "bad" : "ok")));
-    R("Built-in emulators", "RetroArch " + bi.version + " with emulators for " + bi.systems + " systems, ready to go." + (PATHS.own ? " Not in use: you're using your own RetroArch." : ""), ok);
+    H("Playing");
     R("Play fullscreen", "Games fill the screen. Turn off to play in a window.", sw(UI.fullscreen !== false, v => { UI.fullscreen = v; saveUI(); }));
     R("Picture", "How games look: crisp pixels, softened, or with the scanlines of an old TV.", seg([["sharp", "Sharp"], ["smooth", "Smooth"], ["crt", "CRT"]], UI.picture || "sharp", v => { UI.picture = v; saveUI(); }));
     R("Pick up where you left off", "Saves your spot when you leave a game and starts there next time.", sw(UI.resume !== false, v => { UI.resume = v; saveUI(); }));
+  R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
     R("In a game", "Hold Start (or press Esc) to come back to the shelf. Hold Select (or press F1) for the emulator's menu: save slots, controls, restart.", null);
+
+    H("Saves & BIOS");
     const fb = el("div", "btns"), f1 = el("button", "btn", "Saves"), f2 = el("button", "btn", "BIOS");
     f1.onclick = () => APP.openFolder("saves"); f2.onclick = () => APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
     R("Folders", "Game saves are kept in Documents › The Retro Shelf › Saves. BIOS files are needed for PS2 and PC Engine CD games, and can improve PS1, Dreamcast and DS.", fb);
@@ -1671,53 +1690,21 @@ function renderSettings() {
       bl.appendChild(el("b", "", "PlayStation 2")); bl.appendChild(el("span", "", "Set up inside PCSX2, which you install yourself."));
       b.appendChild(bl);
     }
-    R("Use my own RetroArch", "For people who already have RetroArch set up the way they like.", sw(!!UI.ownEmu, v => { UI.ownEmu = v; api("/api/settings", {ui: UI}).then(r => { if (r.ok) PATHS = r.data.paths; renderSettings(); }); }));
+  } else {
+    H("Playing");
+  R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
   }
-  /* the RetroArch path fields only matter when using your own RetroArch */
-  const own = !PATHS.builtin || UI.ownEmu;
-  let ef = null, cf = null, af = null;
-  if (own) {
-    ef = field(PATHS.exe, PATHS.exe_ok, mac ? "/Applications/RetroArch.app/Contents/MacOS/RetroArch" : win ? "C:\\RetroArch-Win64\\retroarch.exe" : "retroarch");
-    R("RetroArch program", PATHS.exe_ok ? "Found." : "Not found. Press Detect, or enter the full path.", ef);
-    cf = field(PATHS.cores_dir, PATHS.cores_ok, mac ? "~/Library/Application Support/RetroArch/cores" : win ? "C:\\RetroArch-Win64\\cores" : "~/.config/retroarch/cores");
-    R("Cores folder", PATHS.cores_ok ? "Found." : "Not found. In RetroArch: Online Updater → Core Downloader.", cf);
-    af = field(PATHS.args, true, "-f");
-    af.removeChild(af.lastChild); R("Extra options", "Added to every RetroArch launch. -f starts fullscreen.", af);
-  }
-  const sv = el("button", "btn primary", "Save and scan");
-  sv.onclick = async () => {
-    busy(true);
-    const paths = {roms_dir: rf.input.value};
-    if (own) Object.assign(paths, {exe: ef.input.value, cores_dir: cf.input.value, args: af.input.value});
-    const r = await api("/api/settings", {paths});
-    if (r.ok) PATHS = r.data.paths; await refresh(true); busy(false); renderSettings(); toast("Saved. " + G.length + " games found.");
-  };
-  const rs = el("button", "btn", "Scan for new games"); rs.onclick = rescan;
-  const bt = el("div", "btns");
-  if (own) {
-    const dt = el("button", "btn", "Detect");
-    dt.onclick = async () => {
-      busy(true); const r = await api("/api/detect", {}); if (r.ok) PATHS = r.data.paths; busy(false); renderSettings();
-      const good = PATHS.exe_ok && PATHS.cores_ok; toast(good ? "RetroArch found." : "Couldn't find RetroArch. Enter the paths by hand.", !good);
-    };
-    bt.appendChild(dt);
-  }
-  bt.appendChild(rs); bt.appendChild(sv); R("Apply", own ? "" : "After changing the games folder.", bt);
-
-  H("Cover art");
-  R("Download missing covers", "Looks up box art by title on thumbnails.libretro.com. Nothing else is sent.", sw(UI.autoCovers, v => { UI.autoCovers = v; saveUI(); }));
-  const pr = el("div", ""), bar = el("div", "pbar"); bar.id = "cbar"; bar.appendChild(el("i")); pr.appendChild(bar);
-  const row = R("Progress", "", pr); row.querySelector(".rl").appendChild(Object.assign(el("span", ""), {id: "ctext"}));
-  const f1 = el("button", "btn primary", "Fetch covers"); f1.onclick = async () => { const r = await api("/api/covers/fetch", {}); toast(r.data.started ? "Fetching covers…" : "Already running."); };
-  const f2 = el("button", "btn", "Search again"); f2.onclick = async () => { const r = await api("/api/covers/fetch", {force: true}); toast(r.data.started ? "Searching again…" : "Already running."); };
-  const cb = el("div", "btns"); cb.appendChild(f2); cb.appendChild(f1);
-  R("Fetch now", "Search again retries games with no match. Your own art always wins: save Game Name.png next to the ROM.", cb);
 
   H("Your play");
   playStats(b, R);
-  H("About");
-  const lb = el("button", "btn", "Licenses"); lb.onclick = () => APP.licenses();
-  R("The Retro Shelf " + (APPINFO.version || ""), "Emulation by RetroArch and the libretro cores, free software by their authors. No games are included.", lb);
+
+  H("App");
+  R("Animations", "Choose Reduced or Off on older computers.", seg([["full", "Full"], ["reduced", "Reduced"], ["off", "Off"]], UI.fx, v => { UI.fx = v; applyUI(); saveUI(); }));
+  R("Sound", "Short clicks when you move and select.", sw(UI.sound, v => { UI.sound = v; saveUI(); if (v) beep(660); }));
+  R("Always show controls", "Otherwise they show for a few seconds at start.", sw(UI.hints, v => { UI.hints = v; applyUI(); saveUI(); if (!v) showHintsBriefly(); }));
+  const fs = el("button", "btn", "Go fullscreen"); fs.onclick = () => { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else HTML.requestFullscreen && HTML.requestFullscreen(); };
+  R("Fullscreen", mac ? "Or press Ctrl ⌘ F." : "Or press F11.", fs);
+
   const ub = el("button", "btn" + (UPD.status === "ready" ? " primary" : ""), {ready: "Restart now", manual: "Download"}[UPD.status] || "Check now");
   ub.disabled = UPD.status === "checking" || UPD.status === "downloading"; ub.onclick = updAction;
   R("Updates", updText(), ub);
@@ -1727,6 +1714,27 @@ function renderSettings() {
   is.onclick = () => APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new");
   pb.appendChild(cp); pb.appendChild(is);
   R("Something not working?", "Copy info puts your versions, setup and the last game's emulator log on the clipboard for a bug report. Nothing is sent until you paste it somewhere.", pb);
+  if (PATHS.builtin) {
+    const bi = PATHS.builtin, ok = el("div", "fld"); ok.appendChild(el("i", "dot " + (PATHS.own ? "bad" : "ok")));
+    R("Built-in emulators", "RetroArch " + bi.version + " with emulators for " + bi.systems + " systems, ready to go." + (PATHS.own ? " Not in use: you're using your own RetroArch." : ""), ok);
+    R("Use my own RetroArch", "For people who already have RetroArch set up the way they like.", sw(!!UI.ownEmu, v => { UI.ownEmu = v; api("/api/settings", {ui: UI}).then(r => { if (r.ok) PATHS = r.data.paths; renderSettings(); }); }));
+  }
+  if (own) {
+    ef = field(PATHS.exe, PATHS.exe_ok, mac ? "/Applications/RetroArch.app/Contents/MacOS/RetroArch" : win ? "C:\\RetroArch-Win64\\retroarch.exe" : "retroarch");
+    R("RetroArch program", PATHS.exe_ok ? "Found." : "Not found. Press Detect, or enter the full path.", ef);
+    cf = field(PATHS.cores_dir, PATHS.cores_ok, mac ? "~/Library/Application Support/RetroArch/cores" : win ? "C:\\RetroArch-Win64\\cores" : "~/.config/retroarch/cores");
+    R("Cores folder", PATHS.cores_ok ? "Found." : "Not found. In RetroArch: Online Updater → Core Downloader.", cf);
+    af = field(PATHS.args, true, "-f");
+    af.removeChild(af.lastChild); R("Extra options", "Added to every RetroArch launch. -f starts fullscreen.", af);
+    const db = el("div", "btns"), dt = el("button", "btn", "Detect"), sa = el("button", "btn primary", "Save");
+    dt.onclick = async () => {
+      busy(true); const r = await api("/api/detect", {}); if (r.ok) PATHS = r.data.paths; busy(false); renderSettings();
+      const good = PATHS.exe_ok && PATHS.cores_ok; toast(good ? "RetroArch found." : "Couldn't find RetroArch. Enter the paths by hand.", !good);
+    };
+    sa.onclick = () => sv.onclick();
+    db.appendChild(dt); db.appendChild(sa); R("Your RetroArch", "Detect looks in the usual places. Save keeps the paths above.", db);
+  }
+  const lb = el("button", "btn", "Licenses"); lb.onclick = () => APP.licenses();
   updateCoverUI(); p.scrollTop = st;
 }
 

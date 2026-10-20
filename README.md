@@ -33,7 +33,9 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 - **Pick up where you left off:** leaving a game saves your spot.
 - **Art and details are automatic:** covers, logos, year, publisher and genre for 38,000+ games. Wrong cover? Pick
   the right one from a list.
-- **Your own shelves,** like "Couch co-op" or "To finish", and sorting by title, year or last played.
+- **Shelves your way:** arrange by console, genre, decade or what you've played; make your own like "Couch co-op";
+  sort by title, year or last played.
+- **Your play:** a trophy shelf of your most played games, and a time card stamped with the days you played.
 - **CRT look:** play with sharp pixels, smoothed, or the scanlines of an old TV.
 - **Controllers just work:** Xbox, PlayStation and Switch Pro.
 - **Saves are safe:** back them all up to one file, and see which BIOS files each console has.
@@ -44,6 +46,10 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
   <tr>
     <td width="50%"><img src="docs/images/selected.jpg" alt="A selected game pulled out of the shelf"></td>
     <td width="50%"><img src="docs/images/back.jpg" alt="The back of a box: last played, playtime and a screenshot"></td>
+  </tr>
+  <tr>
+    <td width="60%"><img src="docs/images/your-play.jpg" alt="Your play: the five most played games face-out on a shelf with brass plates showing their hours"></td>
+    <td width="40%"><img src="docs/images/time-card.jpg" alt="A paper time card: hours this month, days in a row, and twelve weeks of days stamped in ink"></td>
   </tr>
 </table>
 
