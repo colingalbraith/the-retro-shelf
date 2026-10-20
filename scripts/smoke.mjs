@@ -110,6 +110,10 @@ try {
   const title = await page.evaluate("G[0].title");
   if (n !== 1 || title !== "Smoke Test") throw new Error(`the shelf has ${n} games, the first "${title}"`);
   step("the shelf shows " + title);
+  // the profile looks like one from before 0.3.0 (welcomed, no version seen), so what's new shows: the changelog is in the build
+  await until("the What's new card didn't show", () => page.evaluate(`isOpen("news") && $$("#nlist li").length`), 10000);
+  await page.evaluate(`closeNews()`);
+  step("the What's new card showed");
   await sleep(1500);
   const shot = await page.send("Page.captureScreenshot", { format: "png" });
   fs.writeFileSync(path.join(OUT, "shelf.png"), Buffer.from(shot.result.data, "base64"));
