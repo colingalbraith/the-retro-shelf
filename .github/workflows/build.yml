@@ -64,7 +64,7 @@ jobs:
         with:
           path: out
           merge-multiple: true
-      # a draft, so nothing is public until you press Publish on the release page; 0.x versions are marked pre-release
+      # a draft, so nothing is public until you press Publish on the release page
       - name: Create draft release
         run: |
           cat > notes.md <<'NOTES'
@@ -77,9 +77,7 @@ jobs:
 
           No games are included. See the README for where to get games legally.
           NOTES
-          flags=(--draft)
-          [[ "$GITHUB_REF_NAME" == v0.* ]] && flags+=(--prerelease)
-          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" "${flags[@]}" \
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --draft \
             --title "The Retro Shelf $GITHUB_REF_NAME" --notes-file notes.md
         env:
           GH_TOKEN: ${{ github.token }}
