@@ -22,6 +22,8 @@ function findApp() {
   if (process.platform === "win32") {
     const setup = fs.readdirSync(DIST).find(f => /Setup.*\.exe$/.test(f));
     if (!setup) throw new Error("no installer in dist/");
+    // an installer can't replace an app that's open (left by an earlier step, say)
+    spawnSync("taskkill", ["/IM", "The Retro Shelf.exe", "/T", "/F"], { stdio: "ignore" });
     step("installing " + setup);
     const r = spawnSync(path.join(DIST, setup), ["/S"], { stdio: "inherit" });
     if (r.status !== 0) throw new Error("the installer failed (" + r.status + ")");

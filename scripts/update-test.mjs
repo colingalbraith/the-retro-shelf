@@ -140,7 +140,8 @@ try {
 } finally {
   if (server) server.close();
   // the old app if it's still open, and the new one the update opened
-  if (win) spawnSync("taskkill", ["/IM", "The Retro Shelf.exe", "/T", "/F"], { stdio: "ignore" });
+  // the updated app opens itself again once its installer finishes, which can be a little after this: keep closing it
+  if (win) for (let i = 0; i < 10; i++) { spawnSync("taskkill", ["/IM", "The Retro Shelf.exe", "/T", "/F"], { stdio: "ignore" }); await sleep(1500); }
   else { if (app) try { process.kill(app.pid, "SIGTERM"); } catch {} spawnSync("pkill", ["-f", work], { stdio: "ignore" }); }
   await sleep(1500);
   try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
