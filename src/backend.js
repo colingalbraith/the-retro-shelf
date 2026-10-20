@@ -171,6 +171,30 @@ class Backend extends EventEmitter {
     fs.rmSync(path.join(this.files.covers, ".previews"), { recursive: true, force: true });
     this.scan();
     this.checkPins();
+    // a new install starts with the welcome card, not a list of changes it never had
+    if (!this.state.seenVersion && !this.ui.welcomed) { this.state.seenVersion = this.dirs.version; this.saveState(); }
+  }
+
+  /**
+   * What changed since the version this person last used, from CHANGELOG.md: [{version, items: [[bold, text]]}], newest
+   * first. Empty when they've seen this version (or it's a new install).
+   */
+  whatsNew() {
+    const seen = this.state.seenVersion || "0.2.0", cur = this.dirs.version;
+    if (!cur || seen === cur) return [];
+    let text = "";
+    try { text = fs.readFileSync(path.join(this.dirs.app, "..", "CHANGELOG.md"), "utf8"); } catch { return []; }
+    const out = [], num = v => v.split(".").map(n => parseInt(n, 10) || 0), after = (a, b) => { const x = num(a), y = num(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
+    let cur2 = null;
+    for (const line of text.split(/\r?\n/)) {
+      const h = /^## (\d+\.\d+\.\d+)/.exec(line);
+      if (h) { cur2 = after(h[1], seen) && !after(h[1], cur) ? { version: h[1], items: [] } : null; if (cur2) out.push(cur2); continue; }
+      if (!cur2) continue;
+      const it = /^- (?:\*\*(.+?)\*\*\s*)?(.*)$/.exec(line);
+      if (it) cur2.items.push([it[1] || "", it[2]]);
+      else if (/^\s+\S/.test(line) && cur2.items.length) cur2.items[cur2.items.length - 1][1] += " " + line.trim();
+    }
+    return out;
   }
 
   /**
@@ -1101,6 +1125,7 @@ class Backend extends EventEmitter {
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };
       if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.state.sessions, now: now() } };
       if (pathname === "/api/collections") return { code: 200, body: this.collections()[1] };
+      if (pathname === "/api/whatsnew") return { code: 200, body: { version: this.dirs.version, changes: this.whatsNew() } };
       if (pathname === "/api/pins") { const res = this.checkPins(); return { code: 200, body: { pins: pins.catalog(Object.keys(this.cfg.systems)), cats: pins.CATS, state: res, earned: this.state.pins } }; }
       if (pathname.startsWith("/ghost/")) {
         const rest = pathname.slice(7), i = rest.indexOf("/");
@@ -1150,6 +1175,7 @@ class Backend extends EventEmitter {
       case "/api/fav": return j(this.toggleFav(String(d.id || "")));
       case "/api/shelves": return j(this.shelfOp(d));
       case "/api/games/search": return j(this.gameSearch(d.q));
+      case "/api/whatsnew/seen": this.state.seenVersion = this.dirs.version; this.saveState(); return j([200, { ok: true }]);
       case "/api/pins/seen": { const seen = new Set(Array.isArray(d.keys) ? d.keys : []); this.newPins = (this.newPins || []).filter(k => !seen.has(k)); return j([200, { ok: true }]); }
       case "/api/rescan":
         this.scan();

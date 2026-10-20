@@ -48,7 +48,8 @@
     },
     "files": [
       "src/**",
-      "package.json"
+      "package.json",
+      "CHANGELOG.md"
     ],
     "extraResources": [
       {

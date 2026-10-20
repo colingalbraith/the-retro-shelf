@@ -2,6 +2,7 @@ name: Build installers
 
 # Builds The-Retro-Shelf-<version>-mac-arm64.dmg (Apple silicon), -mac-x64.dmg (Intel) and
 # The-Retro-Shelf-Setup-<version>.exe, plus the files the app's updater reads (latest*.yml, the Mac .zips).
+# Each build is then installed and opened, and a test game played (scripts/smoke.mjs).
 # Run it by hand from the Actions tab, or push a tag like v0.1.0 to also get a draft release.
 on:
   workflow_dispatch:
@@ -46,6 +47,17 @@ jobs:
           # macOS builds are ad-hoc signed (identity "-" in package.json) until a Developer ID is set up
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
+      # installs it (Windows), opens it with one small test game, and plays it: a build that can't doesn't get released
+      - name: Open the app and play a game
+        run: node scripts/smoke.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.target }}
+          path: dist/smoke
+          if-no-files-found: ignore
+
       - uses: actions/upload-artifact@v4
         with:
           name: the-retro-shelf-${{ matrix.target }}
@@ -68,6 +80,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: out
+          pattern: the-retro-shelf-*
           merge-multiple: true
       # a draft, so nothing is public until you press Publish on the release page
       - name: Create draft release

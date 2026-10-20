@@ -529,6 +529,11 @@ html:not([data-fx="off"]) #pick.show .panel{animation:rise .22s ease}
 #welcome ol{margin:10px 0 18px;padding-left:1.3em;color:var(--ink2);line-height:1.45}
 #welcome li{margin:0 0 8px}
 #welcome li b{color:var(--ink)}
+#news .slip{width:min(640px,90vw)}
+#nlist{max-height:58vh;overflow-y:auto;margin:10px 0 18px;padding-left:1.1em;color:var(--ink2);line-height:1.45}
+#nlist li{margin:0 0 8px}
+#nlist li b{color:var(--ink)}
+#nlist .v{list-style:none;margin:14px 0 6px -1.1em;font:600 12px var(--disp);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
 
 /* ---------- adding games: drop target and the "which system?" slip ---------- */
 #drop{position:fixed;top:0;left:0;right:0;bottom:0;z-index:140;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s,visibility .15s}
@@ -680,7 +685,10 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     <li><b>Turn a box over</b> with Space or Y to see when you last played and your saves. Press O, Select on a controller, or right-click for more.</li>
     <li><b>Look around.</b> Collections show the series your games belong to, and Your play keeps your hours and pins. Both are in the View menu.</li>
   </ol>
-  <div class="btns"><button class="btn primary" id="wadd">Add games…</button><button class="btn" id="wdone">Got it</button></div></div></div>
+  <div class="btns"><button class="btn primary" id="wgames">Add games…</button><button class="btn" id="wdone">Got it</button></div></div></div>
+
+<div id="news" class="over"><div class="slip"><h2 id="ntitle">New in The Retro Shelf</h2><ul id="nlist"></ul>
+  <div class="btns"><button class="btn primary" id="ndone">Got it</button></div></div></div>
 
 <div id="drop"><div class="slip"><h2>Drop to add</h2><p>Each game goes on the right shelf for its console.</p></div></div>
 
@@ -1256,7 +1264,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "opts", "osk", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth; markUnder();
@@ -1372,7 +1380,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1544,7 +1552,7 @@ async function poll() {
   const s = r.data; offset = s.now * 1000 - Date.now();
   const prev = lastRunning; lastRunning = s.running; STATUS.running = s.running; STATUS.covers = s.covers; STATUS.exit = s.exit; STATUS.import = s.import;
   importProgress(s.import);
-  if (s.newPins && s.newPins.length && !LAUNCH.open && !s.running) showNewPins(s.newPins);
+  if (s.newPins && s.newPins.length && !LAUNCH.open && !s.running && !isOpen("news")) showNewPins(s.newPins);
   if (prev && !s.running) onExit(prev);
   if (!prev && s.running && !LAUNCH.open) showLaunch(byId.get(s.running.id));
   const c = s.covers;
@@ -1582,7 +1590,7 @@ async function loadLibrary(force) {
    In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
    On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
 const PANELS = [["osk", () => closeOsk()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
-  ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["pick", () => closePicker()],
+  ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
 const topPanel = () => PANELS.find(([id]) => isOpen(id));
 function focusables(root) {
@@ -1850,6 +1858,22 @@ async function saveRename() {
 
 /* ---------- first visit ---------- */
 function closeWelcome() { $("#welcome").classList.remove("show"); UI.welcomed = true; saveUI(); light(); focusById(focusId); }
+
+/* ---------- after an update: what's new, once ---------- */
+async function showNews() {
+  const r = await api("/api/whatsnew"); if (!r.ok || !r.data.changes.length) return;
+  const list = $("#nlist"), many = r.data.changes.length > 1; clear(list);
+  $("#ntitle").textContent = many ? "New since you last played" : "New in " + r.data.changes[0].version;
+  for (const c of r.data.changes) {
+    if (many) list.appendChild(el("li", "v", c.version));
+    for (const [head, text] of c.items) {
+      const li = el("li"); if (head) { li.appendChild(el("b", "", head)); li.appendChild(document.createTextNode(" ")); }
+      li.appendChild(document.createTextNode(text)); list.appendChild(li);
+    }
+  }
+  blurActive(); $("#news").classList.add("show"); light();
+}
+function closeNews() { if (!isOpen("news")) return; $("#news").classList.remove("show"); api("/api/whatsnew/seen", {}); light(); focusById(focusId); }
 
 /* ---------- getting games ---------- */
 function openGetGames() { if (LAUNCH.open) return; if (isOpen("settings")) $("#settings").classList.remove("show"); blurActive(); $("#getg").classList.add("show"); light(); beep(520); }
@@ -2238,7 +2262,8 @@ $("#q").addEventListener("blur", paintQ);
 $("#sclose").onclick = closeSettings;
 $("#gclose").onclick = closeGetGames;
 $("#rok").onclick = saveRename; $("#rcancel").onclick = closeRename;
-$("#wdone").onclick = closeWelcome; $("#wadd").onclick = () => { closeWelcome(); addGames(); };
+$("#wdone").onclick = closeWelcome; $("#wgames").onclick = () => { closeWelcome(); addGames(); };
+$("#ndone").onclick = closeNews;
 $("#getg").addEventListener("mousedown", e => { if (e.target === $("#getg")) closeGetGames(); });
 $("#settings").addEventListener("mousedown", e => { if (e.target === $("#settings")) closeSettings(); });
 $("#lhide").onclick = hideLaunch;
@@ -2274,6 +2299,7 @@ document.addEventListener("keydown", e => {
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
   if (isOpen("nsh")) { if (k === "Escape") closeShelfSlip(); else if (k === "Enter") saveShelfSlip(); return; }
   if (isOpen("welcome")) { if (k === "Escape" || k === "Enter") closeWelcome(); return; }
+  if (isOpen("news")) { if (k === "Escape" || k === "Enter") closeNews(); return; }
   if (isOpen("getg")) { if (k === "Escape") closeGetGames(); return; }
   if (isOpen("settings")) { if (k === "Escape") closeSettings(); return; }
   if (LAUNCH.open) { setKb(true); if (k === "Escape" || k === "Backspace") hideLaunch(); return; }
@@ -2387,6 +2413,7 @@ function hideSplash() { const s = $("#splash"); s.classList.add("out"); setTimeo
   lastFound = STATUS.covers.found || 0; lastRun = !!STATUS.covers.running;
   if (STATUS.running) showLaunch(byId.get(STATUS.running.id));
   if (!UI.welcomed) setTimeout(() => { $("#welcome").classList.add("show"); light(); }, fxMode() === "off" ? 0 : 500);
+  else setTimeout(showNews, fxMode() === "off" ? 0 : 500);
   setInterval(poll, 1500); setInterval(tick, 500);
   window.addEventListener("focus", poll);
 })();

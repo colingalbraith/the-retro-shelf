@@ -194,3 +194,23 @@ test("pins added in a newer version that were already earned don't all pop up at
   assert.equal(be.state.pins.hours25, 0);
   assert.deepEqual(be.newPins, []);
 });
+
+test("what's new: shown after an update, once, and never on a new install", async () => {
+  const mk = (seen, welcomed) => {
+    const data = path.join(home, "u" + Math.random());
+    fs.mkdirSync(data, { recursive: true });
+    fs.writeFileSync(path.join(data, "settings.json"), JSON.stringify({ ui: { welcomed } }));
+    if (seen) fs.writeFileSync(path.join(data, "state.json"), JSON.stringify({ seenVersion: seen }));
+    const b = new Backend({ app: APP, data, docs: path.join(home, "docs"), emu: path.join(home, "none"), version: "0.3.0" }, async () => { throw new Error("offline"); });
+    b.init();
+    return b;
+  };
+  assert.deepEqual(mk(null, false).whatsNew(), []);                 // new: the welcome card instead
+  const up = mk(null, true), news = up.whatsNew();                   // from 0.2.0, which didn't keep a version
+  assert.deepEqual(news.map(c => c.version), ["0.3.0"]);
+  assert.equal(news[0].items[0][0], "Collections:");
+  assert.match(news[0].items[0][1], /faded, and collections of your own/);   // the wrapped line joins up
+  await up.route("POST", "/api/whatsnew/seen", {});
+  assert.deepEqual(up.whatsNew(), []);
+  assert.deepEqual(mk("0.1.0", true).whatsNew().map(c => c.version), ["0.3.0", "0.2.0"]);
+});

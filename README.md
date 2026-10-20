@@ -55,6 +55,10 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
     <td width="60%"><img src="docs/images/your-play.jpg" alt="Your play: the five most played games face-out on a shelf with brass plates showing their hours"></td>
     <td width="40%"><img src="docs/images/time-card.jpg" alt="A paper time card: hours this month, days in a row, and twelve weeks of days stamped in ink"></td>
   </tr>
+  <tr>
+    <td width="55%"><img src="docs/images/collections.jpg" alt="Collections: the Legend of Zelda and Mario Kart series on shelves, with the games not in the library standing faded"></td>
+    <td width="45%"><img src="docs/images/pins.jpg" alt="The corkboard of pins: copper and silver pins earned for playing, and faded ones still to earn with progress bars"></td>
+  </tr>
 </table>
 
 ## Download
