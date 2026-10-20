@@ -1076,10 +1076,12 @@ function select(c) {
   if (/\b(flat|lean)\b/.test(c.className)) setTimeout(light, 470);
   $$("#shelves .card.under").forEach(x => x.classList.remove("under"));
   setTimeout(markUnder, 520);
-  /* turned over stays on while moving from game to game, until it's turned back */
-  if (backMode && !c._manual && !c.classList.contains("flip")) flip(true);
+  /* turned over stays on while moving from game to game, until it's turned back. Moving fast, boxes only show
+     their cover: the one you stop on turns over, so half-turned boxes don't flash past */
+  clearTimeout(backT);
+  if (backMode && !c._manual && !c.classList.contains("flip")) backT = setTimeout(() => { if (sel === c && backMode && !c.classList.contains("flip")) flip(true); }, 220);
 }
-let backMode = false;
+let backMode = false, backT = 0;
 function flip(force) {
   if (!sel || sel._manual) return;
   const g = byId.get(sel.dataset.id); if (!g) return;
