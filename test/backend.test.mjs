@@ -214,3 +214,25 @@ test("what's new: shown after an update, once, and never on a new install", asyn
   assert.deepEqual(up.whatsNew(), []);
   assert.deepEqual(mk("0.1.0", true).whatsNew().map(c => c.version), ["0.3.0", "0.2.0"]);
 });
+
+test("a resume picture of one color (a game left before it drew anything) counts as no picture", async () => {
+  const { flatPng } = createRequire(import.meta.url)("../src/backend.js");
+  const zlib = await import("node:zlib");
+  // a PNG the way RetroArch writes one: 8-bit RGB, rows filtered with "Sub"
+  const png = (w, h, px) => {
+    const rows = [];
+    for (let y = 0; y < h; y++) {
+      const r = Buffer.alloc(1 + w * 3); r[0] = 1;
+      for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) r[1 + x * 3 + c] = (px(x, y)[c] - (x ? px(x - 1, y)[c] : 0)) & 255;
+      rows.push(r);
+    }
+    const chunk = (t, d) => { const b = Buffer.alloc(12 + d.length); b.writeUInt32BE(d.length, 0); b.write(t, 4, "latin1"); d.copy(b, 8); return b; };
+    const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+    return Buffer.concat([Buffer.from("\x89PNG\r\n\x1a\n", "latin1"), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(Buffer.concat(rows))), chunk("IEND", Buffer.alloc(0))]);
+  };
+  assert.equal(flatPng(png(256, 224, () => [0, 0, 0])), true);
+  assert.equal(flatPng(png(256, 224, () => [4, 2, 6])), true);                                    // near enough black
+  assert.equal(flatPng(png(256, 224, (x, y) => (x > 100 && x < 110 && y === 50 ? [255, 255, 255] : [0, 0, 0]))), false);  // a little something
+  assert.equal(flatPng(png(64, 64, (x, y) => [x * 4, y * 4, 0])), false);
+  assert.equal(flatPng(Buffer.from("not a png")), false);
+});

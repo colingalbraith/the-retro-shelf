@@ -5,6 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
+const zlib = require("zlib");
 const { spawn } = require("child_process");
 const { EventEmitter } = require("events");
 const ra = require("./retroarch");
@@ -1071,12 +1072,23 @@ class Backend extends EventEmitter {
     }
     const files = dirCache[cn], stem = path.parse(g.path).name, at = f => { try { return Math.floor(fs.statSync(files.get(f)).mtimeMs / 1000); } catch { return 0; } };
     const out = { resume: 0, rpic: false, slots: [] };
-    if (files.has(stem + ".state.auto")) { out.resume = at(stem + ".state.auto"); out.rpic = files.has(stem + ".state.auto.png"); }
+    if (files.has(stem + ".state.auto")) { out.resume = at(stem + ".state.auto"); out.rpic = files.has(stem + ".state.auto.png") && !this.blankPic(files.get(stem + ".state.auto.png")); }
     for (let n = 0; n <= 9; n++) {
       const f = stem + ".state" + (n || "");
       if (files.has(f)) out.slots.push({ n, at: at(f), pic: files.has(f + ".png") });
     }
     return out;
+  }
+  /** a picture that's all one color, near enough: a game left before it drew anything (the screen still black) */
+  blankPic(file) {
+    let st;
+    try { st = fs.statSync(file); } catch { return false; }
+    // anything with something on it doesn't squeeze this small; only those are worth a look
+    if (st.size > 4096) return false;
+    this._blank = this._blank || new Map();
+    const key = file + "|" + st.mtimeMs;
+    if (!this._blank.has(key)) this._blank.set(key, flatPng(fs.readFileSync(file)));
+    return this._blank.get(key);
   }
   /** the picture RetroArch saved with a resume point ("auto") or slot */
   statePic(g, which) {
@@ -1227,4 +1239,35 @@ class Backend extends EventEmitter {
   }
 }
 
-module.exports = { Backend, cleanTitle, regionTag, norm, pick };
+/** true when a PNG (8-bit color, as RetroArch writes them) is one color all over, within a few shades */
+function flatPng(b) {
+  try {
+    if (b.toString("latin1", 1, 4) !== "PNG") return false;
+    let i = 8, w = 0, h = 0, bpp = 0;
+    const idat = [];
+    while (i + 8 <= b.length) {
+      const n = b.readUInt32BE(i), t = b.toString("latin1", i + 4, i + 8), c = b.subarray(i + 8, i + 8 + n);
+      if (t === "IHDR") { w = c.readUInt32BE(0); h = c.readUInt32BE(4); if (c[8] !== 8 || c[12]) return false; bpp = { 2: 3, 6: 4 }[c[9]]; if (!bpp) return false; }
+      else if (t === "IDAT") idat.push(c);
+      i += 12 + n;
+    }
+    const raw = zlib.inflateSync(Buffer.concat(idat)), row = w * bpp;
+    if (raw.length < h * (row + 1)) return false;
+    let prev = Buffer.alloc(row), lo = 255, hi = 0;
+    for (let y = 0; y < h; y++) {
+      const f = raw[y * (row + 1)], cur = Buffer.from(raw.subarray(y * (row + 1) + 1, (y + 1) * (row + 1)));
+      for (let x = 0; x < row; x++) {
+        const a = x >= bpp ? cur[x - bpp] : 0, up = prev[x], ul = x >= bpp ? prev[x - bpp] : 0;
+        let v = cur[x];
+        if (f === 1) v += a; else if (f === 2) v += up; else if (f === 3) v += (a + up) >> 1;
+        else if (f === 4) { const p = a + up - ul, pa = Math.abs(p - a), pb = Math.abs(p - up), pc = Math.abs(p - ul); v += pa <= pb && pa <= pc ? a : pb <= pc ? up : ul; }
+        cur[x] = v & 255;
+        if (bpp === 3 || x % 4 !== 3) { if (cur[x] < lo) lo = cur[x]; if (cur[x] > hi) hi = cur[x]; if (hi - lo > 12) return false; }
+      }
+      prev = cur;
+    }
+    return true;
+  } catch { return false; }
+}
+
+module.exports = { Backend, cleanTitle, regionTag, norm, pick, flatPng };

@@ -196,7 +196,7 @@ button{cursor:pointer}
 .bk .bt{flex:none;height:6%;background:var(--sb)}
 .bk .in{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;padding:7% 8% 6%}
 .bk h4{margin:0 22% 0 0;font:700 1.5em/1.02 var(--disp)}
-.bk .sub{margin:.35em 0 .9em;color:var(--ink2);font-weight:600;line-height:1.25}
+.bk .sub{margin:.35em 22% .9em 0;color:var(--ink2);font-weight:600;line-height:1.25}
 .bk dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:.28em 1em;padding-top:.7em;border-top:1px solid rgba(28,25,22,.18)}
 .bk dt{color:var(--ink2);white-space:nowrap}.bk dd{margin:0;font-weight:700;color:var(--ink);min-width:0;overflow-wrap:break-word}
 .bk dd.dim{color:var(--ink2);font-weight:600}
@@ -226,14 +226,14 @@ button{cursor:pointer}
 /* wide boxes have short backs: title and buttons on the left, the record on the right. Small square ones keep one
    column and leave out the keyboard hints and barcode */
 .card:is([data-m=mini],[data-m=cd],[data-m=card]) .bk :is(.bar,.slots){display:none}
-.card:is([data-m=mini],[data-m=cd],[data-m=card]) .bk h4{margin-right:0}
+.card:is([data-m=mini],[data-m=cd],[data-m=card]) .bk :is(h4,.sub){margin-right:0}
 .card:is([data-m=mini],[data-m=cd],[data-m=card]) .bk dl{gap:.2em .8em;padding-top:.5em}
 .card[data-m=wide] .bk .in{display:grid;grid-template-columns:1fr 1.05fr;grid-template-rows:auto auto auto 1fr auto auto;column-gap:1.4em}
 .card[data-m=wide] .bk .sub2{grid-column:1;grid-row:3}
 .card[data-m=wide] .bk .pic{grid-column:1;grid-row:4 / 6;align-self:end;margin:0}
 .card[data-m=wide] .bk .slots{grid-column:2;grid-row:4;align-self:end}
 .card[data-m=wide] .bk h4{grid-column:1;grid-row:1;margin-right:0}
-.card[data-m=wide] .bk .sub{grid-column:1;grid-row:2}
+.card[data-m=wide] .bk .sub{grid-column:1;grid-row:2;margin-right:0}
 .card[data-m=wide] .bk .acts{grid-column:2;grid-row:5;margin-top:0;padding-top:.5em}
 .card[data-m=wide] .bk dl{grid-column:2;grid-row:1 / 4;align-content:start;border-top:0;padding-top:.15em;grid-template-columns:auto minmax(0,1fr);gap:.28em .7em}
 .card[data-m=wide] .bk .file{display:none}
@@ -1175,12 +1175,24 @@ function fillBack(c, g) {
   const bar = el("div", "bar"); bar.appendChild(el("i", "", g.id.slice(0, 8).toUpperCase())); inn.appendChild(bar);
   fitBack(bk, inn);
 }
-/* everything on the back has to fit the box: the screenshot gives up its room first, then the text gets smaller */
+/* everything on the back has to fit the box: a squeezed screenshot goes first, then the text gets a little smaller,
+   then the maker and genre line goes, then the picture. Too much is something running off the bottom, or on a wide
+   back (the picture at the bottom of the left side) the picture coming up over the lines above it */
 function fitBack(bk, inn) {
-  const pic = inn.querySelector(".pic"), over = () => inn.scrollHeight > inn.clientHeight + 1;
+  let pic = inn.querySelector(".pic");
+  const over = () => {
+    if (inn.scrollHeight > inn.clientHeight + 1) return true;
+    const above = inn.querySelector(".sub2") || inn.querySelector(".sub");
+    return !!(pic && above && pic.offsetTop < above.offsetTop + above.offsetHeight - 1);
+  };
+  const shrink = min => { bk.style.removeProperty("--fit"); for (let f = .95; over() && f >= min - .001; f -= .05) bk.style.setProperty("--fit", f.toFixed(2)); return !over(); };
   bk.style.removeProperty("--fit");
-  if (pic && pic.clientHeight < pic.clientWidth * .28) pic.remove();
-  for (let f = .95; over() && f >= .7; f -= .05) bk.style.setProperty("--fit", f.toFixed(2));
+  if (pic && pic.clientHeight < pic.clientWidth * .28) { pic.remove(); pic = null; }
+  if (shrink(.8)) return;
+  const who = inn.querySelector(".sub2");
+  if (who) { who.remove(); if (shrink(.8)) return; }
+  if (pic) { pic.remove(); pic = null; }
+  shrink(.7);
 }
 function hookSlot(c) {
   c.addEventListener("focus", () => select(c));
