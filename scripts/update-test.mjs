@@ -14,11 +14,18 @@ import { createRequire } from "node:module";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = process.env.DIST_DIR || path.join(ROOT, "dist"), REPO = "colingalbraith/the-retro-shelf", PORT = 9341, FEED = 9342;
-const { compare } = createRequire(import.meta.url)("../src/version.js");
+const require = createRequire(import.meta.url);
+const { compare } = require("../src/version.js"), asar = require("@electron/asar");
 const NEW = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const step = s => console.log("· " + s);
 const win = process.platform === "win32";
+/** the version an installed app really is: the one in its own package.json (Windows file versions lose "-beta.1") */
+const versionIn = resources => {
+  const archive = path.join(resources, "app.asar");
+  // the reader remembers an archive's index by its path, and the update put a different archive there
+  try { asar.uncache(archive); return JSON.parse(asar.extractFile(archive, "package.json").toString()).version; } catch { return ""; }
+};
 
 async function github(p) {
   const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
@@ -93,7 +100,7 @@ try {
     const progs = path.join(process.env.LOCALAPPDATA, "Programs");
     exe = fs.readdirSync(progs).map(d => path.join(progs, d, "The Retro Shelf.exe")).find(f => fs.existsSync(f));
     if (!exe) throw new Error("the old version didn't install");
-    installed = () => execFileSync("powershell", ["-NoProfile", "-Command", `(Get-Item '${exe}').VersionInfo.ProductVersion`]).toString().trim();
+    installed = () => versionIn(path.join(path.dirname(exe), "resources"));
   } else {
     const arch = process.arch === "arm64" ? "arm64" : "x64", a = rel.assets.find(x => x.name.endsWith(`-mac-${arch}.zip`));
     const zip = path.join(work, a.name);
@@ -101,7 +108,7 @@ try {
     execFileSync("ditto", ["-x", "-k", zip, work]);
     const bundle = path.join(work, "The Retro Shelf.app");
     exe = path.join(bundle, "Contents", "MacOS", "The Retro Shelf");
-    installed = () => { try { return execFileSync("plutil", ["-extract", "CFBundleShortVersionString", "raw", path.join(bundle, "Contents", "Info.plist")]).toString().trim(); } catch { return ""; } };
+    installed = () => versionIn(path.join(bundle, "Contents", "Resources"));
   }
   const before = installed();
   if (compare(before, OLD) !== 0) throw new Error(`the old app says it's ${before}, not ${OLD}`);
