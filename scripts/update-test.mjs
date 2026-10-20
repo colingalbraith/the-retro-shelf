@@ -140,8 +140,13 @@ try {
 } finally {
   if (server) server.close();
   // the old app if it's still open, and the new one the update opened
-  // the updated app opens itself again once its installer finishes, which can be a little after this: keep closing it
-  if (win) for (let i = 0; i < 10; i++) { spawnSync("taskkill", ["/IM", "The Retro Shelf.exe", "/T", "/F"], { stdio: "ignore" }); await sleep(1500); }
+  // the update's installer carries on a little after the new files are in place, then opens the app again: wait for
+  // it to finish, then close the app, so the next step's installer has the field to itself
+  if (win) {
+    const running = () => /The-Retro-Shelf-Setup/i.test(spawnSync("tasklist", ["/FO", "CSV", "/NH"], { encoding: "utf8" }).stdout || "");
+    for (let i = 0; i < 90 && running(); i++) await sleep(2000);
+    for (let i = 0; i < 6; i++) { spawnSync("taskkill", ["/IM", "The Retro Shelf.exe", "/T", "/F"], { stdio: "ignore" }); await sleep(1500); }
+  }
   else { if (app) try { process.kill(app.pid, "SIGTERM"); } catch {} spawnSync("pkill", ["-f", work], { stdio: "ignore" }); }
   await sleep(1500);
   try { fs.rmSync(home, { recursive: true, force: true }); } catch {}

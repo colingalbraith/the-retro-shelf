@@ -23,10 +23,15 @@ function findApp() {
   if (process.platform === "win32") {
     const setup = fs.readdirSync(DIST).find(f => /Setup.*\.exe$/.test(f));
     if (!setup) throw new Error("no installer in dist/");
-    // an installer can't replace an app that's open (left by an earlier step, say)
-    spawnSync("taskkill", ["/IM", "The Retro Shelf.exe", "/T", "/F"], { stdio: "ignore" });
     step("installing " + setup);
-    const r = spawnSync(path.join(DIST, setup), ["/S"], { stdio: "inherit" });
+    // an installer can't run while the app is open or another installer is still going (an earlier step's): close the
+    // app, and try again a little later
+    let r = null;
+    for (let i = 0; i < 3 && (!r || r.status !== 0); i++) {
+      if (i) { console.log("  (the installer couldn't run yet; trying again)"); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15000); }
+      spawnSync("taskkill", ["/IM", "The Retro Shelf.exe", "/T", "/F"], { stdio: "ignore" });
+      r = spawnSync(path.join(DIST, setup), ["/S"], { stdio: "inherit" });
+    }
     if (r.status !== 0) throw new Error("the installer failed (" + r.status + ")");
     // a one-click install goes in the user's Programs folder
     const progs = path.join(process.env.LOCALAPPDATA, "Programs");
