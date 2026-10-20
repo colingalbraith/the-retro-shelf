@@ -344,14 +344,34 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .biosl b::before{content:"";display:inline-block;width:9px;height:9px;margin-right:8px;background:#b9b1a2;vertical-align:0}
 .biosl b.ok::before{background:#2f7d4f}.biosl b.need::before,.biosl b.bad::before{background:#c23b22}.biosl b.partial::before{background:#d29a2b}
 .biosl span{color:var(--ink2)}
-/* play stats: labeled bars */
-.stats{padding:12px 0 14px;border-bottom:1px solid rgba(28,25,22,.14)}
-.stats h4{margin:0 0 8px;font:600 15px var(--disp)}
-.srow{display:grid;grid-template-columns:minmax(0,15em) 1fr 6.5em;gap:12px;align-items:center;padding:3px 0;font-size:14px}
-.srow b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.srow span{color:var(--ink2);text-align:right;font:500 13px var(--mono)}
-.sbar{height:10px;background:rgba(28,25,22,.08)}
-.sbar i{display:block;height:100%;background:var(--acc)}
+/* ---------- your play: a trophy shelf of the most played games, and a stack of boxes per console ---------- */
+#trophy{position:fixed;top:0;left:0;right:0;bottom:0;z-index:127;overflow-y:auto;background:linear-gradient(180deg,var(--wall-hi),var(--wall) 420px),var(--wall);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s}
+#trophy.show{opacity:1;visibility:visible}
+.tin{max-width:1080px;margin:0 auto;padding:34px 56px 60px}
+.thead{display:flex;align-items:center;justify-content:space-between}
+.thead .tape{transform:rotate(-1.2deg)}
+#tclose{color:var(--chalk)}
+.tsum{margin:22px 0 0;color:var(--dust);font:500 17px/1.5 var(--disp)}
+.tsum b{color:var(--chalk);font:700 44px/1 var(--disp);letter-spacing:-.01em;margin-right:10px;vertical-align:-4px}
+/* the plank: the same wood as the shelves */
+.tshelf{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:34px;margin-top:46px;padding:0 20px 58px;
+  background:linear-gradient(180deg,#3f2a1a 0,#3f2a1a 2px,#876041 2px,#8d6644 10px,#a67b54 10px,#a67b54 11px,#5f412a 11px,#573b25 33px,#24170d 33px,rgba(0,0,0,.5) 34px,transparent 56px) left bottom / 100% 56px no-repeat}
+.tro{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;transform:rotate(var(--rz, 0deg));transform-origin:50% 100%}
+.tro .art{position:relative;height:var(--th);box-shadow:0 10px 18px rgba(0,0,0,.55),0 2px 3px rgba(0,0,0,.6)}
+.tro .art img{display:block;height:100%;width:auto}
+.tro .art.gen{width:calc(var(--th) * .72);display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;background:var(--paper);color:var(--ink);font:700 15px/1.15 var(--disp);text-align:center}
+.tro::after{content:"";position:absolute;left:8%;right:8%;bottom:-6px;height:8px;background:radial-gradient(closest-side,rgba(0,0,0,.55),transparent)}
+.tro .star{position:absolute;top:-14px;right:-14px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#ffe9a6,#e2b33d 55%,#b8862a);color:#5a3d0c;font-size:22px;box-shadow:0 2px 5px rgba(0,0,0,.5);transform:rotate(12deg)}
+/* brass plates hang on the plank's front edge, under each box or stack */
+.tplate{position:absolute;left:50%;bottom:-38px;transform:translateX(-50%);white-space:nowrap;height:18px;padding:0 13px;display:flex;align-items:center;gap:7px;
+  background:linear-gradient(180deg,#cdb27a,#a88a52);color:#3a2c14;font:700 11px/1 var(--disp);letter-spacing:.12em;text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(255,240,200,.45);box-shadow:inset 0 1px 0 rgba(255,245,215,.55),inset 0 -1px 0 rgba(0,0,0,.25),0 1px 2px rgba(0,0,0,.5)}
+.tplate::before,.tplate::after{content:"";width:4px;height:4px;border-radius:50%;background:#7d6436;box-shadow:inset 0 1px 0 rgba(0,0,0,.4)}
+.tplate small{font-size:10px;opacity:.75;letter-spacing:.06em}
+/* consoles: boxes lying flat, a taller pile for more time */
+.stacks{gap:30px;margin-top:70px}
+.stk-c{position:relative;flex:none;display:flex;flex-direction:column-reverse;align-items:center;width:96px}
+.slab{width:var(--w);height:13px;margin-top:1px;background:linear-gradient(90deg,var(--band) 0 9px,var(--body) 9px);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.35),0 1px 1px rgba(0,0,0,.4);transform:translateX(var(--x))}
 .seg{display:flex;flex:none;border:1.5px solid var(--ink)}
 .seg button{border:0;background:none;padding:5px 14px;font-weight:600;white-space:nowrap}
 .seg button+button{border-left:1.5px solid var(--ink)}
@@ -506,6 +526,15 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
         <div class="links"><a href="https://www.gog.com" target="_blank" rel="noopener">GOG</a><a href="https://evercade.co.uk" target="_blank" rel="noopener">Evercade</a><a href="https://limitedrungames.com" target="_blank" rel="noopener">Limited Run Games</a></div></div>
       <p class="legal">There are no links to ROM sites here. Downloading a commercial game is illegal in most countries, even if you own a copy.</p>
     </div>
+  </div>
+</div>
+
+<div id="trophy" role="dialog" aria-label="Your play">
+  <div class="tin">
+    <div class="thead"><span class="tape">Your play</span><button id="tclose" class="btn">Done<kbd>Esc</kbd></button></div>
+    <p class="tsum" id="tsum"></p>
+    <div class="tshelf" id="ttop"></div>
+    <div class="tshelf stacks" id="tcon"></div>
   </div>
 </div>
 
@@ -1084,7 +1113,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth; markUnder();
@@ -1200,7 +1229,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1657,25 +1686,74 @@ function renderSettings() {
   updateCoverUI(); p.scrollTop = st;
 }
 
-/* ---------- your play: time played, most played, and time by console ---------- */
+/* ---------- your play: a trophy shelf of the most played games, and a stack of boxes per console ---------- */
+/* box colors for each console's pile: [body, the band down one side] */
+const STACK = {"NES": ["#2b2a28", "#c8312b"], "SNES": ["#cfcac0", "#5b4fa3"], "Game Boy": ["#bdb8aa", "#3f3b8f"], "GBA": ["#3b3a8a", "#d8d3c8"],
+  "Genesis": ["#141312", "#d8382f"], "Master System": ["#f0eee8", "#1f1f1f"], "PC Engine": ["#e8e4da", "#d2402c"], "Atari 2600": ["#1d1b19", "#c9a24a"],
+  "N64": ["#2b2a28", "#3c8d3e"], "PS1": ["#141312", "#e9e1cf"], "Dreamcast": ["#efece6", "#e85d1c"], "DS": ["#e9e6df", "#1d1b19"], "PSP": ["#141312", "#9aa4ad"],
+  "Arcade": ["#d9a531", "#1d1a16"], "GameCube/Wii": ["#5f4b9b", "#e9e1cf"], "PS2": ["#16294d", "#e9e1cf"]};
 function playStats(b, R) {
   const played = G.filter(g => g.time > 0), total = played.reduce((t, g) => t + g.time, 0);
-  if (!played.length) { R("Nothing yet", "Play something and your stats show up here.", null); return; }
-  R("Time played", fmtDur(total) + " across " + plural(played.length, "game", "games") + " (of " + G.length + " on your shelves) · " + plural(G.reduce((t, g) => t + (g.plays || 0), 0), "session", "sessions") + ".", null);
-  const bars = (title, rows) => {
-    const box = el("div", "stats"), top = Math.max(...rows.map(r => r[1]));
-    box.appendChild(el("h4", "", title));
-    rows.forEach(([label, v]) => {
-      const r = el("div", "srow"), bar = el("i"); bar.style.width = Math.max(2, Math.round(v / top * 100)) + "%";
-      r.appendChild(el("b", "", label)); const t = el("div", "sbar"); t.appendChild(bar); r.appendChild(t); r.appendChild(el("span", "", fmtDur(v)));
-      box.appendChild(r);
-    });
-    b.appendChild(box);
-  };
-  bars("Most played", played.sort((x, y) => y.time - x.time).slice(0, 5).map(g => [g.title, g.time]));
-  const by = {}; played.forEach(g => { by[g.system] = (by[g.system] || 0) + g.time; });
-  bars("By console", Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, 8));
+  const op = el("button", "btn", "Open"); op.onclick = () => { closeSettings(); openTrophy(); };
+  R("Your trophy shelf", played.length ? fmtDur(total) + " played across " + plural(played.length, "game", "games") + "." : "Play something and your most played games show up here.", op);
 }
+function openTrophy() {
+  if (LAUNCH.open) return;
+  const played = G.filter(g => g.time > 0).sort((x, y) => y.time - x.time), total = played.reduce((t, g) => t + g.time, 0);
+  const sum = $("#tsum"), top = $("#ttop"), con = $("#tcon"); clear(sum); clear(top); clear(con);
+  if (!played.length) {
+    sum.textContent = "Nothing on the trophy shelf yet. Play something and your most played games will stand here.";
+  } else {
+    sum.appendChild(el("b", "", fmtDur(total)));
+    sum.appendChild(document.createTextNode("played · " + played.length + " of " + G.length + " games · " + plural(G.reduce((t, g) => t + (g.plays || 0), 0), "session", "sessions")));
+    /* the five most played, biggest first, a little crooked like boxes put up by hand */
+    played.slice(0, 5).forEach((g, i) => {
+      const t = el("div", "tro"), art = el("div", "art");
+      t.dataset.h = Math.round(250 * [1, .86, .76, .68, .62][i]); t.style.setProperty("--th", t.dataset.h + "px");
+      t.style.setProperty("--rz", ((hash(g.id) % 5) - 2) * .6 + "deg");
+      if (g.cv) { const im = new Image(); im.alt = g.title; im.onload = fitTrophy; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); }
+      else { art.classList.add("gen"); art.textContent = g.title; }
+      if (!i) art.appendChild(el("span", "star", "★"));
+      const pl = el("div", "tplate", fmtDur(g.time)); pl.title = g.title;
+      t.appendChild(art); t.appendChild(pl); top.appendChild(t);
+    });
+    /* each console's time as a pile of its boxes: the most played console gets twelve */
+    const by = {}; played.forEach(g => { by[g.system] = (by[g.system] || 0) + g.time; });
+    const rows = Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, 8), most = rows[0][1];
+    rows.forEach(([sys, tm]) => {
+      const c = el("div", "stk-c"), col = STACK[sys] || ["#3a352f", "#e9e1cf"], n = Math.max(1, Math.round(12 * tm / most));
+      for (let k = 0; k < n; k++) {
+        const sl = el("div", "slab"), h = hash(sys + k);
+        sl.style.setProperty("--body", col[0]); sl.style.setProperty("--band", col[1]);
+        sl.style.setProperty("--w", 78 + h % 14 + "px"); sl.style.setProperty("--x", (h >>> 4) % 9 - 4 + "px");
+        c.appendChild(sl);
+      }
+      const pl = el("div", "tplate", sys); pl.appendChild(el("small", "", fmtDur(tm)));
+      c.appendChild(pl); con.appendChild(c);
+    });
+  }
+  con.hidden = !played.length;
+  blurActive(); $("#trophy").scrollTop = 0; $("#trophy").classList.add("show"); light(); beep(520);
+  fitTrophy();
+}
+/* everything stays on its plank: the trophies shrink together until they fit, and consoles that don't fit are left
+   off (the least played go first); each pile is as wide as its plate */
+function fitTrophy() {
+  if (!isOpen("trophy")) return;
+  const top = $("#ttop"), con = $("#tcon"), tros = [...top.children];
+  if (tros.length) {
+    tros.forEach(t => t.style.setProperty("--th", t.dataset.h + "px"));
+    const gap = parseFloat(getComputedStyle(top).columnGap) || 0, room = top.clientWidth - 40;
+    const need = tros.reduce((w, t) => w + t.offsetWidth, 0) + gap * (tros.length - 1);
+    if (need > room) { const k = room / need; tros.forEach(t => t.style.setProperty("--th", Math.floor(t.dataset.h * k) + "px")); }
+  }
+  [...con.children].forEach(c => { c.hidden = false; const pl = c.querySelector(".tplate"); c.style.width = Math.max(96, pl.offsetWidth + 8) + "px"; });
+  const cs = [...con.children];
+  while (cs.length > 1 && con.scrollWidth > con.clientWidth) cs.pop().hidden = true;
+}
+window.addEventListener("resize", fitTrophy);
+function closeTrophy() { if (!isOpen("trophy")) return; $("#trophy").classList.remove("show"); focusById(focusId); light(); beep(330); }
+$("#tclose").onclick = closeTrophy;
 
 /* ---------- moving around the shelves ---------- */
 function setKb(on) { if (kbMode !== on) { kbMode = on; document.body.classList.toggle("kb", on); } }
@@ -1748,6 +1826,7 @@ document.addEventListener("keydown", e => {
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
+  if (isOpen("trophy")) { if (k === "Escape" || k === "Enter") closeTrophy(); return; }
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
   if (isOpen("nsh")) { if (k === "Escape") closeShelfSlip(); else if (k === "Enter") saveShelfSlip(); return; }
   if (isOpen("welcome")) { if (k === "Escape" || k === "Enter") closeWelcome(); return; }
@@ -1797,6 +1876,7 @@ setInterval(() => {
   if (isOpen("imp")) { if (press("b")) $("#icancel").click(); }
   else if (isOpen("ren")) { if (press("b")) closeRename(); }
   else if (isOpen("pick")) { if (press("b")) closePicker(); }
+  else if (isOpen("trophy")) { if (press("b") || press("a")) closeTrophy(); }
   else if (isOpen("nsh")) { if (press("b")) closeShelfSlip(); }
   else if (isOpen("welcome")) { if (press("a") || press("b")) closeWelcome(); }
   else if (isOpen("getg")) { if (press("b")) closeGetGames(); }
@@ -1831,6 +1911,7 @@ APP.onMenu(w => {
   if (LAUNCH.open) return;
   if (w === "add-games") { closeSettings(); addGames(); }
   else if (w === "get-games") openGetGames();
+  else if (w === "your-play") { closeSettings(); openTrophy(); }
   else if (w && w.cmd === "rename") openRename(w.id);
   else if (w && w.cmd === "find-cover") openPicker(w.id);
   else if (w && w.cmd === "new-shelf") openShelfSlip({id: w.id});
