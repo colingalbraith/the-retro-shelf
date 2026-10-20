@@ -144,7 +144,8 @@ function gameMenu(id) {
     ...(saves && saves.resume ? [{ label: "Start Fresh", click: () => send({ cmd: "play", id: g.id, fresh: true }) }] : []),
     { type: "separator" },
     { label: "Rename…", click: () => send({ cmd: "rename", id: g.id }) },
-    { label: "Change Cover…", click: () => pickPicture("cover") },
+    { label: "Find Cover…", click: () => send({ cmd: "find-cover", id: g.id }) },
+    { label: "Use My Own Cover…", click: () => pickPicture("cover") },
     { label: "Change Logo…", click: () => pickPicture("logo") },
     { label: "Change Screenshot…", click: () => pickPicture("snap") },
     ...(others.length ? [{ label: "Move to", submenu: others.map(s => ({ label: s, click: () => {

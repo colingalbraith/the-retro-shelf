@@ -43,6 +43,13 @@ Arcade) and check every license again.
 
 GNU General Public License v2 or later. From https://github.com/libretro/dolphin (`Data/Sys`).
 
+## PPSSPP system files
+
+Fonts, the on-screen dialog atlas and other data the PPSSPP core reads, from libretro's
+https://buildbot.libretro.com/assets/system/PPSSPP.zip (the `assets` folder of https://github.com/hrydgard/ppsspp).
+GNU General Public License v2 or later, with the notices in `PPSSPP/LICENSE.TXT`; the Roboto fonts are Apache 2.0
+and Inconsolata is SIL Open Font License 1.1.
+
 ## Electron
 
 MIT License. Electron bundles Chromium, Node.js and other components; their notices ship in the app as

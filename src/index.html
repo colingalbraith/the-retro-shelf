@@ -72,6 +72,8 @@ button{cursor:pointer}
 .card.sel .box{transform:translate3d(var(--px, 0px), var(--py, -14px), 0) translateZ(calc(var(--card) * var(--zs, 1.4))) rotateY(-90deg)}
 .card.sel.flip .box{transform:translate3d(var(--fx, 0px), var(--fy, -22px), 0) translateZ(calc(var(--card) * var(--zf, 2.1))) rotateY(90deg)}
 .noanim .box,.noanim .card,.noanim .card::after,.noanim .plate,.noanim .sp b,.noanim .sp{transition:none!important}
+/* boxes well off screen aren't drawn: their slot keeps its size, so nothing moves (see watchFar) */
+.card.far > .box{display:none}
 
 /* a lived-in shelf: a box leaning on its neighbor, a small pile lying flat, a little unevenness.
    Picking a box straightens it up (a flat one stands up) before it slides out */
@@ -336,6 +338,12 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .fld{display:flex;align-items:center;gap:10px}
 .dot{width:9px;height:9px;flex:none}
 .dot.ok{background:#2f7d4f}.dot.bad{background:#c23b22}
+/* BIOS checker: one line per console */
+.biosl{display:grid;grid-template-columns:max-content 1fr;gap:7px 16px;padding:4px 0 14px;border-bottom:1px solid rgba(28,25,22,.14);font-size:14px;line-height:1.35}
+.biosl b{font-weight:600;white-space:nowrap}
+.biosl b::before{content:"";display:inline-block;width:9px;height:9px;margin-right:8px;background:#b9b1a2;vertical-align:0}
+.biosl b.ok::before{background:#2f7d4f}.biosl b.need::before,.biosl b.bad::before{background:#c23b22}.biosl b.partial::before{background:#d29a2b}
+.biosl span{color:var(--ink2)}
 .seg{display:flex;flex:none;border:1.5px solid var(--ink)}
 .seg button{border:0;background:none;padding:5px 14px;font-weight:600;white-space:nowrap}
 .seg button+button{border-left:1.5px solid var(--ink)}
@@ -369,6 +377,20 @@ html:not([data-fx="off"]) #getg.show .panel{animation:rise .22s ease}
 .links a{color:var(--ink);font-weight:600;text-decoration:none;border-bottom:1.5px solid var(--acc);white-space:nowrap}
 .links a::after{content:" ↗";font-weight:400;color:var(--ink2)}
 .links a:hover{color:#000;border-bottom-color:var(--ink)}
+
+/* ---------- picking a cover by hand ---------- */
+#pick{position:fixed;top:0;left:0;right:0;bottom:0;z-index:126;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;transition:opacity .18s,visibility .18s}
+#pick.show{opacity:1;visibility:visible}
+html:not([data-fx="off"]) #pick.show .panel{animation:rise .22s ease}
+.psearch{display:flex;gap:8px;margin-top:16px}
+.psearch input{flex:1;min-width:0;padding:8px 11px;border:1.5px solid var(--ink);border-radius:0;background:var(--paper-hi);outline:none;font:500 15px var(--disp);user-select:text}
+#pmsg{margin:12px 0 0;color:var(--ink2)}
+#pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:14px;margin:14px 0 4px}
+#pgrid button{display:flex;flex-direction:column;gap:6px;padding:0;border:0;background:none;text-align:left;color:var(--ink);font:500 12px/1.25 var(--disp)}
+#pgrid .im{display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:1;background:#1c1916;outline:2px solid transparent;outline-offset:2px}
+#pgrid img{max-width:100%;max-height:100%;object-fit:contain}
+#pgrid button:hover .im,#pgrid button:focus-visible .im{outline-color:var(--acc)}
+#pgrid span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink2)}
 
 /* ---------- small slips: rename, welcome ---------- */
 .over{position:fixed;top:0;left:0;right:0;bottom:0;z-index:135;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;transition:opacity .18s,visibility .18s}
@@ -475,6 +497,17 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
       <div class="row2"><div class="rl"><b>Re-releases</b><span>Lots of old games are still sold today. These run in their own apps, not on the shelf.</span></div>
         <div class="links"><a href="https://www.gog.com" target="_blank" rel="noopener">GOG</a><a href="https://evercade.co.uk" target="_blank" rel="noopener">Evercade</a><a href="https://limitedrungames.com" target="_blank" rel="noopener">Limited Run Games</a></div></div>
       <p class="legal">There are no links to ROM sites here. Downloading a commercial game is illegal in most countries, even if you own a copy.</p>
+    </div>
+  </div>
+</div>
+
+<div id="pick">
+  <div class="panel" role="dialog" aria-label="Find a cover">
+    <div class="phead"><div><small>Retro Shelf manual</small><h2>Find a cover</h2></div><button id="pclose" class="btn primary">Done<kbd>Esc</kbd></button></div>
+    <div id="pbody">
+      <div class="psearch"><input type="text" id="pq" spellcheck="false" autocomplete="off" aria-label="Search covers"><button class="btn" id="pgo">Search</button></div>
+      <p class="lead" id="pmsg"></p>
+      <div id="pgrid"></div>
     </div>
   </div>
 </div>
@@ -929,7 +962,7 @@ function fillBack(c, g) {
   const fine = el("div", "fine", "Enter play · F favorite · Space turn back");
   const link = (t, fn) => { const u = el("u", "", t); u.onclick = e => { e.stopPropagation(); fn(); }; fine.appendChild(document.createTextNode(" · ")); fine.appendChild(u); };
   link("More…", () => APP.gameMenu(g.id));
-  if (!g.cv) link("Find cover art", () => findCover(g.id));
+  link(g.cv ? "Change cover" : "Find cover art", () => openPicker(g.id));
   inn.appendChild(fine);
   const bar = el("div", "bar"); bar.appendChild(el("i", "", g.id.slice(0, 8).toUpperCase())); inn.appendChild(bar);
   fitBack(bk, inn);
@@ -946,7 +979,7 @@ function hookSlot(c) {
   c.onmouseenter = () => { if (!kbMode && !scrolling && sel !== c) c.focus({preventScroll: true}); };
 }
 function slot(g, face, i) {
-  const c = el("div", "card"); c.tabIndex = 0; c.dataset.id = g.id; paintVars(c, g);
+  const c = el("div", "card far"); c.tabIndex = 0; c.dataset.id = g.id; paintVars(c, g);
   if (i < 80) c.style.setProperty("--i", i);
   c.appendChild(box(c, g)); stickers(c, g);
   if (face || (g.cv && SEEN.has("/cover/" + g.id + "?v=" + g.cv))) fillCover(c, g); else if (g.cv && io) io.observe(c);
@@ -1027,13 +1060,27 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "imp", "getg", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "imp", "getg", "pick", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth; markUnder();
     requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("noanim")));
   }
+  watchFar(root);
   POOL = null;
+}
+/* Only boxes within about half a screen of the view are drawn. Every box is several 3D layers, and with a big library
+   thousands of them made scrolling stutter; the rest wait as empty slots of the same size */
+let farIO = null;
+function watchFar(root) {
+  if (farIO) farIO.disconnect();
+  farIO = new IntersectionObserver(es => es.forEach(e => { if (e.target !== sel) e.target.classList.toggle("far", !e.isIntersecting); }), {root, rootMargin: "60% 0px"});
+  const R = root.getBoundingClientRect(), m = R.height * .6;
+  slots().forEach(c => {
+    const r = c.getBoundingClientRect();
+    c.classList.toggle("far", c !== sel && (r.bottom < R.top - m || r.top > R.bottom + m));
+    farIO.observe(c);
+  });
 }
 /* a group narrower than its name plate gets a little extra shelf so plates never overlap. Only the part of the
    group on the plate's own line counts: a group that wraps onto the next shelf is already wide enough */
@@ -1045,9 +1092,15 @@ function fitPlates() {
     /* a group starting at the very end of a shelf, with no room for its name plate, starts on the next shelf */
     const row = f.parentNode, edge = row.getBoundingClientRect().right - parseFloat(getComputedStyle(row).paddingRight);
     if (pl.getBoundingClientRect().right > edge + 1) { const prev = f.previousElementSibling; row.insertBefore(el("i", "brk"), prev && prev.classList.contains("bookend") ? prev : f); }
-    const top = f.getBoundingClientRect().top;
-    const grp = Array.prototype.filter.call(f.parentNode.children, e => e.dataset.group === f.dataset.group && Math.abs(e.getBoundingClientRect().top - top) < 12);
-    const last = grp[grp.length - 1], w = last.getBoundingClientRect().right - f.getBoundingClientRect().left, need = pl.offsetWidth + 10;
+    /* the group's boxes on the plate's line: they follow the first one until the shelf wraps */
+    const fr = f.getBoundingClientRect();
+    let last = f, lastR = fr;
+    for (let e = f.nextElementSibling; e && e.dataset.group === f.dataset.group; e = e.nextElementSibling) {
+      const r = e.getBoundingClientRect();
+      if (Math.abs(r.top - fr.top) >= 12) break;
+      last = e; lastR = r;
+    }
+    const w = lastR.right - fr.left, need = pl.offsetWidth + 10;
     if (w > 0 && need > w) last.style.marginRight = (need - w) + "px";
   });
 }
@@ -1069,6 +1122,7 @@ function emptyShelf() {
 }
 function select(c) {
   if (sel === c) { light(); return; }
+  c.classList.remove("far");
   if (sel) sel.classList.remove("sel", "flip");
   c._lsel = null;
   if (!c._manual && !c.classList.contains("flat") && !c.closest(".lslot")) c._lsel = placeBox(c, "--zs", 18, "--px", "--py");
@@ -1100,7 +1154,7 @@ function markUnder() {
   if (!c || c._manual || !document.body.contains(c) || c.closest(".row.face")) return;
   const f = c.querySelector(c.classList.contains("flip") ? ".f.bk" : ".f.cv").getBoundingClientRect();
   const line = x => (x.closest(".stack") || x).getBoundingClientRect().top, y0 = line(c);
-  $$("#shelves .card").forEach(x => {
+  $$("#shelves .card:not(.far)").forEach(x => {
     if (x === c || Math.abs(line(x) - y0) > 12) return;
     const q = x.getBoundingClientRect();
     if (q.right > f.left + 2 && q.left < f.right - 2) x.classList.add("under");
@@ -1122,7 +1176,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("ren") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("ren") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1137,12 +1191,6 @@ async function toggleFav(id) {
   const r = await api("/api/fav", {id}); if (!r.ok) return;
   FAV = new Set(r.data.fav); beep(660);
   renderShelves(id);
-}
-async function findCover(id) {
-  const r = await api("/api/covers/fetch", {id, force: true});
-  if (r.data.reason) return toast(r.data.reason, true);
-  if (r.data.started === false) return toast("Cover search is already running.");
-  singleSearch = true; lastRun = true; toast("Looking for cover art…");
 }
 async function rescan() {
   busy(true); await api("/api/rescan", {}); await refresh(true); busy(false); toast("Found " + G.length + " games");
@@ -1162,7 +1210,9 @@ async function importPaths(paths) {
 async function importBatch(paths) {
   busy(true); const r = await api("/api/import/check", {paths}); busy(false);
   if (!r.ok) return toast(r.data.error || "Couldn't read those files.", true);
-  const items = r.data.items, fresh = items.filter(i => !i.exists);
+  const items = r.data.items, fresh = items.filter(i => !i.exists), nb = (r.data.biosAdded || []).length;
+  if (nb) { toast("Put " + plural(nb, "BIOS file", "BIOS files") + " in the BIOS folder (" + r.data.biosAdded.slice(0, 3).join(", ") + (nb > 3 ? "…" : "") + ")."); checkBios(); }
+  if (!items.length && nb) return;
   if (!items.length) return toast(r.data.unknownCount ? "Those don't look like games this can play (" + r.data.unknown.slice(0, 3).join(", ") + (r.data.unknownCount > 3 ? "…" : "") + ")." : "No games found there.", true);
   if (!fresh.length) return toast(items.length === 1 ? "That game is already on your shelves." : "Those games are already on your shelves.");
   const unsure = fresh.filter(i => !i.system), picks = unsure.length ? await askSystems(unsure) : {};
@@ -1292,7 +1342,7 @@ function onExit(prev) {
 }
 
 /* ---------- polling + refresh ---------- */
-let lastFound = 0, lastRun = false, singleSearch = false, lastRunning = null;
+let lastFound = 0, lastRun = false, lastRunning = null;
 async function poll() {
   const r = await api("/api/status"); if (!r.ok) return;
   const s = r.data; offset = s.now * 1000 - Date.now();
@@ -1302,7 +1352,6 @@ async function poll() {
   if (!prev && s.running && !LAUNCH.open) showLaunch(byId.get(s.running.id));
   const c = s.covers;
   if (c.found !== lastFound || (lastRun && !c.running)) refresh();
-  if (lastRun && !c.running && singleSearch) { singleSearch = false; if (!c.found) toast(c.error || "No cover found. Save an image named like the ROM next to it.", true); }
   lastFound = c.found; lastRun = c.running;
   updateCoverUI(); updatePill();
 }
@@ -1332,6 +1381,45 @@ async function loadLibrary(force) {
   else G.forEach(g => { if (art.get(g.id) !== g.cv + "/" + g.lv) redrawArt(g); });
 }
 
+/* ---------- picking a cover by hand: search the covers for this console, click the right one ---------- */
+let pickId = null, pickIO = null;
+function openPicker(id) {
+  const g = byId.get(id); if (!g || LAUNCH.open) return;
+  if (isOpen("settings")) $("#settings").classList.remove("show");
+  pickId = id; blurActive(); $("#pq").value = g.title; $("#pick").classList.add("show"); light(); beep(520);
+  searchCovers(); setTimeout(() => { $("#pq").focus(); $("#pq").select(); }, 60);
+}
+function closePicker() { if (!isOpen("pick")) return; $("#pick").classList.remove("show"); pickId = null; if (pickIO) pickIO.disconnect(); focusById(focusId); light(); beep(330); }
+async function searchCovers() {
+  const grid = $("#pgrid"), msg = $("#pmsg"), id = pickId; clear(grid); msg.textContent = "Searching…";
+  const r = await api("/api/covers/search", {id, q: $("#pq").value});
+  if (id !== pickId) return;
+  if (!r.ok) { msg.textContent = r.data.error || "Couldn't search for covers."; return; }
+  const res = r.data.results;
+  msg.textContent = !res.length ? "No covers match. Try fewer or different words."
+    : "Click the right box to use it" + (res.length >= 60 ? " (showing the first 60)." : ".");
+  /* pictures load as they scroll into view: each one is a download */
+  if (pickIO) pickIO.disconnect();
+  pickIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.src = e.target.dataset.src; pickIO.unobserve(e.target); } }), {root: $("#pick .panel"), rootMargin: "200px"});
+  res.forEach(x => {
+    const b = el("button", ""), box = el("div", "im"), im = new Image(); im.alt = ""; im.decoding = "async";
+    im.dataset.src = "/cover-preview/" + encodeURIComponent(x.thumb) + "/" + encodeURIComponent(x.name);
+    im.onerror = () => box.classList.add("none");
+    box.appendChild(im); b.appendChild(box); b.appendChild(el("span", "", x.name.replace(/\.png$/i, "")));
+    b.onclick = () => pickCover(x);
+    grid.appendChild(b); pickIO.observe(im);
+  });
+}
+async function pickCover(x) {
+  const id = pickId; if (!id) return;
+  busy(true); const r = await api("/api/covers/pick", {id, thumb: x.thumb, name: x.name}); busy(false);
+  if (!r.ok) return toast(r.data.error || "Couldn't use that cover.", true);
+  closePicker(); await refresh(); focusById(id); toast("New cover saved.");
+}
+$("#pclose").onclick = closePicker;
+$("#pgo").onclick = searchCovers;
+$("#pick").addEventListener("mousedown", e => { if (e.target === $("#pick")) closePicker(); });
+
 /* ---------- rename ---------- */
 let renId = null;
 function openRename(id) {
@@ -1356,7 +1444,20 @@ function openGetGames() { if (LAUNCH.open) return; if (isOpen("settings")) $("#s
 function closeGetGames() { if (!isOpen("getg")) return; $("#getg").classList.remove("show"); focusById(focusId); light(); beep(330); }
 
 /* ---------- settings ---------- */
-function openSettings() { if (isOpen("settings") || LAUNCH.open) return; blurActive(); renderSettings(); $("#settings").classList.add("show"); light(); beep(520); }
+function openSettings() { if (isOpen("settings") || LAUNCH.open) return; blurActive(); checkBios(); renderSettings(); $("#settings").classList.add("show"); light(); beep(520); }
+/* which BIOS files are in place, for Settings */
+let BIOSST = null;
+function checkBios() { api("/api/bios", {}).then(r => { if (r.ok) { BIOSST = r.data.systems; if (isOpen("settings")) renderSettings(); } }); }
+/* the games a console's BIOS is for: PC Engine CD games only (not cards); for arcade there's no telling which are Neo Geo */
+const biosGames = c => c.system === "Arcade" ? 0 : G.filter(g => g.system === c.system && (c.system !== "PC Engine" || /\.(cue|chd)$/i.test(g.file || ""))).length;
+function biosLine(c) {
+  const has = c.files.filter(f => f.ok).map(f => f.name), wrong = c.files.filter(f => f.found && !f.ok).map(f => f.name);
+  const n = biosGames(c), games = n ? " You have " + plural(n, "game", "games") + " for it." : "";
+  if (c.state === "ok") return "Found " + has[0] + (has.length > 1 ? " and " + (has.length - 1) + " more" : "") + ".";
+  if (c.state === "bad") return wrong.join(", ") + " is the wrong size, so it's probably not a real BIOS. Copy it again from your console.";
+  if (c.state === "partial") return "Has " + has.join(", ") + ". Missing " + c.files.filter(f => !f.found).map(f => f.name).join(", ") + ". " + c.note;
+  return "Missing: " + c.files[0].name + (c.files.length > 1 ? (c.files.length > 3 ? " (or another one of its BIOS files)" : ", " + c.files.slice(1).map(f => f.name).join(", ")) : "") + ". " + c.note + games;
+}
 function closeSettings() { if (!isOpen("settings")) return; $("#settings").classList.remove("show"); focusById(focusId); light(); beep(330); }
 function updateCoverUI() {
   const t = $("#ctext"); if (!t) return; const c = STATUS.covers || {};
@@ -1419,6 +1520,16 @@ function renderSettings() {
     const fb = el("div", "btns"), f1 = el("button", "btn", "Saves"), f2 = el("button", "btn", "BIOS");
     f1.onclick = () => APP.openFolder("saves"); f2.onclick = () => APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
     R("Folders", "Game saves are kept in Documents › The Retro Shelf › Saves. BIOS files are needed for PS2 and PC Engine CD games, and can improve PS1, Dreamcast and DS.", fb);
+    R("BIOS files", "Copied from your own consoles. Drop them on this window and they go in the right place." + (BIOSST ? "" : " Checking…"), null);
+    if (BIOSST) {
+      const bl = el("div", "biosl");
+      BIOSST.forEach(c => {
+        const need = c.state === "missing" && /^Needed/.test(c.note) && biosGames(c) > 0;
+        bl.appendChild(el("b", need ? "need" : c.state, c.label)); bl.appendChild(el("span", "", biosLine(c)));
+      });
+      bl.appendChild(el("b", "", "PlayStation 2")); bl.appendChild(el("span", "", "Set up inside PCSX2, which you install yourself."));
+      b.appendChild(bl);
+    }
     R("Use my own RetroArch", "For people who already have RetroArch set up the way they like.", sw(!!UI.ownEmu, v => { UI.ownEmu = v; api("/api/settings", {ui: UI}).then(r => { if (r.ok) PATHS = r.data.paths; renderSettings(); }); }));
   }
   /* the RetroArch path fields only matter when using your own RetroArch */
@@ -1541,6 +1652,7 @@ document.addEventListener("keydown", e => {
   const k = e.key;
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
+  if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
   if (isOpen("welcome")) { if (k === "Escape" || k === "Enter") closeWelcome(); return; }
   if (isOpen("getg")) { if (k === "Escape") closeGetGames(); return; }
@@ -1584,6 +1696,7 @@ setInterval(() => {
   const press = k => n[k] && !pad[k];
   if (isOpen("imp")) { if (press("b")) $("#icancel").click(); }
   else if (isOpen("ren")) { if (press("b")) closeRename(); }
+  else if (isOpen("pick")) { if (press("b")) closePicker(); }
   else if (isOpen("welcome")) { if (press("a") || press("b")) closeWelcome(); }
   else if (isOpen("getg")) { if (press("b")) closeGetGames(); }
   else if (isOpen("settings")) { if (press("b")) closeSettings(); }
@@ -1618,6 +1731,7 @@ APP.onMenu(w => {
   if (w === "add-games") { closeSettings(); addGames(); }
   else if (w === "get-games") openGetGames();
   else if (w && w.cmd === "rename") openRename(w.id);
+  else if (w && w.cmd === "find-cover") openPicker(w.id);
   else if (w && w.cmd === "play") play(byId.get(w.id), {fresh: w.fresh});
 });
 $("#lhint").textContent = "Hold Start or press Esc to come back here.";

@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { biosDest } = require("./bios");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
 const SHEETS = [".cue", ".gdi", ".m3u"];
@@ -179,11 +180,14 @@ class Importer {
     // an .m3u wins over the discs it lists
     for (const [x, owner] of [...owned]) if (path.extname(owner).toLowerCase() === ".cue" && owned.get(owner)) owned.set(x, owned.get(owner));
 
-    const items = [], unknown = [], stems = new Map();
+    const items = [], unknown = [], stems = new Map(), bios = [];
     for (const f of files) {
       const ext = path.extname(f).toLowerCase(), name = path.basename(f);
       if (owned.has(f) && owned.get(f) !== f) continue;
       if (IMG.includes(ext)) continue;
+      // a BIOS file (scph5501.bin, neogeo.zip…) goes to the BIOS folder, not onto a shelf
+      const dest = biosDest(name);
+      if (dest) { bios.push({ src: f, name, dest }); continue; }
       const cands = this.byExt[ext];
       if (!cands) { if (!/^(readme|desktop\.ini|thumbs\.db)/i.test(name)) unknown.push(name); continue; }
       let size = 0;
@@ -211,7 +215,7 @@ class Importer {
       const it = stems.get(path.join(path.dirname(f), path.parse(f).name).toLowerCase());
       if (it) it.extras.push(f);
     }
-    return { items, unknown };
+    return { items, unknown, bios };
   }
 
   /** Where an item ends up inside the games folder. Multi-file games get their own subfolder. */

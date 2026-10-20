@@ -26,6 +26,7 @@ function bundled(emuDir) {
     assets: firstDir(path.join(emuDir, "assets"), path.join(raDir, "assets")),
     autoconfig: firstDir(path.join(emuDir, "autoconfig"), path.join(raDir, "autoconfig")),
     dolphinSys: path.join(emuDir, "dolphin-Sys"),
+    ppsspp: path.join(emuDir, "PPSSPP"),
   };
 }
 
@@ -109,19 +110,24 @@ function writeConfig(file, keys) {
   fs.writeFileSync(file, lines.join("\n") + "\n");
 }
 
-/** Dolphin's core reads its Sys folder from <system>/dolphin-emu/Sys. Point that at the bundled copy. */
-function linkDolphinSys(ra, systemDir) {
-  if (!ra || !fs.existsSync(ra.dolphinSys)) return;
-  const link = path.join(systemDir, "dolphin-emu", "Sys");
+/**
+ * Data folders some cores read from the BIOS folder, pointed at the bundled copies: Dolphin's Sys folder
+ * (<system>/dolphin-emu/Sys) and PPSSPP's fonts and dialogs (<system>/PPSSPP).
+ */
+function linkSystemData(ra, systemDir, core) {
+  if (!ra) return;
+  const want = { dolphin_libretro: [ra.dolphinSys, path.join(systemDir, "dolphin-emu", "Sys")], ppsspp_libretro: [ra.ppsspp, path.join(systemDir, "PPSSPP")] }[core];
+  if (!want || !fs.existsSync(want[0])) return;
+  const [from, link] = want;
   try {
-    if (fs.realpathSync(link) === fs.realpathSync(ra.dolphinSys)) return;
+    if (fs.realpathSync(link) === fs.realpathSync(from)) return;
   } catch {}
   fs.mkdirSync(path.dirname(link), { recursive: true });
   fs.rmSync(link, { recursive: true, force: true });
   try {
-    fs.symlinkSync(ra.dolphinSys, link, process.platform === "win32" ? "junction" : "dir");
+    fs.symlinkSync(from, link, process.platform === "win32" ? "junction" : "dir");
   } catch {
-    fs.cpSync(ra.dolphinSys, link, { recursive: true });
+    fs.cpSync(from, link, { recursive: true });
   }
 }
 
@@ -141,4 +147,4 @@ function explain(logFile) {
   return "";
 }
 
-module.exports = { bundled, corePath, enforced, neededDirs, writeConfig, linkDolphinSys, explain, CORE_EXT };
+module.exports = { bundled, corePath, enforced, neededDirs, writeConfig, linkSystemData, explain, CORE_EXT };

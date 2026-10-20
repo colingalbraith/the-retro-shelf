@@ -9,6 +9,7 @@ const { spawn } = require("child_process");
 const { EventEmitter } = require("events");
 const ra = require("./retroarch");
 const { Importer, sheetFiles } = require("./importer");
+const { biosDest, biosStatus } = require("./bios");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
 const SHEETS = [".cue", ".gdi", ".m3u"];
@@ -159,6 +160,7 @@ class Backend extends EventEmitter {
     // shouldn't stop it from opening: it says so instead
     this.setupError = "";
     try { this.firstRun(); } catch (e) { this.setupError = e.message; }
+    fs.rmSync(path.join(this.files.covers, ".previews"), { recursive: true, force: true });
     this.scan();
   }
 
@@ -272,7 +274,7 @@ class Backend extends EventEmitter {
           const p = path.join(dir, e.name);
           if (e.isDirectory()) { if (depth < 8) walk(p, depth + 1); continue; }
           const lower = e.name.toLowerCase();
-          if (!exts.some(x => lower.endsWith(x))) continue;
+          if (!exts.some(x => lower.endsWith(x)) || biosDest(lower)) continue;
           const stem = path.parse(e.name).name, id = gid(p);
           // arcade files are short codes ("sf2"); the full name is the title and what art is looked up by
           let full = s.names && (this.names[s.names] || {})[stem.toLowerCase()], year = "", pub = "", dev = "", genre = "";
@@ -321,7 +323,7 @@ class Backend extends EventEmitter {
       for (const d of ra.neededDirs(dirs)) fs.mkdirSync(d, { recursive: true });
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
       ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...this.ui, load: !(opts.fresh || slot !== null) }));
-      if (s.core === "dolphin_libretro") ra.linkDolphinSys(this.ra, this.folders.bios);
+      ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
       return { cmd: [this.ra.exe, "-L", core, g.path, "--config", this.files.raCfg, "--log-file", this.files.raLog, "--verbose", ...(slot !== null ? ["-e", String(slot)] : [])], builtIn: true };
@@ -540,6 +542,55 @@ class Backend extends EventEmitter {
     if (cur && cur !== g) cur[kind] = dest;
   }
 
+  // ---------------------------------------------------------------- choosing a cover by hand
+  /** box art on the thumbnails site for the game's console whose name has every word of the search */
+  async coverSearch(id, q) {
+    const g = this.games.get(id);
+    if (!g) return [404, { error: "Unknown game." }];
+    const text = String(q || "").trim() || g.title;
+    const words = text.toLowerCase().replace(/&/g, " and ").split(/[^a-z0-9]+/).filter(w => w && !["the", "a", "an", "of"].includes(w));
+    const want = norm(text), results = [];
+    let err = "";
+    for (const th of asList(this.cfg.systems[g.system].thumbs)) {
+      let idx;
+      try { idx = await this.indexFor(th, "cover"); } catch (e) { err = e.message; continue; }
+      for (const name of idx.names) {
+        const low = name.toLowerCase();
+        if (!words.every(w => low.includes(w))) continue;
+        const n = norm(path.parse(name).name);
+        results.push({ thumb: th, name, score: (n === want ? 1000 : 0) + (n.startsWith(want) ? 200 : 0) - Math.abs(n.length - want.length) + (/\((usa|world)/i.test(name) ? 5 : 0) });
+      }
+    }
+    if (!results.length && err) return [502, { error: "Couldn't load the list of covers. Check your internet connection." }];
+    results.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    return [200, { results: results.slice(0, 60).map(({ thumb, name }) => ({ thumb, name })) }];
+  }
+
+  /** one cover from the site's list, downloaded once and kept while the picker browses */
+  async coverFile(thumb, name) {
+    const idx = this._idx.get("cover|" + thumb);
+    if (!idx || !idx.names.has(name)) return null;
+    const f = path.join(this.files.covers, ".previews", crypto.createHash("sha1").update(thumb + "/" + name).digest("hex") + ".png");
+    if (!fs.existsSync(f)) {
+      const data = await this.fetchUrl(`${this.coverBase()}/${encodeURIComponent(thumb)}/${ART.cover.dir}/${encodeURIComponent(name)}`, 20000);
+      if (data.subarray(0, 4).toString("latin1") !== "\x89PNG") return null;
+      fs.mkdirSync(path.dirname(f), { recursive: true });
+      fs.writeFileSync(f, data);
+    }
+    return f;
+  }
+
+  async coverPick(id, thumb, name) {
+    const g = this.games.get(id);
+    if (!g) return [404, { error: "Unknown game." }];
+    if (!asList(this.cfg.systems[g.system].thumbs).includes(thumb)) return [400, { error: "That cover is for another console." }];
+    let f = null;
+    try { f = await this.coverFile(thumb, String(name)); } catch { return [502, { error: "Couldn't download that cover. Check your internet connection." }]; }
+    if (!f) return [404, { error: "That cover isn't available." }];
+    this.saveArt(g, "cover", fs.readFileSync(f));
+    return [200, { ok: true }];
+  }
+
   /** true = saved, false = no match, null = network trouble */
   async fetchArt(g, kind) {
     if (kind === "logo") return this.fetchLogo(g);
@@ -647,7 +698,16 @@ class Backend extends EventEmitter {
 
   // ---------------------------------------------------------------- importing
   importCheck(paths) {
-    const { items, unknown } = this.importer.inspect(Array.isArray(paths) ? paths : []);
+    const { items, unknown, bios } = this.importer.inspect(Array.isArray(paths) ? paths : []);
+    const biosAdded = [], biosFailed = [];
+    for (const b of bios) {
+      const to = path.join(this.folders.bios, ...b.dest.split("/"));
+      try {
+        fs.mkdirSync(path.dirname(to), { recursive: true });
+        if (path.resolve(to) !== path.resolve(b.src)) fs.copyFileSync(b.src, to);
+        biosAdded.push(b.name);
+      } catch { biosFailed.push(b.name); }
+    }
     this.pending = new Map(items.map(it => [it.id, it]));
     const root = this.romsRoot();
     return [200, {
@@ -656,7 +716,7 @@ class Backend extends EventEmitter {
         if (it.system) { try { const d = this.importer.plan(it, root).main; exists = fs.existsSync(d); } catch {} }
         return { id: it.id, name: it.name, size: it.size, system: it.system, choices: it.choices, exists };
       }),
-      unknown: unknown.slice(0, 50), unknownCount: unknown.length,
+      unknown: unknown.slice(0, 50), unknownCount: unknown.length, biosAdded, biosFailed,
     }];
   }
 
@@ -872,6 +932,13 @@ class Backend extends EventEmitter {
         const g = this.games.get(pathname.slice(6));
         if (g && g.logo) return this.file(g.logo, "image/png", "public, max-age=31536000, immutable");
       }
+      if (pathname.startsWith("/cover-preview/")) {
+        const rest = pathname.slice(15), i = rest.indexOf("/");
+        let f = null;
+        try { if (i > 0) f = await this.coverFile(rest.slice(0, i), rest.slice(i + 1)); } catch {}
+        if (f) return this.file(f, "image/png", "public, max-age=86400");
+        return { code: 404, body: { error: "not found" } };
+      }
       if (pathname.startsWith("/cover/")) {
         const g = this.games.get(pathname.slice(7));
         if (g && g.cover) return this.file(g.cover, MIME[path.extname(g.cover).toLowerCase()] || "image/png", "public, max-age=31536000, immutable");
@@ -911,6 +978,9 @@ class Backend extends EventEmitter {
         return j([200, { started: this.coverJob(ids, !!d.force) }]);
       }
       case "/api/import/check": return j(this.importCheck(d.paths));
+      case "/api/covers/search": return j(await this.coverSearch(String(d.id || ""), d.q));
+      case "/api/covers/pick": return j(await this.coverPick(String(d.id || ""), String(d.thumb || ""), String(d.name || "")));
+      case "/api/bios": return j([200, { systems: biosStatus(this.folders.bios, path.join(this.romsRoot(), this.cfg.systems.Arcade ? this.cfg.systems.Arcade.folder || "arcade" : "arcade")) }]);
       case "/api/import": return j(this.importRun(d.items));
     }
     return { code: 404, body: { error: "not found" } };

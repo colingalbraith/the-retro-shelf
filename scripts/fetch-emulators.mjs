@@ -2,8 +2,8 @@
 // Downloads RetroArch and the libretro cores The Retro Shelf ships with into vendor/<os>/,
 // which electron-builder copies into the app as Resources/emulators.
 //
-//   node scripts/fetch-emulators.mjs mac   -> vendor/mac/{RetroArch.app,cores,info,dolphin-Sys}
-//   node scripts/fetch-emulators.mjs win   -> vendor/win/{RetroArch,cores,info,dolphin-Sys}
+//   node scripts/fetch-emulators.mjs mac   -> vendor/mac/{RetroArch.app,cores,info,dolphin-Sys,PPSSPP}
+//   node scripts/fetch-emulators.mjs win   -> vendor/win/{RetroArch,cores,info,dolphin-Sys,PPSSPP}
 //
 // Cores come from src/config.json (every system with a "core"). Downloads are cached in vendor/.cache.
 // No games are downloaded, ever.
@@ -180,6 +180,14 @@ function dolphinSys() {
   fs.cpSync(path.join(src, "Data", "Sys"), dest, { recursive: true });
 }
 
+// PPSSPP's core needs its fonts and system dialogs (PPSSPP/ppge_atlas.zim and friends) in the BIOS folder
+async function ppssppAssets() {
+  const z = await download(`${BOT}/assets/system/PPSSPP.zip`, "PPSSPP-system.zip");
+  const tmp = path.join(CACHE, "x", "ppsspp"); rm(tmp); unzip(z, tmp);
+  fs.cpSync(path.join(tmp, "PPSSPP"), path.join(OUT, "PPSSPP"), { recursive: true });
+  console.log("  PPSSPP system files");
+}
+
 (async () => {
   console.log(`The Retro Shelf: fetching emulators for ${os_} -> ${path.relative(ROOT, OUT)}`);
   rm(OUT); mkdir(OUT);
@@ -189,6 +197,7 @@ function dolphinSys() {
   await cores();
   await infos();
   if (CORES.includes("dolphin_libretro")) dolphinSys();
+  if (CORES.includes("ppsspp_libretro")) await ppssppAssets();
   fs.writeFileSync(path.join(OUT, "versions.json"), JSON.stringify({ retroarch: RA_VERSION, cores: CORES, fetched: new Date().toISOString() }, null, 2));
   console.log(`Done: ${mb(OUT)} in ${path.relative(ROOT, OUT)}`);
 })().catch(e => { console.error(e.message || e); process.exit(1); });
