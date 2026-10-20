@@ -55,6 +55,13 @@ and Inconsolata is SIL Open Font License 1.1.
 The CRT picture setting uses zfast-crt by Greg Hogan (SoltanGris42), from https://github.com/libretro/slang-shaders.
 GNU General Public License v2 or later.
 
+## Game details and series
+
+Release years, genres, arcade game names and the series lists Collections use (`src/data/meta`,
+`src/data/arcade-names.json`, `src/data/franchises.json`) are built from https://github.com/libretro/libretro-database
+by the `scripts/fetch-*.mjs` scripts.
+Creative Commons Attribution-ShareAlike 4.0 International; these files are shared under the same license.
+
 ## Electron
 
 MIT License. Electron bundles Chromium, Node.js and other components; their notices ship in the app as
