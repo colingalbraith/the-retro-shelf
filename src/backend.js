@@ -46,6 +46,9 @@ function jsave(p, obj) {
   fs.writeFileSync(p + ".tmp", JSON.stringify(obj, null, 2));
   fs.renameSync(p + ".tmp", p);
 }
+// what one game can have of its own (setGameOpts), and the choices for each
+const GAME_OPTS = { picture: ["sharp", "smooth", "crt"] };
+
 function cleanUi(d) {
   const out = { ...DEFAULT_UI, hidden: [] };
   if (!d || typeof d !== "object") return out;
@@ -159,7 +162,7 @@ class Backend extends EventEmitter {
     this.state = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
     // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}]]) if (!this.state[k]) this.state[k] = v;
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -413,11 +416,12 @@ class Backend extends EventEmitter {
       // RetroArch ignores (and falls back from) any directory setting that doesn't exist yet
       for (const d of ra.neededDirs(dirs)) fs.mkdirSync(d, { recursive: true });
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
-      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...this.ui, load: !(opts.fresh || slot !== null) }));
+      const play = this.playOpts(g);
+      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, load: !(opts.fresh || slot !== null) }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
-      const crt = this.ui.picture === "crt" && fs.existsSync(this.ra.crt) ? ["--set-shader", this.ra.crt] : [];
+      const crt = play.picture === "crt" && fs.existsSync(this.ra.crt) ? ["--set-shader", this.ra.crt] : [];
       return { cmd: [this.ra.exe, "-L", core, g.path, "--config", this.files.raCfg, "--log-file", this.files.raLog, "--verbose", ...crt, ...(slot !== null ? ["-e", String(slot)] : [])], builtIn: true };
     }
     const r = this.cfg.retroarch;
@@ -444,7 +448,7 @@ class Backend extends EventEmitter {
     }
     proc.stdin.on("error", () => {});
     const rec = { id, since: now(), proc, alive: true, builtIn: built.builtIn, stopping: false };
-    if (built.builtIn && this.ui.picture === "crt") this.event("crt");
+    if (built.builtIn && this.playOpts(g).picture === "crt") this.event("crt");
     if (this.ui.tv) this.event("tv");
     this.running = rec;
     this.state.last[id] = Math.floor(rec.since);
@@ -492,11 +496,31 @@ class Backend extends EventEmitter {
   /** stats belong to a game's id (its path); when the file moves they move with it */
   moveStats(from, to) {
     const st = this.state;
-    for (const k of ["last", "plays", "time", "names"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
+    for (const k of ["last", "plays", "time", "names", "gameOpts"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
     for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(from); if (i >= 0) st[k][i] = to; }
     for (const sh of st.shelves) { const i = sh.ids.indexOf(from); if (i >= 0) sh.ids[i] = to; }
     for (const ses of st.sessions) if (ses[0] === from) ses[0] = to;
   }
+
+  /**
+   * Settings for one game, over the app's own when it starts (GAME_OPTS lists what can be set). A value of null or ""
+   * goes back to the app's setting.
+   */
+  setGameOpts(id, opts) {
+    if (!this.games.has(id)) return [404, { error: "Unknown game." }];
+    const cur = { ...(this.state.gameOpts[id] || {}) };
+    for (const [k, v] of Object.entries(opts && typeof opts === "object" ? opts : {})) {
+      if (!(k in GAME_OPTS)) continue;
+      if (v === null || v === "") delete cur[k];
+      else if (GAME_OPTS[k].includes(v)) cur[k] = v;
+      else return [400, { error: `"${v}" isn't a choice for ${k}.` }];
+    }
+    if (Object.keys(cur).length) this.state.gameOpts[id] = cur; else delete this.state.gameOpts[id];
+    this.saveState();
+    return [200, { ok: true, opts: cur }];
+  }
+  /** the settings a game plays with: the app's, then its own */
+  playOpts(g) { return { ...this.ui, ...(this.state.gameOpts[g.id] || {}) }; }
 
   /** shelves people make ("Couch co-op", "To finish"): create, rename, delete, and put games on them or take them off */
   shelfOp(d) {
@@ -1107,7 +1131,7 @@ class Backend extends EventEmitter {
       games: [...this.games.values()].map(g => ({ id: g.id, title: g.title, tag: g.tag, system: g.system, cv: this.artVer(g.cover), lv: this.artVer(g.logo),
         plays: st.plays[g.id] || 0, time: st.time[g.id] || 0, last: st.last[g.id] || 0,
         added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "", gg: pins.genreGroup(g.genre),
-        sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id],
+        sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null,
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems),
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
@@ -1197,6 +1221,7 @@ class Backend extends EventEmitter {
       case "/api/fav": return j(this.toggleFav(String(d.id || "")));
       case "/api/shelves": return j(this.shelfOp(d));
       case "/api/games/search": return j(this.gameSearch(d.q));
+      case "/api/game/opts": return j(this.setGameOpts(String(d.id || ""), d.opts));
       case "/api/whatsnew/seen": this.state.seenVersion = this.dirs.version; this.saveState(); return j([200, { ok: true }]);
       case "/api/pins/seen": { const seen = new Set(Array.isArray(d.keys) ? d.keys : []); this.newPins = (this.newPins || []).filter(k => !seen.has(k)); return j([200, { ok: true }]); }
       case "/api/rescan":

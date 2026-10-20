@@ -255,3 +255,19 @@ test("what's new with test versions: their notes reach people on test versions, 
   assert.deepEqual(mk("0.4.0", "0.3.1"), ["0.4.0"]);
   assert.deepEqual(mk("0.4.0", "0.4.0-beta.2"), ["0.4.0"]);
 });
+
+test("a game can have settings of its own, over the app's, and they follow it when it moves", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const g = byTitle("Chrono Trigger");
+  assert.equal(be.playOpts(g).picture, be.ui.picture);
+  assert.deepEqual((await be.route("POST", "/api/game/opts", { id: g.id, opts: { picture: "crt", nonsense: 1 } })).body, { ok: true, opts: { picture: "crt" } });
+  assert.equal(be.playOpts(g).picture, "crt");
+  assert.equal((await be.route("POST", "/api/game/opts", { id: g.id, opts: { picture: "neon" } })).code, 400);
+  assert.equal(be.libraryJson().games.find(x => x.id === g.id).opts.picture, "crt");
+  be.moveStats(g.id, "moved");
+  assert.equal(be.state.gameOpts.moved.picture, "crt");
+  be.moveStats("moved", g.id);
+  await be.route("POST", "/api/game/opts", { id: g.id, opts: { picture: null } });   // back to the app's setting
+  assert.equal(be.state.gameOpts[g.id], undefined);
+  assert.equal(be.playOpts(g).picture, be.ui.picture);
+});
