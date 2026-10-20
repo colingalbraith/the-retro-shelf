@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1
+
+- **Test versions:** Settings → App → Get test versions, to try new features early.
+- **Clearer messages** when a game won't start: which BIOS file it needs, a game zipped in a way its emulator can't
+  read, or an emulator that crashed.
+- Box backs no longer let the picture cover the text, and a blank "where you left off" picture gives way to the
+  game's screenshot.
+
 ## 0.3.0
 
 - **Collections:** every series your games belong to, with the games you don't have standing faded, and collections

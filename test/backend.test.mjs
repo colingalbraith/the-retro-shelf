@@ -236,3 +236,22 @@ test("a resume picture of one color (a game left before it drew anything) counts
   assert.equal(flatPng(png(64, 64, (x, y) => [x * 4, y * 4, 0])), false);
   assert.equal(flatPng(Buffer.from("not a png")), false);
 });
+
+test("what's new with test versions: their notes reach people on test versions, a release shows its own", () => {
+  const app = path.join(home, "app"), src = path.join(app, "src");
+  fs.mkdirSync(src, { recursive: true });
+  fs.writeFileSync(path.join(app, "CHANGELOG.md"), "# Changelog\n\n## 0.4.0\n\n- **All of it**\n\n## 0.4.0-beta.2\n\n- Rewind\n\n## 0.4.0-beta.1\n\n- Filters\n\n## 0.3.1\n\n- Fixes\n");
+  const mk = (version, seen) => {
+    const data = path.join(home, "v" + Math.random());
+    fs.mkdirSync(data, { recursive: true });
+    fs.writeFileSync(path.join(data, "settings.json"), JSON.stringify({ ui: { welcomed: true } }));
+    fs.writeFileSync(path.join(data, "state.json"), JSON.stringify({ seenVersion: seen }));
+    const b = new Backend({ app: src, data, docs: path.join(home, "docs"), emu: path.join(home, "none"), version }, async () => { throw new Error("offline"); });
+    b.init();
+    return b.whatsNew().map(c => c.version);
+  };
+  assert.deepEqual(mk("0.4.0-beta.2", "0.4.0-beta.1"), ["0.4.0-beta.2"]);
+  assert.deepEqual(mk("0.4.0-beta.1", "0.3.1"), ["0.4.0-beta.1"]);
+  assert.deepEqual(mk("0.4.0", "0.3.1"), ["0.4.0"]);
+  assert.deepEqual(mk("0.4.0", "0.4.0-beta.2"), ["0.4.0"]);
+});

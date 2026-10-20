@@ -136,18 +136,31 @@ function linkSystemData(ra, systemDir, core) {
 }
 
 /** Why did RetroArch close right away? Reads its log; returns "" when there's nothing useful. */
-function explain(logFile) {
+/**
+ * Why a game closed right after starting, in plain words, from RetroArch's log; "" when the log doesn't say.
+ * exit: how the emulator ended ({code, signal}), to tell a crash apart.
+ */
+function explain(logFile, exit = {}) {
   let log = "";
   try { log = fs.readFileSync(logFile, "utf8"); } catch { return ""; }
-  const errs = log.split(/\r?\n/).filter(l => /\[(ERROR|WARN)\]|error|fail/i.test(l)).join("\n");
-  if (/bios|firmware/i.test(errs) && /missing|not found|required|could not|failed/i.test(errs))
-    return "This game needs a BIOS file from the original console. Put it in the BIOS folder (Settings → Emulator → Folders → BIOS), then try again.";
+  const lines = log.split(/\r?\n/), errs = lines.filter(l => /\[(ERROR|WARN)\]|error|fail/i.test(l)).join("\n");
+  const hard = lines.filter(l => /\[ERROR\]/.test(l)).join("\n");
+  if (/bios|firmware/i.test(errs) && /missing|not found|required|could not|failed/i.test(errs)) {
+    // the file it wanted, when the log names it
+    const name = (/([\w-]+\.(?:bin|rom|img|zip|pce|BIN|ROM))\b/.exec(errs.split("\n").filter(l => /bios|firmware/i.test(l)).join("\n")) || [])[1];
+    return "This game needs a BIOS file from the original console" + (name ? " (" + name + ")" : "") + ". Drop it on this window and it goes in the right place. Settings → Saves & BIOS shows what each console has.";
+  }
   if (/Failed to open libretro core|Failed to load core|dylib.*not|could not load library/i.test(errs))
     return "The emulator for this system didn't load. Reinstalling The Retro Shelf should fix it.";
   if (/(video driver|graphics).*(fail|could not|cannot)|failed to initialize video/i.test(errs))
-    return "RetroArch couldn't start graphics on this computer.";
+    return "RetroArch couldn't start graphics on this computer." + (process.platform === "win32" ? " Updating the graphics driver usually fixes this." : "");
+  if (/\b(zip|7z|archive|compressed)\b/i.test(hard))
+    return "This game is in a .zip or .7z its emulator can't play from. Unzip it, then add the game file itself.";
   if (/Failed to load content|failed to load game|content.*(not|couldn).*load|Couldn't open/i.test(errs))
-    return "RetroArch couldn't open this file. It may be damaged, zipped wrong, or not a game for this system.";
+    return "RetroArch couldn't open this file. It may be damaged, or not a game for this system.";
+  // ended by a crash: a signal on a Mac, an NTSTATUS error code (0xC0000005 and the like) on Windows
+  if (exit.signal && exit.signal !== "SIGTERM" && exit.signal !== "SIGKILL" || exit.code >= 0xC0000000)
+    return "The emulator crashed while starting this game. If it happens again, Settings → Copy info puts what's needed for a bug report on the clipboard.";
   return "";
 }
 

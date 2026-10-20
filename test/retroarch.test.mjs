@@ -36,9 +36,16 @@ test("a failed start is explained from RetroArch's log", () => {
     fs.writeFileSync(log, "[ERROR] [Content] Failed to load content.\n");
     assert.match(ra.explain(log), /couldn't open this file/);
     fs.writeFileSync(log, "[ERROR] Missing required firmware: scph5501.bin\n");
-    assert.match(ra.explain(log), /BIOS/);
+    assert.match(ra.explain(log), /BIOS file from the original console \(scph5501\.bin\)\. Drop it on this window/);
+    fs.writeFileSync(log, "[ERROR] [Content] Cannot load compressed archive for this core.\n");
+    assert.match(ra.explain(log), /\.zip or \.7z/);
     fs.writeFileSync(log, "[INFO] all good\n");
     assert.equal(ra.explain(log), "");
+    // nothing in the log, but the emulator crashed
+    assert.match(ra.explain(log, { code: null, signal: "SIGSEGV" }), /crashed/);
+    assert.match(ra.explain(log, { code: 3221225477, signal: null }), /crashed/);
+    assert.equal(ra.explain(log, { code: 0, signal: null }), "");
+    assert.equal(ra.explain(log, { code: null, signal: "SIGTERM" }), "");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

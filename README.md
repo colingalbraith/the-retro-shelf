@@ -72,8 +72,16 @@ Grab the latest version from [Releases](https://github.com/colingalbraith/the-re
 
 After that it updates itself.
 
-The app isn't signed yet, so the first launch needs one extra click. On a **Mac**, go to System Settings →
-Privacy & Security and click **Open Anyway**. On **Windows**, click **More info → Run anyway**.
+The app isn't signed by Apple or Microsoft, so the first launch needs an extra step. After that it opens normally,
+updates included.
+
+**Mac:**
+1. Open The Retro Shelf from Applications. macOS says it can't check the app; click **Done**.
+2. Open **System Settings → Privacy & Security** and scroll down to **Security**. Next to "The Retro Shelf was
+   blocked to protect your Mac", click **Open Anyway** and confirm with your password or Touch ID.
+3. Click **Open Anyway** once more when asked.
+
+**Windows:** if a blue "Windows protected your PC" box appears, click **More info**, then **Run anyway**.
 
 > [!NOTE]
 > This is an early beta. [Bug reports](https://github.com/colingalbraith/the-retro-shelf/issues) are welcome.

@@ -3,12 +3,14 @@
 // Windows: electron-updater downloads the new installer in the background and runs it when the app quits.
 // Mac: the system updater only accepts apps signed with an Apple Developer ID, so this does the same job itself. It
 // downloads the new app, checks it against the checksum published with the release, and swaps it in on quit.
+// With test versions on, both also take GitHub prereleases (0.4.0-beta.1); otherwise only full releases.
 const { app, net } = require("electron");
 const { spawn, execFileSync } = require("child_process");
 const { EventEmitter } = require("events");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { compare } = require("./version");
 
 const REPO = "colingalbraith/the-retro-shelf";
 const PAGE = `https://github.com/${REPO}/releases/latest`;
@@ -16,13 +18,8 @@ const PAGE = `https://github.com/${REPO}/releases/latest`;
 const FEED = (process.env.RETRO_SHELF_UPDATE_FEED || `https://github.com/${REPO}/releases/latest/download`).replace(/\/$/, "");
 const EVERY = 6 * 3600 * 1000;
 
-/** is version a newer than b ("0.2.1" > "0.2.0") */
-function newer(a, b) {
-  const p = v => String(v).replace(/^v/, "").split("-")[0].split(".").map(n => parseInt(n, 10) || 0);
-  const x = p(a), y = p(b);
-  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
-  return false;
-}
+/** is version a newer than b ("0.2.1" > "0.2.0", "0.4.0-beta.2" > "0.4.0-beta.1") */
+const newer = (a, b) => compare(a, b) > 0;
 
 /** the parts of electron-builder's latest-mac.yml needed here: the version, and each file's name, checksum and size */
 function parseFeed(text) {
@@ -47,12 +44,14 @@ class Updater extends EventEmitter {
     this.state = { status: "idle", version: "", progress: 0, error: "", current: app.getVersion() };
     this.ready = null;
     this.applied = false;
+    this.beta = () => false;
   }
   set(s) { Object.assign(this.state, s); this.emit("change", { ...this.state }); }
   page() { return PAGE; }
 
-  /** checks shortly after launch and every few hours, while enabled() says so */
-  start(enabled) {
+  /** checks shortly after launch and every few hours, while enabled() says so; beta() says whether test versions count */
+  start(enabled, beta) {
+    if (beta) this.beta = beta;
     if (!app.isPackaged && !process.env.RETRO_SHELF_UPDATE_FEED) return;
     const auto = () => { if (enabled()) this.check(false); };
     setTimeout(auto, 15000);
@@ -91,6 +90,8 @@ class Updater extends EventEmitter {
   async checkWindows() {
     const au = this.win();
     if (process.env.RETRO_SHELF_UPDATE_FEED) au.setFeedURL({ provider: "generic", url: FEED });
+    // test versions are GitHub prereleases; their update file has the same name as a release's (latest.yml)
+    else au.allowPrerelease = !!this.beta();
     await au.checkForUpdates();
   }
 
@@ -102,8 +103,19 @@ class Updater extends EventEmitter {
     try { fs.accessSync(path.dirname(b), fs.constants.W_OK); fs.accessSync(b, fs.constants.W_OK); return b; } catch { return null; }
   }
 
+  /** where this Mac's update comes from: the latest release, or with test versions on, the newest of any kind */
+  async macBase() {
+    if (process.env.RETRO_SHELF_UPDATE_FEED || !this.beta()) return FEED;
+    const r = await net.fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { cache: "no-store", headers: { Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const rel = (await r.json()).filter(x => !x.draft && (x.assets || []).some(a => a.name === "latest-mac.yml"))
+      .sort((a, b) => compare(b.tag_name, a.tag_name))[0];
+    return rel ? `https://github.com/${REPO}/releases/download/${encodeURIComponent(rel.tag_name)}` : FEED;
+  }
+
   async checkMac() {
-    const r = await net.fetch(FEED + "/latest-mac.yml", { cache: "no-store", signal: AbortSignal.timeout(20000) });
+    const base = await this.macBase();
+    const r = await net.fetch(base + "/latest-mac.yml", { cache: "no-store", signal: AbortSignal.timeout(20000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const feed = parseFeed(await r.text());
     if (!feed.version || !newer(feed.version, app.getVersion())) return this.set({ status: "current" });
@@ -118,7 +130,7 @@ class Updater extends EventEmitter {
     fs.mkdirSync(work, { recursive: true });
     try {
       const zip = path.join(work, "update.zip");
-      await this.download(FEED + "/" + encodeURIComponent(file.url), zip, file);
+      await this.download(base + "/" + encodeURIComponent(file.url), zip, file);
       execFileSync("ditto", ["-x", "-k", zip, work]);
       fs.rmSync(zip, { force: true });
       const next = fs.readdirSync(work).find(f => f.endsWith(".app"));

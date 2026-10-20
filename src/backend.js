@@ -12,6 +12,7 @@ const ra = require("./retroarch");
 const { Importer, sheetFiles } = require("./importer");
 const { biosDest, biosStatus } = require("./bios");
 const pins = require("./pins");
+const { compare, isTest } = require("./version");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
 const SHEETS = [".cue", ".gdi", ".m3u"];
@@ -27,7 +28,7 @@ const GITHUB_API = "https://api.github.com/repos/libretro-thumbnails";
 const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
-                     fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true,
+                     fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false,
                      picture: "sharp", sort: "title", buttons: "auto", arrange: "console" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
@@ -58,7 +59,7 @@ function cleanUi(d) {
   if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
   if (Array.isArray(d.hiddenSeries)) out.hiddenSeries = d.hiddenSeries.map(String).slice(0, 1000);
   else if (["art", "color"].includes(d.spine)) out.spine = "cover";
-  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "tv"]) if (typeof d[k] === "boolean") out[k] = d[k];
+  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "beta", "tv"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
   if (Array.isArray(d.hidden)) out.hidden = d.hidden.map(String).slice(0, 100);
   return out;
@@ -185,11 +186,12 @@ class Backend extends EventEmitter {
     if (!cur || seen === cur) return [];
     let text = "";
     try { text = fs.readFileSync(path.join(this.dirs.app, "..", "CHANGELOG.md"), "utf8"); } catch { return []; }
-    const out = [], num = v => v.split(".").map(n => parseInt(n, 10) || 0), after = (a, b) => { const x = num(a), y = num(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
+    const out = [];
     let cur2 = null;
     for (const line of text.split(/\r?\n/)) {
-      const h = /^## (\d+\.\d+\.\d+)/.exec(line);
-      if (h) { cur2 = after(h[1], seen) && !after(h[1], cur) ? { version: h[1], items: [] } : null; if (cur2) out.push(cur2); continue; }
+      const h = /^## (\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)/.exec(line);
+      // test versions' notes show to people on test versions; a release has its own full notes
+      if (h) { cur2 = compare(h[1], seen) > 0 && compare(h[1], cur) <= 0 && (isTest(cur) || !isTest(h[1])) ? { version: h[1], items: [] } : null; if (cur2) out.push(cur2); continue; }
       if (!cur2) continue;
       const it = /^- (?:\*\*(.+?)\*\*\s*)?(.*)$/.exec(line);
       if (it) cur2.items.push([it[1] || "", it[2]]);
@@ -448,12 +450,12 @@ class Backend extends EventEmitter {
     this.state.last[id] = Math.floor(rec.since);
     this.state.plays[id] = (this.state.plays[id] || 0) + 1;
     this.saveState();
-    proc.once("exit", () => this.onExit(rec));
+    proc.once("exit", (code, signal) => this.onExit(rec, { code, signal }));
     this.emit("launch", g);
     return [200, { ok: true, since: rec.since, now: now() }];
   }
 
-  onExit(rec) {
+  onExit(rec, how = {}) {
     rec.alive = false;
     const dt = now() - rec.since;
     this.state.time[rec.id] = (this.state.time[rec.id] || 0) + Math.floor(dt);
@@ -466,7 +468,7 @@ class Backend extends EventEmitter {
     if (this.running === rec) this.running = null;
     this.saveState();
     let error = "";
-    if (dt < 4 && !rec.stopping) error = (rec.builtIn && ra.explain(this.files.raLog)) || "";
+    if (dt < 4 && !rec.stopping) error = (rec.builtIn && ra.explain(this.files.raLog, how)) || "";
     this.lastExit = { id: rec.id, at: now(), dt, error };
     this.emit("exit", this.lastExit);
   }

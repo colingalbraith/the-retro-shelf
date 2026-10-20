@@ -2,7 +2,8 @@ name: Build installers
 
 # Builds The-Retro-Shelf-<version>-mac-arm64.dmg (Apple silicon), -mac-x64.dmg (Intel) and
 # The-Retro-Shelf-Setup-<version>.exe, plus the files the app's updater reads (latest*.yml, the Mac .zips).
-# Each build is then installed and opened, and a test game played (scripts/smoke.mjs).
+# Each build is then checked: the last release updates itself to it (scripts/update-test.mjs), and it's installed,
+# opened and a test game played (scripts/smoke.mjs).
 # Run it by hand from the Actions tab, or push a tag like v0.1.0 to also get a draft release.
 on:
   workflow_dispatch:
@@ -46,6 +47,12 @@ jobs:
         env:
           # macOS builds are ad-hoc signed (identity "-" in package.json) until a Developer ID is set up
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      # installs the last release and has it update itself to this build, the way people get it
+      - name: Update from the last release
+        run: node scripts/update-test.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       # installs it (Windows), opens it with one small test game, and plays it: a build that can't doesn't get released
       - name: Open the app and play a game
@@ -94,15 +101,17 @@ jobs:
           - Intel: `mac-x64.dmg`
 
           Not sure which? Apple menu → About This Mac: "Chip" means Apple silicon, "Processor" means Intel.
-          The app isn't notarized yet, so the first time macOS will refuse to open it: go to
-          System Settings → Privacy & Security, scroll down and click **Open Anyway**.
+          The app isn't signed by Apple, so the first time macOS won't open it. Click **Done**, then open
+          System Settings → Privacy & Security, scroll down to Security, click **Open Anyway** and confirm.
 
           **Windows** (10 and 11): download and run the `Setup .exe`. If SmartScreen appears, click
           **More info → Run anyway**.
 
           After this, The Retro Shelf updates itself. No games are included. See the README for where to get games legally.
           NOTES
-          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --draft \
+          # a test version (v0.4.0-beta.1) is a prerelease: only people who chose test versions get it
+          pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --draft $pre \
             --title "The Retro Shelf $GITHUB_REF_NAME" --notes-file notes.md
         env:
           GH_TOKEN: ${{ github.token }}

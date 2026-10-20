@@ -2095,6 +2095,7 @@ function renderSettings() {
   ub.disabled = UPD.status === "checking" || UPD.status === "downloading"; ub.onclick = updAction;
   R("Updates", updText(), ub);
   R("Check for updates by itself", "Looks for a new version on GitHub every few hours. Nothing about you or your games is sent.", sw(UI.updates !== false, v => { UI.updates = v; saveUI(); }));
+  R("Get test versions", "Try new features before they're finished, as test versions come out. They can have bugs; your games and saves stay as they are.", sw(!!UI.beta, v => { UI.beta = v; saveUI(); if (v) setTimeout(() => APP.update("check").then(s => { if (s) { UPD = s; paintUpd(); } }), 900); }));
   const pb = el("div", "btns"), cp = el("button", "btn", "Copy info"), is = el("button", "btn", "Report a problem");
   cp.onclick = async () => { await APP.copyReport(); toast("Copied. Paste it into your bug report."); };
   is.onclick = () => APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new");

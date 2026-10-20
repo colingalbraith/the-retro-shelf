@@ -265,7 +265,7 @@ app.whenReady().then(() => {
   if (backend.ui.autoCovers) backend.coverJob([...backend.games.keys()]);
   updater = new Updater();
   updater.on("change", s => { if (win && !win.isDestroyed()) win.webContents.send("menu", { cmd: "update", state: s }); });
-  updater.start(() => backend.ui.updates !== false);
+  updater.start(() => backend.ui.updates !== false, () => !!backend.ui.beta);
 });
 
 app.on("activate", () => { if (!win) createWindow(); else focusApp(); });

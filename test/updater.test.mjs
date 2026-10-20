@@ -12,6 +12,16 @@ test("only a higher version counts as an update", () => {
   assert.equal(newer("0.1.9", "0.2.0"), false);
 });
 
+test("test versions come in order, before the release they lead up to", () => {
+  assert.equal(newer("0.4.0-beta.1", "0.3.1"), true);
+  assert.equal(newer("0.4.0-beta.2", "0.4.0-beta.1"), true);
+  assert.equal(newer("0.4.0-beta.10", "0.4.0-beta.9"), true);
+  assert.equal(newer("0.4.0", "0.4.0-beta.11"), true);
+  assert.equal(newer("0.4.0-beta.3", "0.4.0"), false);
+  assert.equal(newer("0.4.0-rc.1", "0.4.0-beta.5"), true);
+  assert.equal(newer("0.4.0-beta.1", "0.4.0-beta.1"), false);
+});
+
 test("the release's update file gives the version and each download's checksum", () => {
   const feed = parseFeed(`version: 0.2.1
 files:
