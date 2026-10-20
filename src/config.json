@@ -10,6 +10,7 @@
       "core": "fceumm_libretro",
       "thumbs": "Nintendo - Nintendo Entertainment System",
       "media": "cart",
+      "picture": "crt",
       "abbr": "NES",
       "look": [
         "nes",
@@ -31,6 +32,7 @@
       "core": "snes9x_libretro",
       "thumbs": "Nintendo - Super Nintendo Entertainment System",
       "media": "wide",
+      "picture": "crt",
       "abbr": "SNES",
       "look": [
         "snes",
@@ -55,6 +57,7 @@
         "Nintendo - Game Boy Color"
       ],
       "media": "mini",
+      "picture": "lcd",
       "abbr": "GB",
       "look": [
         "gb",
@@ -82,6 +85,7 @@
       "core": "mgba_libretro",
       "thumbs": "Nintendo - Game Boy Advance",
       "media": "mini",
+      "picture": "lcd",
       "abbr": "GBA",
       "look": [
         "gba",
@@ -114,6 +118,7 @@
       "core": "genesis_plus_gx_libretro",
       "thumbs": "Sega - Mega Drive - Genesis",
       "media": "cart",
+      "picture": "crt",
       "abbr": "MD",
       "look": [
         "genesis",
@@ -138,6 +143,7 @@
         "Sega - Game Gear"
       ],
       "media": "cart",
+      "picture": "crt",
       "abbr": "SMS",
       "look": [
         "sms",
@@ -159,6 +165,7 @@
       "core": "mednafen_pce_fast_libretro",
       "thumbs": "NEC - PC Engine - TurboGrafx 16",
       "media": "card",
+      "picture": "crt",
       "abbr": "PCE",
       "look": [
         "pce",
@@ -199,6 +206,7 @@
       "core": "stella_libretro",
       "thumbs": "Atari - 2600",
       "media": "cart",
+      "picture": "crt",
       "abbr": "2600",
       "look": [
         "atari",
@@ -221,6 +229,7 @@
       "core": "mupen64plus_next_libretro",
       "thumbs": "Nintendo - Nintendo 64",
       "media": "wide",
+      "picture": "crt",
       "abbr": "N64",
       "look": [
         "n64",
@@ -242,6 +251,7 @@
       "core": "pcsx_rearmed_libretro",
       "thumbs": "Sony - PlayStation",
       "media": "cd",
+      "picture": "crt",
       "abbr": "PS1",
       "look": [
         "ps1",
@@ -297,6 +307,7 @@
       "core": "flycast_libretro",
       "thumbs": "Sega - Dreamcast",
       "media": "cd",
+      "picture": "sharp",
       "abbr": "DC",
       "look": [
         "dc",
@@ -331,6 +342,7 @@
       "core": "melondsds_libretro",
       "thumbs": "Nintendo - Nintendo DS",
       "media": "mini",
+      "picture": "sharp",
       "abbr": "DS",
       "look": [
         "ds",
@@ -374,6 +386,7 @@
       "core": "ppsspp_libretro",
       "thumbs": "Sony - PlayStation Portable",
       "media": "umd",
+      "picture": "sharp",
       "abbr": "PSP",
       "look": [
         "psp",
@@ -396,6 +409,7 @@
         "MAME"
       ],
       "media": "board",
+      "picture": "crt",
       "abbr": "ARC",
       "look": [
         "arcade",
@@ -457,6 +471,7 @@
         "Nintendo - Wii"
       ],
       "media": "dvd",
+      "picture": "sharp",
       "abbr": "GCN",
       "look": [
         "gc",
@@ -483,6 +498,7 @@
       ],
       "thumbs": "Sony - PlayStation 2",
       "media": "dvd",
+      "picture": "sharp",
       "abbr": "PS2",
       "look": [
         "ps2",

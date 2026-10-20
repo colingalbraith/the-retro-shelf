@@ -259,7 +259,8 @@ test("what's new with test versions: their notes reach people on test versions, 
 test("a game can have settings of its own, over the app's, and they follow it when it moves", async () => {
   put("snes/Chrono Trigger (USA).sfc"); be.scan();
   const g = byTitle("Chrono Trigger");
-  assert.equal(be.playOpts(g).picture, be.ui.picture);
+  assert.equal(be.ui.picture, "auto");
+  assert.equal(be.playOpts(g).picture, "crt");                                // SNES, by console: the old TV
   assert.deepEqual((await be.route("POST", "/api/game/opts", { id: g.id, opts: { picture: "crt", nonsense: 1 } })).body, { ok: true, opts: { picture: "crt" } });
   assert.equal(be.playOpts(g).picture, "crt");
   assert.equal((await be.route("POST", "/api/game/opts", { id: g.id, opts: { picture: "neon" } })).code, 400);
@@ -269,5 +270,9 @@ test("a game can have settings of its own, over the app's, and they follow it wh
   be.moveStats("moved", g.id);
   await be.route("POST", "/api/game/opts", { id: g.id, opts: { picture: null } });   // back to the app's setting
   assert.equal(be.state.gameOpts[g.id], undefined);
-  assert.equal(be.playOpts(g).picture, be.ui.picture);
+  assert.equal(be.playOpts(g).picture, "crt");
+  put("gb/Tetris (World).gb"); be.scan();
+  assert.equal(be.playOpts(byTitle("Tetris")).picture, "lcd");               // a handheld, by console: its screen
+  be.ui.picture = "sharp";
+  assert.equal(be.playOpts(byTitle("Tetris")).picture, "sharp");             // a choice of your own wins
 });

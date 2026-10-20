@@ -29,7 +29,7 @@ const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
                      fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false,
-                     picture: "sharp", sort: "title", buttons: "auto", arrange: "console" };
+                     picture: "auto", sort: "title", buttons: "auto", arrange: "console" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -47,7 +47,7 @@ function jsave(p, obj) {
   fs.renameSync(p + ".tmp", p);
 }
 // what one game can have of its own (setGameOpts), and the choices for each
-const GAME_OPTS = { picture: ["sharp", "smooth", "crt"] };
+const GAME_OPTS = { picture: ["sharp", "smooth", "crt", "lcd"] };
 
 function cleanUi(d) {
   const out = { ...DEFAULT_UI, hidden: [] };
@@ -56,7 +56,7 @@ function cleanUi(d) {
   if (["full", "reduced", "off"].includes(d.fx)) out.fx = d.fx;
   if (["spines", "covers"].includes(d.shelf)) out.shelf = d.shelf;
   if (["cover", "printed"].includes(d.spine)) out.spine = d.spine;
-  if (["sharp", "smooth", "crt"].includes(d.picture)) out.picture = d.picture;
+  if (["auto", "sharp", "smooth", "crt", "lcd"].includes(d.picture)) out.picture = d.picture;
   if (["title", "year", "played"].includes(d.sort)) out.sort = d.sort;
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
   if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
@@ -421,7 +421,7 @@ class Backend extends EventEmitter {
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
-      const crt = play.picture === "crt" && fs.existsSync(this.ra.crt) ? ["--set-shader", this.ra.crt] : [];
+      const shader = { crt: this.ra.crt, lcd: this.ra.lcd }[play.picture], crt = shader && fs.existsSync(shader) ? ["--set-shader", shader] : [];
       return { cmd: [this.ra.exe, "-L", core, g.path, "--config", this.files.raCfg, "--log-file", this.files.raLog, "--verbose", ...crt, ...(slot !== null ? ["-e", String(slot)] : [])], builtIn: true };
     }
     const r = this.cfg.retroarch;
@@ -519,8 +519,12 @@ class Backend extends EventEmitter {
     this.saveState();
     return [200, { ok: true, opts: cur }];
   }
-  /** the settings a game plays with: the app's, then its own */
-  playOpts(g) { return { ...this.ui, ...(this.state.gameOpts[g.id] || {}) }; }
+  /** the settings a game plays with: the app's, then its own. "By console" pictures become that console's own */
+  playOpts(g) {
+    const o = { ...this.ui, ...(this.state.gameOpts[g.id] || {}) };
+    if (o.picture === "auto") o.picture = (this.cfg.systems[g.system] || {}).picture || "sharp";
+    return o;
+  }
 
   /** shelves people make ("Couch co-op", "To finish"): create, rename, delete, and put games on them or take them off */
   shelfOp(d) {

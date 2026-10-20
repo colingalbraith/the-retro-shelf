@@ -2045,7 +2045,8 @@ function renderSettings() {
   if (PATHS.builtin) {
     H("Playing");
     R("Play fullscreen", "Games fill the screen. Turn off to play in a window.", sw(UI.fullscreen !== false, v => { UI.fullscreen = v; saveUI(); }));
-    R("Picture", "How games look: crisp pixels, softened, or with the scanlines of an old TV.", seg([["sharp", "Sharp"], ["smooth", "Smooth"], ["crt", "CRT"]], UI.picture || "sharp", v => { UI.picture = v; saveUI(); }));
+    R(t("Picture"), t("How games look. By console: an old TV's scanlines for home consoles, a handheld's screen for Game Boy and GBA, crisp pixels for the rest."),
+      seg([["auto", t("By console")], ["sharp", t("Sharp")], ["smooth", t("Smooth")], ["crt", t("Old TV")], ["lcd", t("Handheld")]], UI.picture || "auto", v => { UI.picture = v; saveUI(); }));
     R("Pick up where you left off", "Saves your spot when you leave a game and starts there next time.", sw(UI.resume !== false, v => { UI.resume = v; saveUI(); }));
   R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
     R("In a game", "Hold Start (or press Esc) to come back to the shelf. Hold Select (or press F1) for the emulator's menu: save slots, controls, restart.", null);

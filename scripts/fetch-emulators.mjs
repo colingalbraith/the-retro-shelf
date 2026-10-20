@@ -17,9 +17,11 @@ const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RA_VERSION = "1.22.2";
 const BOT = "https://buildbot.libretro.com";
-// The CRT look (Settings → Picture): zfast-crt from libretro's shader collection, pinned to one commit
+// The old-TV and handheld looks (Settings → Picture): zfast-crt and zfast-lcd from libretro's shader collection,
+// pinned to one commit
 const SHADERS = "https://raw.githubusercontent.com/libretro/slang-shaders/e1d75632a205";
-const CRT_FILES = ["crt/zfast-crt.slangp", "crt/shaders/zfast_crt/zfast_crt_finemask.slang", "crt/shaders/zfast_crt/zfast_crt_impl.inc"];
+const SHADER_FILES = ["crt/zfast-crt.slangp", "crt/shaders/zfast_crt/zfast_crt_finemask.slang", "crt/shaders/zfast_crt/zfast_crt_impl.inc",
+  "handheld/zfast-lcd.slangp", "handheld/shaders/zfast_lcd.slang"];
 // Dolphin's libretro core needs the Sys folder from the same source tree it was built from.
 const DOLPHIN_SYS_REPO = "https://github.com/libretro/dolphin.git";
 
@@ -191,13 +193,13 @@ async function ppssppAssets() {
   console.log("  PPSSPP system files");
 }
 
-async function crtShader() {
-  for (const f of CRT_FILES) {
+async function pictureShaders() {
+  for (const f of SHADER_FILES) {
     const src = await download(`${SHADERS}/${f}`, "shader-" + f.replace(/\//g, "-"));
     fs.mkdirSync(path.dirname(path.join(OUT, "shaders", f)), { recursive: true });
     fs.copyFileSync(src, path.join(OUT, "shaders", f));
   }
-  console.log("  CRT shader");
+  console.log("  old-TV and handheld shaders");
 }
 
 (async () => {
@@ -210,7 +212,7 @@ async function crtShader() {
   await infos();
   if (CORES.includes("dolphin_libretro")) dolphinSys();
   if (CORES.includes("ppsspp_libretro")) await ppssppAssets();
-  await crtShader();
+  await pictureShaders();
   fs.writeFileSync(path.join(OUT, "versions.json"), JSON.stringify({ retroarch: RA_VERSION, cores: CORES, fetched: new Date().toISOString() }, null, 2));
   console.log(`Done: ${mb(OUT)} in ${path.relative(ROOT, OUT)}`);
 })().catch(e => { console.error(e.message || e); process.exit(1); });

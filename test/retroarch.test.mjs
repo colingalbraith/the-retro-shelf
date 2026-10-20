@@ -49,11 +49,12 @@ test("a failed start is explained from RetroArch's log", () => {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("the picture setting picks sharp pixels, smoothing or the CRT shader", () => {
+test("the picture setting picks sharp pixels, smoothing, or the old-TV or handheld shader", () => {
   const dirs = { saves: "s", states: "t", screenshots: "p", system: "b", private: "x" };
   const emu = { cores: "c", info: "i", assets: "a", autoconfig: "j" };
   const look = picture => { const e = ra.enforced(emu, dirs, { picture }); return [e.video_smooth, e.video_shader_enable]; };
   assert.deepEqual(look("sharp"), ["false", "false"]);
   assert.deepEqual(look("smooth"), ["true", "false"]);
   assert.deepEqual(look("crt"), ["false", "true"]);
+  assert.deepEqual(look("lcd"), ["false", "true"]);
 });
