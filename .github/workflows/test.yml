@@ -20,3 +20,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+
+      # every screen and box back at small and large windows, a controller through every panel (scripts/ui-test.mjs)
+      - name: Screen tests
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb > /dev/null
+          xvfb-run -a --server-args="-screen 0 1920x1080x24" node scripts/ui-test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Linux'
+        with:
+          name: screens
+          path: dist/ui-test
+          if-no-files-found: ignore

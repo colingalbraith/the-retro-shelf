@@ -2467,6 +2467,16 @@ APP.onMenu(w => {
 });
 $("#lhint").textContent = "Hold Start or press Esc to come back here.";
 
+/* ---------- words ----------
+   Text the app shows goes through t("English text", {name: value}), so it can be translated: WORDS holds each
+   language's table, keyed by the English, and English is the text itself */
+const WORDS = {};
+let LANG = "en";
+function t(text, vars) {
+  const out = (WORDS[LANG] && WORDS[LANG][text]) || text;
+  return vars ? out.replace(/\{(\w+)\}/g, (m, k) => k in vars ? String(vars[k]) : m) : out;
+}
+
 /* ---------- boot ---------- */
 function hideSplash() { const s = $("#splash"); s.classList.add("out"); setTimeout(() => s.remove(), 450); }
 (async function boot() {
