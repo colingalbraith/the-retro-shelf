@@ -63,6 +63,13 @@ function onScreen(b) {
   return seen ? b : { width: Math.min(b.width, area.width), height: Math.min(b.height, area.height) };
 }
 
+/** TV mode: everything a quarter bigger, and fullscreen */
+function tvMode(on) {
+  if (!win || win.isDestroyed()) return;
+  win.webContents.setZoomFactor(on ? 1.25 : 1);
+  if (win.isFullScreen() !== on) win.setFullScreen(on);
+}
+
 function createWindow() {
   const saved = loadBounds();
   win = new BrowserWindow({
@@ -80,7 +87,7 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   if (saved.maximized) win.maximize();
   if (saved.fullscreen) win.setFullScreen(true);
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => { win.show(); if (backend && backend.ui.tv) tvMode(true); });
   for (const ev of ["resize", "move", "enter-full-screen", "leave-full-screen"]) win.on(ev, () => { clearTimeout(win._st); win._st = setTimeout(saveBounds, 500); });
   win.on("close", saveBounds);
   win.on("closed", () => { win = null; });
@@ -107,7 +114,8 @@ function menu() {
       mac ? { role: "close" } : { role: "quit" },
     ] },
     { role: "editMenu" },
-    { label: "View", submenu: [{ label: "Your Play", accelerator: "CmdOrCtrl+P", click: () => win && win.webContents.send("menu", "your-play") }, { type: "separator" },
+    { label: "View", submenu: [{ label: "Your Play", accelerator: "CmdOrCtrl+P", click: () => win && win.webContents.send("menu", "your-play") },
+      { label: "Collections", accelerator: "CmdOrCtrl+L", click: () => win && win.webContents.send("menu", "collections") }, { type: "separator" },
       { role: "togglefullscreen" }, { type: "separator" }, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" },
       ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
     { role: "windowMenu" },
@@ -213,6 +221,7 @@ function ipc() {
     try { fs.mkdirSync(backend.folders.saves, { recursive: true }); return { ok: true, ...unzipInto(r.filePaths[0], backend.folders.saves) }; }
     catch (e) { return { ok: false, error: "Couldn't restore from that file: " + e.message }; }
   });
+  ipcMain.handle("tv-mode", (_, on) => tvMode(!!on));
   ipcMain.handle("copy-report", () => { clipboard.writeText(backend.report(app.getVersion())); return true; });
   ipcMain.handle("update", (_, what) => {
     if (what === "check") return updater.check(true);

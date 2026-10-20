@@ -95,7 +95,7 @@ test("shelves people make can be filled, renamed and deleted, and follow a game 
   assert.deepEqual(be.state.shelves[0].ids, [moved.id, chrono]);
   be.shelfOp({ op: "rename", name: "Couch co-op", to: "Two players" });
   be.shelfOp({ op: "remove", name: "Two players", id: chrono });
-  assert.deepEqual(be.libraryJson().shelves, [{ name: "Two players", ids: [moved.id] }]);
+  assert.deepEqual(be.libraryJson().shelves, [{ name: "Two players", ids: [moved.id], wanted: [] }]);
   be.shelfOp({ op: "delete", name: "Two players" });
   assert.deepEqual(be.state.shelves, []);
 });
@@ -120,4 +120,31 @@ test("each sitting is logged when a game closes (not one that quit right away), 
   assert.ok(Math.abs(be.state.sessions[0][2] - 1800) < 5);
   const [, moved] = be.moveTo(id, "PC Engine");
   assert.equal(be.state.sessions[0][0], moved.id);
+});
+
+test("collections: series show which games you have, and your own ones can hold games you want", () => {
+  put("gb/Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb");
+  put("snes/Legend of Zelda, The - A Link to the Past (USA).sfc");
+  be.scan();
+  const { series } = be.collections()[1];
+  const poke = series.find(s => s.name === "Pokémon"), zelda = series.find(s => s.name === "The Legend of Zelda");
+  assert.ok(poke && zelda, "series with a game you have are listed");
+  assert.equal(poke.have, 1);
+  assert.ok(poke.items.length > 5, "and the ones you don't have too");
+  assert.equal(poke.items.find(i => i.id).title, "Pokemon: Red Version");
+  assert.ok(!series.some(s => s.name === "Mega Man"), "series with none of your games aren't");
+
+  const found = be.gameSearch("pokemon blue")[1].results;
+  assert.equal(found[0].title, "Pokemon: Blue Version");
+  assert.equal(found[0].id, null);
+  be.shelfOp({ op: "create", name: "Wishlist" });
+  be.shelfOp({ op: "want", name: "Wishlist", system: found[0].system, look: found[0].look });
+  let mine = be.collections()[1].mine[0];
+  assert.deepEqual(mine.items.map(i => [i.title, !!i.id]), [["Pokemon: Blue Version", false]]);
+  put("gb/" + found[0].look + ".gb");
+  be.scan();
+  mine = be.collections()[1].mine[0];
+  assert.equal(mine.have, 1, "a wanted game you then add counts as yours");
+  be.shelfOp({ op: "unwant", name: "Wishlist", system: found[0].system, look: found[0].look });
+  assert.equal(be.collections()[1].mine[0].items.length, 0);
 });

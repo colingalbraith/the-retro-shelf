@@ -54,8 +54,9 @@ function cleanUi(d) {
   if (["title", "year", "played"].includes(d.sort)) out.sort = d.sort;
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
   if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
+  if (Array.isArray(d.hiddenSeries)) out.hiddenSeries = d.hiddenSeries.map(String).slice(0, 1000);
   else if (["art", "color"].includes(d.spine)) out.spine = "cover";
-  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates"]) if (typeof d[k] === "boolean") out[k] = d[k];
+  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "tv"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
   if (Array.isArray(d.hidden)) out.hidden = d.hidden.map(String).slice(0, 100);
   return out;
@@ -442,7 +443,12 @@ class Backend extends EventEmitter {
     } else {
       const sh = find(name);
       if (!sh) return [404, { error: "There's no shelf called that." }];
-      if (op === "add" || op === "remove") {
+      if (op === "want" || op === "unwant") {
+        const sys = String(d.system || ""), look = String(d.look || "").slice(0, 300);
+        if (!this.cfg.systems[sys] || !look) return [400, { error: "Unknown game." }];
+        sh.wanted = (sh.wanted || []).filter(([s2, l2]) => !(s2 === sys && l2 === look));
+        if (op === "want") sh.wanted.push([sys, look]);
+      } else if (op === "add" || op === "remove") {
         const id = String(d.id || "");
         sh.ids = sh.ids.filter(x => x !== id);
         if (op === "add" && this.games.has(id)) sh.ids.push(id);
@@ -628,11 +634,12 @@ class Backend extends EventEmitter {
     return [200, { results: results.slice(0, 60).map(({ thumb, name }) => ({ thumb, name })) }];
   }
 
-  /** one cover from the site's list, downloaded once and kept while the picker browses */
-  async coverFile(thumb, name) {
+  /** one cover from the site's list, downloaded once: kept while the picker browses (.previews, cleared each launch) or
+      for good (.ghosts, the boxes of games a collection is missing) */
+  async coverFile(thumb, name, keep = ".previews") {
     const idx = this._idx.get("cover|" + thumb);
     if (!idx || !idx.names.has(name)) return null;
-    const f = path.join(this.files.covers, ".previews", crypto.createHash("sha1").update(thumb + "/" + name).digest("hex") + ".png");
+    const f = path.join(this.files.covers, keep, crypto.createHash("sha1").update(thumb + "/" + name).digest("hex") + ".png");
     if (!fs.existsSync(f)) {
       const data = await this.fetchUrl(`${this.coverBase()}/${encodeURIComponent(thumb)}/${ART.cover.dir}/${encodeURIComponent(name)}`, 20000);
       if (data.subarray(0, 4).toString("latin1") !== "\x89PNG") return null;
@@ -640,6 +647,68 @@ class Backend extends EventEmitter {
       fs.writeFileSync(f, data);
     }
     return f;
+  }
+
+  /** the box of a game you don't have, for a collection: found by name like any cover, shown faded */
+  async ghostCover(system, look) {
+    const s = this.cfg.systems[system];
+    if (!s) return null;
+    for (const th of asList(s.thumbs)) {
+      let idx;
+      try { idx = await this.indexFor(th, "cover"); } catch { continue; }
+      const name = this.matchName(idx, look);
+      if (name) { try { const f = await this.coverFile(th, name, ".ghosts"); if (f) return f; } catch {} }
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------- collections
+  /** the library's games by console and name, the way collections look them up */
+  ownedIndex() {
+    const idx = new Map();
+    for (const g of this.games.values()) for (const n of [g.look, g.title, this.state.names[g.id]]) if (n) { const k = g.system + "|" + norm(n); if (!idx.has(k)) idx.set(k, g.id); }
+    return idx;
+  }
+  /**
+   * Series (from libretro-database's franchise lists) with at least one game in the library, every game marked with the
+   * library's id when it's there; and the shelves people made, their own games plus the ones they want.
+   */
+  collections() {
+    this.franchises = this.franchises || jload(path.join(this.dirs.app, "data", "franchises.json"), {});
+    const own = this.ownedIndex(), item = ([system, look]) => ({ system, look, title: cleanTitle(look), id: own.get(system + "|" + norm(look)) || null });
+    const series = [];
+    for (const [name, games] of Object.entries(this.franchises)) {
+      if (!games.some(([sys, look]) => own.has(sys + "|" + norm(look)))) continue;
+      const items = games.filter(([sys]) => this.cfg.systems[sys]).map(item);
+      series.push({ name, have: items.filter(i => i.id).length, items });
+    }
+    series.sort((a, b) => b.have - a.have || b.have / b.items.length - a.have / a.items.length || a.name.localeCompare(b.name));
+    const mine = this.state.shelves.map(sh => {
+      const ids = sh.ids.filter(id => this.games.has(id)), items = ids.map(id => { const g = this.games.get(id); return { system: g.system, look: g.look, title: this.state.names[id] || g.title, id }; });
+      for (const w of sh.wanted || []) { const it = item(w); if (!it.id || !ids.includes(it.id)) items.push(it); }
+      return { name: sh.name, have: items.filter(i => i.id).length, items };
+    });
+    return [200, { series, mine }];
+  }
+  /** games in the metadata lists (every console's, ~38,000) whose names have all the words, for adding to a collection */
+  gameSearch(q) {
+    const words = String(q || "").toLowerCase().split(/[^a-z0-9]+/).filter(w => w && !["the", "a", "an", "of"].includes(w));
+    if (!words.length) return [200, { results: [] }];
+    const own = this.ownedIndex(), seen = new Map();
+    for (const [system, s] of Object.entries(this.cfg.systems)) {
+      if (s.names) continue;
+      const folder = s.folder || system;
+      this.metaFor(folder, "");
+      for (const [look, md] of Object.entries(this._meta[folder].m)) {
+        const low = look.toLowerCase();
+        if (!words.every(w => low.includes(w))) continue;
+        const k = system + "|" + norm(look), cur = seen.get(k), usa = /\bUSA\b/.test(look);
+        if (!cur || (usa && !cur.usa)) seen.set(k, { system, look, title: cleanTitle(look), year: md[0] || "", id: own.get(k) || null, usa });
+      }
+    }
+    const want = words.join("");
+    const results = [...seen.values()].sort((a, b) => (norm(b.look) === want) - (norm(a.look) === want) || b.usa - a.usa || a.title.length - b.title.length || a.title.localeCompare(b.title));
+    return [200, { results: results.slice(0, 40).map(({ usa, ...r }) => r) }];
   }
 
   async coverPick(id, thumb, name) {
@@ -947,7 +1016,7 @@ class Backend extends EventEmitter {
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id],
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems),
-      shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)) })),
+      shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
       media: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, v.media || "cart"])),
       settings: this.settingsJson(), status: this.statusJson(),
     };
@@ -982,6 +1051,14 @@ class Backend extends EventEmitter {
       if (pathname === "/api/library") return { code: 200, body: this.libraryJson() };
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };
       if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.state.sessions, now: now() } };
+      if (pathname === "/api/collections") return { code: 200, body: this.collections()[1] };
+      if (pathname.startsWith("/ghost/")) {
+        const rest = pathname.slice(7), i = rest.indexOf("/");
+        let f = null;
+        try { if (i > 0) f = await this.ghostCover(rest.slice(0, i), rest.slice(i + 1)); } catch {}
+        if (f) return this.file(f, "image/png", "public, max-age=86400");
+        return { code: 404, body: { error: "not found" } };
+      }
       if (pathname === "/api/licenses") return { code: 200, body: this.licenses() };
       if (pathname.startsWith("/snap/")) {
         const g = this.games.get(pathname.slice(6));
@@ -1022,6 +1099,7 @@ class Backend extends EventEmitter {
       case "/api/stop": await this.stop(); return j([200, { ok: true }]);
       case "/api/fav": return j(this.toggleFav(String(d.id || "")));
       case "/api/shelves": return j(this.shelfOp(d));
+      case "/api/games/search": return j(this.gameSearch(d.q));
       case "/api/rescan":
         this.scan();
         if (this.ui.autoCovers) this.coverJob([...this.games.keys()], false, true);

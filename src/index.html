@@ -388,6 +388,56 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .tgrid .d.l3{background:rgba(178,52,38,.74);border-color:transparent}.tgrid .d.l4{background:rgba(160,40,28,.95);border-color:transparent}
 .tgrid .d.today{outline:1.5px solid var(--ink);outline-offset:1px}
 .tcf{margin-top:14px;font-size:12.5px;color:var(--ink2)}
+/* ---------- collections: a strip of boxes per series; the ones you don't have stand faded ---------- */
+#colls{position:fixed;top:0;left:0;right:0;bottom:0;z-index:127;overflow-y:auto;background:linear-gradient(180deg,var(--wall-hi),var(--wall) 420px),var(--wall);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s}
+#colls.show{opacity:1;visibility:visible}
+#colls .thead .btns{display:flex;gap:12px;align-items:center}
+#cclose{color:var(--chalk)}
+.seg.ctabs{border-color:var(--chalk)}.seg.ctabs button{color:var(--chalk)}.seg.ctabs button+button{border-left-color:var(--chalk)}.seg.ctabs button.on{background:var(--chalk);color:var(--wall)}
+.col{margin-top:38px}
+.colh{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.colh .tplate{position:static;transform:none;height:20px}
+.colh .lnk{border:0;background:none;padding:0;color:var(--dust);font:500 13px var(--disp);text-decoration:underline;text-underline-offset:3px}
+.colh .lnk:hover{color:var(--chalk)}
+.strip{display:flex;align-items:flex-end;gap:16px;overflow-x:auto;padding:14px 18px 30px;scrollbar-width:thin;scrollbar-color:#3a352f transparent;
+  background:linear-gradient(180deg,#3f2a1a 0,#3f2a1a 2px,#876041 2px,#8d6644 8px,#a67b54 8px,#a67b54 9px,#5f412a 9px,#4f3622 22px,rgba(0,0,0,.45) 23px,transparent 34px) left bottom / 100% 34px no-repeat}
+.ci{position:relative;flex:none;padding:0;border:0;background:none;cursor:pointer}
+.ci .art{display:block;height:128px;box-shadow:0 8px 14px rgba(0,0,0,.5)}
+.ci img{display:block;height:100%;width:auto;max-width:210px;object-fit:contain}
+.ci .ph{display:flex;align-items:center;justify-content:center;width:94px;height:100%;padding:8px;box-sizing:border-box;background:var(--paper);color:var(--ink);font:700 12px/1.15 var(--disp);text-align:center}
+.ci:focus-visible{outline:2px solid var(--acc);outline-offset:4px}
+/* a game you don't have: the box as a faded print, or an empty outline */
+.ci.ghost .art{box-shadow:none;outline:1.5px dashed rgba(221,214,200,.35);outline-offset:3px}
+.ci.ghost img{filter:grayscale(1) contrast(.85);opacity:.3}
+.ci.ghost .ph{background:transparent;color:var(--dust);border:0}
+.ci .x{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:0;background:var(--chalk);color:var(--wall);font:700 13px/22px var(--disp);display:none}
+.ci:hover .x,.ci:focus-within .x{display:block}
+.ci.add .art{display:flex;align-items:center;justify-content:center;width:94px;box-shadow:none;outline:1.5px dashed rgba(221,214,200,.5);outline-offset:3px;color:var(--chalk);font:600 13px/1.2 var(--disp);text-align:center}
+.cmore{margin:40px 0 0;color:var(--dust);font-size:14px}
+.cmore button{border:0;background:none;padding:0;color:var(--chalk);font:inherit;text-decoration:underline;text-underline-offset:3px}
+.slip.wide{width:560px;max-width:86vw}
+#waddr{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15)}
+#waddr button{display:flex;width:100%;justify-content:space-between;gap:12px;padding:9px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.1);background:none;text-align:left;color:var(--ink);font:500 15px var(--disp)}
+#waddr button span{color:var(--ink2);font-size:13px;white-space:nowrap}
+#waddr button:hover,#waddr button:focus-visible{background:rgba(28,25,22,.06);outline:none}
+/* ---------- controller: options menu, on-screen keyboard, and where the focus is ---------- */
+#optl{display:flex;flex-direction:column;margin-top:10px}
+#optl button{padding:11px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.12);background:none;text-align:left;color:var(--ink);font:600 17px var(--disp)}
+#optl button:hover,#optl button:focus{background:rgba(28,25,22,.07);outline:none;padding-left:12px}
+#optl .sep{height:10px}
+#osk{position:fixed;left:0;right:0;bottom:0;z-index:300;display:flex;justify-content:center;padding:18px;background:rgba(12,11,10,.6);transform:translateY(100%);transition:transform .18s ease;visibility:hidden}
+#osk.show{transform:none;visibility:visible}
+.oskin{background:var(--paper);padding:16px 18px 10px;box-shadow:0 -10px 30px rgba(0,0,0,.5)}
+#oskv{min-height:30px;margin-bottom:10px;padding:4px 10px;border:1.5px solid var(--ink);background:var(--paper-hi);color:var(--ink);font:600 18px/30px var(--disp);white-space:pre}
+.oskr{display:flex;gap:6px;margin-bottom:6px}
+.oskr button{width:48px;height:44px;border:1.5px solid var(--ink);background:none;color:var(--ink);font:700 17px var(--disp)}
+.oskr button.wide{flex:1;width:auto}.oskr button.done{width:96px;background:var(--ink);color:var(--paper)}
+.oskr button:focus{background:var(--acc);color:#fff;outline:none}
+.oskh{margin:6px 0 0;color:var(--ink2);font-size:12px;text-align:center}
+body.kb :is(#settings,#getg,#pick,#colls,#trophy,.over) :is(button,input,select):focus,body.kb .sw:focus-within{outline:2.5px solid var(--acc);outline-offset:3px}
+/* TV mode: the controls always show, and the pointer hides while a controller or keyboard is in use */
+html.tv #hintbar.gone{height:36px;opacity:1;border-top-color:#000}
+html.tv body.kb,html.tv body.kb *{cursor:none!important}
 .slab{width:var(--w);height:13px;margin-top:1px;background:linear-gradient(90deg,var(--band) 0 9px,var(--body) 9px);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.35),0 1px 1px rgba(0,0,0,.4);transform:translateX(var(--x))}
 .seg{display:flex;flex:none;border:1.5px solid var(--ink)}
 .seg button{border:0;background:none;padding:5px 14px;font-weight:600;white-space:nowrap}
@@ -556,6 +606,23 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   </div>
 </div>
 
+<div id="colls" role="dialog" aria-label="Collections">
+  <div class="tin">
+    <div class="thead"><span class="tape">Collections</span><div class="btns"><div class="seg ctabs" id="ctabs"><button data-t="series">Series</button><button data-t="mine">Yours</button></div><button id="cclose" class="btn">Done<kbd>Esc</kbd></button></div></div>
+    <p class="tsum" id="csum"></p>
+    <div id="clist"></div>
+  </div>
+</div>
+
+<div id="wadd" class="over"><div class="slip wide"><h2 id="waddt">Add a game</h2><p>Any game for these consoles, yours or not. The ones you don't have yet stand faded.</p>
+  <input type="text" id="waddq" spellcheck="false" autocomplete="off" placeholder="Search by name">
+  <div id="waddr"></div>
+  <div class="btns"><button class="btn" id="waddclose">Done</button></div></div></div>
+
+<div id="opts" class="over"><div class="slip"><h2 id="optst">Options</h2><div id="optl"></div></div></div>
+
+<div id="osk"><div class="oskin"><div id="oskv"></div><div id="oskk"></div><p class="oskh">A types · X deletes · Y space · B done</p></div></div>
+
 <div id="pick">
   <div class="panel" role="dialog" aria-label="Find a cover">
     <div class="phead"><div><small>Retro Shelf manual</small><h2>Find a cover</h2></div><button id="pclose" class="btn primary">Done<kbd>Esc</kbd></button></div>
@@ -699,11 +766,12 @@ function applyUI() {
   HTML.dataset.fx = (UI.fx === "full" && rm) ? "reduced" : UI.fx;
   HTML.style.setProperty("--card", UI.card + "px");
   setAcc(hexRgb(UI.accent));
-  if (UI.hints) { clearTimeout(hintT); $("#hintbar").classList.remove("gone"); }
+  if (UI.hints || UI.tv) { clearTimeout(hintT); $("#hintbar").classList.remove("gone"); }
+  applyTv();
 }
 function showHintsBriefly() {
   const h = $("#hintbar"); h.classList.remove("gone"); clearTimeout(hintT);
-  if (!UI.hints) hintT = setTimeout(() => h.classList.add("gone"), 7000);
+  if (!UI.hints && !UI.tv) hintT = setTimeout(() => h.classList.add("gone"), 7000);
 }
 let saveT;
 /* uiEdits counts changes not yet saved: until they are, a library refresh keeps this copy of the settings */
@@ -1156,7 +1224,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "opts", "osk", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth; markUnder();
@@ -1272,7 +1340,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1477,6 +1545,195 @@ async function loadLibrary(force) {
   else G.forEach(g => { if (art.get(g.id) !== g.cv + "/" + g.lv) redrawArt(g); });
 }
 
+/* ---------- a controller (or TV remote setup) reaches everything ----------
+   In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
+   On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
+const PANELS = [["osk", () => closeOsk()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
+  ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["pick", () => closePicker()],
+  ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
+const topPanel = () => PANELS.find(([id]) => isOpen(id));
+function focusables(root) {
+  return $$("button, input, select, a[href]", root).filter(e => !e.disabled && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden"
+    && !(e.type === "checkbox" && !e.closest(".sw")));
+}
+/* the nearest control in a direction: straight along it counts more than off to the side */
+function padNav(root, dir) {
+  const all = focusables(root); if (!all.length) return;
+  const cur = all.includes(document.activeElement) ? document.activeElement : null;
+  if (!cur) { all[0].focus({preventScroll: true}); all[0].scrollIntoView({block: "nearest"}); return; }
+  if (cur.type === "range" && (dir === "l" || dir === "r")) { dir === "l" ? cur.stepDown() : cur.stepUp(); cur.dispatchEvent(new Event("input")); cur.dispatchEvent(new Event("change")); return; }
+  const at = e => { const b = (e.closest(".sw") || e).getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
+  const [cx, cy] = at(cur), [dx, dy] = {l: [-1, 0], r: [1, 0], u: [0, -1], d: [0, 1]}[dir];
+  let best = null, bs = Infinity;
+  for (const e of all) {
+    if (e === cur) continue;
+    const [x, y] = at(e), along = (x - cx) * dx + (y - cy) * dy, across = Math.abs((x - cx) * dy - (y - cy) * dx);
+    if (along <= 2) continue;
+    const score = along + across * 2.5; if (score < bs) { bs = score; best = e; }
+  }
+  if (best) { best.focus({preventScroll: true}); (best.closest(".sw") || best).scrollIntoView({block: "nearest", inline: "nearest"}); beep(440, .03, .02); }
+}
+function padPress(root) {
+  const e = document.activeElement;
+  if (!root.contains(e) || e === root) { const f = focusables(root)[0]; if (f) f.focus(); return; }
+  if (e.tagName === "INPUT" && e.type === "text") openOsk(e);
+  else e.click();
+}
+
+/* options for the picked game (Select, O, or the context-menu key) */
+function openOpts(sub) {
+  if (LAUNCH.open) return;
+  const g = selGame(), list = $("#optl"); clear(list);
+  const item = (label, fn, cls) => { const b = el("button", cls || "", label); b.onclick = () => { closeOpts(true); fn(); }; list.appendChild(b); };
+  if (g && sub === "shelf") {
+    $("#optst").textContent = "Put " + g.title + " on a shelf";
+    SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast((on ? "Took it off " : "Put it on ") + sh.name + "."); }); });
+    item("New shelf…", () => openShelfSlip({id: g.id}));
+  } else {
+    $("#optst").textContent = g ? g.title : "The Retro Shelf";
+    if (g) {
+      const resume = g.saves && g.saves.resume;
+      item(resume ? "Continue" : "Play", () => play(g));
+      if (resume) item("Start fresh", () => play(g, {fresh: true}));
+      item(sel.classList.contains("flip") ? "Turn back" : "Turn over", () => flip());
+      item(FAV.has(g.id) ? "Remove from favorites" : "Add to favorites", () => toggleFav(g.id));
+      item("Put on a shelf…", () => setTimeout(() => openOpts("shelf"), 30));
+      item("Find cover…", () => openPicker(g.id));
+      item("Rename…", () => openRename(g.id));
+      item(g.hidden ? "Show on shelves" : "Hide from shelves", async () => { await api("/api/game/hide", {id: g.id, hidden: !g.hidden}); refresh(true); });
+      list.appendChild(el("i", "sep"));
+    }
+    item("Search…", () => { $("#q").focus(); paintQ(); openOsk($("#q")); });
+    item("Collections", () => openColls());
+    item("Your play", () => openTrophy());
+    item("Settings", () => openSettings());
+  }
+  $("#opts").classList.add("show"); light(); beep(520);
+  setTimeout(() => { const f = list.querySelector("button"); if (f) f.focus(); }, 30);
+}
+function closeOpts(quiet) { if (!isOpen("opts")) return; $("#opts").classList.remove("show"); if (!quiet) { focusById(focusId); light(); beep(330); } }
+$("#opts").addEventListener("mousedown", e => { if (e.target === $("#opts")) closeOpts(); });
+
+/* the on-screen keyboard: types into a text box, for when there's only a controller */
+let oskFor = null;
+const OSK_ROWS = ["1234567890", "QWERTYUIOP", "ASDFGHJKL'", "ZXCVBNM-.:"];
+function openOsk(input) {
+  oskFor = input; const k = $("#oskk"); clear(k);
+  OSK_ROWS.forEach(r => { const row = el("div", "oskr"); [...r].forEach(ch => { const b = el("button", "", ch); b.onclick = () => oskType(ch.toLowerCase()); row.appendChild(b); }); k.appendChild(row); });
+  const last = el("div", "oskr"), sp = el("button", "wide", "Space"), bs = el("button", "", "⌫"), dn = el("button", "done", "Done");
+  sp.onclick = () => oskType(" "); bs.onclick = () => oskType(null); dn.onclick = () => closeOsk();
+  last.appendChild(sp); last.appendChild(bs); last.appendChild(dn); k.appendChild(last);
+  $("#oskv").textContent = input.value || ""; $("#osk").classList.add("show");
+  setTimeout(() => k.querySelector("button").focus(), 30);
+}
+function oskType(ch) {
+  const i = oskFor; if (!i) return;
+  i.value = ch === null ? i.value.slice(0, -1) : i.value + (i.value || ch !== " " ? ch : "");
+  i.dispatchEvent(new Event("input", {bubbles: true})); $("#oskv").textContent = i.value; beep(600, .02, .015);
+}
+function closeOsk() {
+  if (!isOpen("osk")) return;
+  const i = oskFor; $("#osk").classList.remove("show"); oskFor = null;
+  /* done with the search: go to the first game it found */
+  if (i === $("#q")) { i.blur(); focusById(null); paintQ(); }
+  else if (i) i.focus();
+}
+
+/* TV mode: fullscreen, bigger, controls always showing, no mouse pointer while playing with a controller */
+function applyTv() { HTML.classList.toggle("tv", !!UI.tv); }
+
+/* ---------- collections: series (which of their games you have) and the ones you make, with games you want ---------- */
+let COLL = null, collTab = "series", showHiddenSeries = false, collIO = null;
+async function openColls(tab) {
+  if (LAUNCH.open) return;
+  if (tab) collTab = tab;
+  if (isOpen("settings")) $("#settings").classList.remove("show");
+  blurActive(); $("#colls").classList.add("show"); light(); beep(520);
+  $("#csum").textContent = "Looking through your shelves…"; clear($("#clist"));
+  const r = await api("/api/collections");
+  if (!isOpen("colls")) return;
+  COLL = r.ok ? r.data : {series: [], mine: []};
+  renderColls();
+}
+function closeColls() { if (!isOpen("colls")) return; $("#colls").classList.remove("show"); if (collIO) collIO.disconnect(); focusById(focusId); light(); beep(330); }
+function collItem(it, list) {
+  const b = el("button", "ci" + (it.id ? "" : " ghost")), art = el("span", "art"), g = it.id && byId.get(it.id);
+  b.title = it.title + " · " + it.system + (it.id ? "" : " · not in your library");
+  if (g && g.cv) { const im = new Image(); im.alt = ""; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); }
+  else if (!it.id) {
+    /* a missing game's box comes from the cover site when it scrolls into view; an outline with its name until then */
+    const ph = el("span", "ph", it.title); art.appendChild(ph);
+    const im = new Image(); im.alt = ""; im.dataset.src = "/ghost/" + encodeURIComponent(it.system) + "/" + encodeURIComponent(it.look);
+    im.onload = () => { ph.remove(); art.appendChild(im); };
+    art._im = im; collIO.observe(art);
+  } else art.appendChild(el("span", "ph", it.title));
+  b.appendChild(art);
+  b.onclick = () => {
+    if (it.id) { closeColls(); setTimeout(() => focusById(it.id), 60); }
+    else toast(it.title + " isn't in your library." + (list ? "" : " Help → Where to Get Games has the legal ways to get games."));
+  };
+  if (list && !it.id) {
+    const x = el("button", "x", "×"); x.title = "Take it off this collection";
+    x.onclick = async e => { e.stopPropagation(); await api("/api/shelves", {op: "unwant", name: list, system: it.system, look: it.look}); openColls(); };
+    b.appendChild(x);
+  }
+  return b;
+}
+function renderColls() {
+  const list = $("#clist"), sum = $("#csum"), hidden = new Set(UI.hiddenSeries || []); clear(list);
+  $$("#ctabs button").forEach(b => b.classList.toggle("on", b.dataset.t === collTab));
+  if (collIO) collIO.disconnect();
+  collIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting && e.target._im) { e.target._im.src = e.target._im.dataset.src; collIO.unobserve(e.target); } }), {root: $("#colls"), rootMargin: "300px"});
+  const block = (name, have, items, opts) => {
+    const sec = el("section", "col"), h = el("div", "colh"), pl = el("span", "tplate", name); pl.appendChild(el("small", "", have + " of " + items.length));
+    h.appendChild(pl);
+    if (opts.hide) { const hb = el("button", "lnk", opts.hidden ? "Show" : "Hide"); hb.onclick = opts.hide; h.appendChild(hb); }
+    const strip = el("div", "strip"); items.forEach(it => strip.appendChild(collItem(it, opts.list)));
+    if (opts.list) { const add = el("button", "ci add"), art = el("span", "art", "+ Add a game"); add.appendChild(art); add.onclick = () => openWantAdd(opts.list); strip.appendChild(add); }
+    sec.appendChild(h); sec.appendChild(strip); list.appendChild(sec);
+  };
+  if (collTab === "series") {
+    const shown = COLL.series.filter(s => showHiddenSeries || !hidden.has(s.name)), done = COLL.series.filter(s => s.have === s.items.length).length;
+    sum.textContent = COLL.series.length ? "Your games are part of " + plural(COLL.series.length, "series", "series") + (done ? ", and you have all of " + done + "." : ".") + " Faded boxes are the ones you don't have."
+      : "None of your games belong to a series we know of yet.";
+    shown.forEach(s => block(s.name, s.have, s.items, {hidden: hidden.has(s.name), hide: () => {
+      UI.hiddenSeries = hidden.has(s.name) ? [...hidden].filter(n => n !== s.name) : [...hidden, s.name]; saveUI(); renderColls();
+    }}));
+    const nh = COLL.series.filter(s => hidden.has(s.name)).length;
+    if (nh) { const p = el("p", "cmore", plural(nh, "series is", "series are") + " hidden. "), t = el("button", "", showHiddenSeries ? "Hide them again" : "Show them"); t.onclick = () => { showHiddenSeries = !showHiddenSeries; renderColls(); }; p.appendChild(t); list.appendChild(p); }
+  } else {
+    sum.textContent = "Your own collections. Add any game, even one you don't have yet: it stands faded until you do.";
+    COLL.mine.forEach(c => block(c.name, c.have, c.items, {list: c.name}));
+    const p = el("p", "cmore", COLL.mine.length ? "" : "You haven't made one yet. "), nb = el("button", "", "Make a new collection"); nb.onclick = () => openShelfSlip({}); p.appendChild(nb); list.appendChild(p);
+  }
+}
+$("#cclose").onclick = closeColls;
+$$("#ctabs button").forEach(b => { b.onclick = () => { collTab = b.dataset.t; renderColls(); beep(520); }; });
+
+/* adding a game to one of your collections: search every game the app knows */
+let waddList = null, waddT = 0;
+function openWantAdd(name) {
+  waddList = name; $("#waddt").textContent = "Add a game to " + name; $("#waddq").value = ""; clear($("#waddr"));
+  $("#wadd").classList.add("show"); setTimeout(() => $("#waddq").focus(), 50);
+}
+function closeWantAdd() { if (!isOpen("wadd")) return; $("#wadd").classList.remove("show"); waddList = null; if (isOpen("colls")) openColls(); }
+$("#waddq").addEventListener("input", () => { clearTimeout(waddT); waddT = setTimeout(async () => {
+  const q = $("#waddq").value, out = $("#waddr"); if (!q.trim()) return clear(out);
+  const r = await api("/api/games/search", {q}); if (!r.ok || $("#waddq").value !== q) return;
+  clear(out);
+  if (!r.data.results.length) out.appendChild(el("p", "", "No games match."));
+  r.data.results.forEach(x => {
+    const b = el("button", ""); b.appendChild(document.createTextNode(x.title)); b.appendChild(el("span", "", x.system + (x.year ? " · " + x.year : "") + (x.id ? " · yours" : "")));
+    b.onclick = async () => {
+      const res = await api("/api/shelves", x.id ? {op: "add", name: waddList, id: x.id} : {op: "want", name: waddList, system: x.system, look: x.look});
+      if (!res.ok) return toast(res.data.error || "Couldn't add it.", true);
+      toast("Added " + x.title + "."); if (x.id) refresh(true);
+    };
+    out.appendChild(b);
+  });
+}, 220); });
+$("#waddclose").onclick = closeWantAdd;
+
 /* ---------- picking a cover by hand: search the covers for this console, click the right one ---------- */
 let pickId = null, pickIO = null;
 function openPicker(id) {
@@ -1536,6 +1793,7 @@ async function saveShelfSlip() {
   if (!r.ok) return toast(r.data.error || "Couldn't save the shelf.", true);
   closeShelfSlip(); await refresh(true);
   if (o.id) focusById(o.id);
+  if (isOpen("colls")) openColls("mine");
   toast(o.from ? "Shelf renamed." : "Made the shelf “" + name + "”.");
 }
 $("#nshok").onclick = saveShelfSlip;
@@ -1622,6 +1880,8 @@ function renderSettings() {
   R("Add games", "Or drag game files onto the window. They're copied into the games folder, sorted by system.", ab);
   const gg = el("button", "btn", "Open"); gg.onclick = openGetGames;
   R("Where to get games", "Copying games you own, free homebrew, and official re-releases.", gg);
+  const co = el("button", "btn", "Open"); co.onclick = () => openColls();
+  R("Collections", "Every series your games belong to, with the ones you don't have yet, and collections you make yourself.", co);
   if (!SHELVES.length) R("Your shelves", "Right-click any game and choose Add to Shelf to make one, like Couch co-op or To finish.", null);
   SHELVES.forEach(sh => {
     const bs = el("div", "btns"), rn = el("button", "btn", "Rename"), del = el("button", "btn", "Delete");
@@ -1699,6 +1959,7 @@ function renderSettings() {
   playStats(b, R);
 
   H("App");
+  R("TV mode", "For a computer hooked up to a TV: opens fullscreen and bigger, and everything works with a controller. Select opens a game's options.", sw(!!UI.tv, v => { UI.tv = v; saveUI(); applyUI(); APP.tvMode(v); }));
   R("Animations", "Choose Reduced or Off on older computers.", seg([["full", "Full"], ["reduced", "Reduced"], ["off", "Off"]], UI.fx, v => { UI.fx = v; applyUI(); saveUI(); }));
   R("Sound", "Short clicks when you move and select.", sw(UI.sound, v => { UI.sound = v; saveUI(); if (v) beep(660); }));
   R("Always show controls", "Otherwise they show for a few seconds at start.", sw(UI.hints, v => { UI.hints = v; applyUI(); saveUI(); if (!v) showHintsBriefly(); }));
@@ -1923,7 +2184,11 @@ document.addEventListener("keydown", e => {
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
+  if (isOpen("osk")) { if (k === "Escape") closeOsk(); return; }
+  if (isOpen("opts")) { if (k === "Escape") closeOpts(); return; }
   if (isOpen("trophy")) { if (k === "Escape" || k === "Enter") closeTrophy(); return; }
+  if (isOpen("wadd")) { if (k === "Escape") closeWantAdd(); return; }
+  if (isOpen("colls")) { if (k === "Escape") closeColls(); return; }
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
   if (isOpen("nsh")) { if (k === "Escape") closeShelfSlip(); else if (k === "Enter") saveShelfSlip(); return; }
   if (isOpen("welcome")) { if (k === "Escape" || k === "Enter") closeWelcome(); return; }
@@ -1948,14 +2213,15 @@ document.addEventListener("keydown", e => {
   else if (k === "s" || k === "S") openSettings();
   else if (k === "Enter") activate();
   else if ((k === "f" || k === "F") && selGame()) toggleFav(selGame().id);
+  else if (k === "o" || k === "O" || k === "ContextMenu") { e.preventDefault(); openOpts(); }
 });
 
 /* gamepad: d-pad/stick move, A play, B back, X favorite, Y turn over, LB/RB shelves, Start settings */
-let pad = {};
+let pad = {}, padHeld = {};
 function renderHints() {
   const h = $("#hintbar"); clear(h);
-  const items = padOn ? [["D-pad", "browse"], ["Y", "turn over"], ["A", "play"], ["X", "favorite"], ["LB RB", "shelves"], ["Start", "manual"]]
-    : [["← → ↑ ↓", "browse"], ["Space", "turn over"], ["Enter", "play"], ["F", "favorite"], ["Q E", "shelves"], ["/", "search"], ["S", "manual"]];
+  const items = padOn ? [["D-pad", "browse"], ["Y", "turn over"], ["A", "play"], ["X", "favorite"], ["LB RB", "shelves"], ["Select", "options"], ["Start", "settings"]]
+    : [["← → ↑ ↓", "browse"], ["Space", "turn over"], ["Enter", "play"], ["F", "favorite"], ["Q E", "shelves"], ["/", "search"], ["O", "options"], ["S", "settings"]];
   items.forEach(it => { const s = el("span"); s.appendChild(el("kbd", "", it[0])); s.appendChild(document.createTextNode(it[1])); h.appendChild(s); });
 }
 window.addEventListener("gamepadconnected", () => { padOn = true; renderHints(); showHintsBriefly(); });
@@ -1966,22 +2232,25 @@ setInterval(() => {
      on top, an Xbox one A at the bottom and X on the left */
   const nin = UI.buttons === "nintendo" || (UI.buttons !== "xbox" && /nintendo|pro controller|joy-?con|057e/i.test(gp.id));
   const n = {l: bt(14) || gp.axes[0] < -.6, r: bt(15) || gp.axes[0] > .6, u: bt(12) || gp.axes[1] < -.6, d: bt(13) || gp.axes[1] > .6,
-    a: bt(nin ? 1 : 0), b: bt(nin ? 0 : 1), x: bt(nin ? 3 : 2), y: bt(nin ? 2 : 3), lb: bt(4), rb: bt(5), st: bt(9)};
+    a: bt(nin ? 1 : 0), b: bt(nin ? 0 : 1), x: bt(nin ? 3 : 2), y: bt(nin ? 2 : 3), lb: bt(4), rb: bt(5), sel: bt(8), st: bt(9)};
   if (!document.hasFocus()) { pad = n; return; }
   const any = Object.keys(n).some(k => n[k]); if (any) { setKb(true); if (!padOn) { padOn = true; renderHints(); showHintsBriefly(); } }
   const press = k => n[k] && !pad[k];
-  if (isOpen("imp")) { if (press("b")) $("#icancel").click(); }
-  else if (isOpen("ren")) { if (press("b")) closeRename(); }
-  else if (isOpen("pick")) { if (press("b")) closePicker(); }
-  else if (isOpen("trophy")) { if (press("b") || press("a")) closeTrophy(); }
-  else if (isOpen("nsh")) { if (press("b")) closeShelfSlip(); }
-  else if (isOpen("welcome")) { if (press("a") || press("b")) closeWelcome(); }
-  else if (isOpen("getg")) { if (press("b")) closeGetGames(); }
-  else if (isOpen("settings")) { if (press("b")) closeSettings(); }
+  /* the d-pad repeats when held: once, then after a moment every tenth of a second */
+  const now = Date.now(), rep = k => { if (!n[k]) return false; if (!pad[k]) { padHeld[k] = now + 380; return true; } if (now >= padHeld[k]) { padHeld[k] = now + 110; return true; } return false; };
+  const panel = topPanel();
+  if (panel && !LAUNCH.open) {
+    const root = $("#" + panel[0]);
+    for (const k of ["l", "r", "u", "d"]) if (rep(k)) padNav(root, k);
+    if (panel[0] === "osk") { if (press("a")) padPress(root); if (press("x")) oskType(null); if (press("y")) oskType(" "); }
+    else if (press("a")) padPress(root);
+    if (press("b")) panel[1]();
+    if (panel[0] === "colls" && (press("lb") || press("rb"))) { collTab = collTab === "series" ? "mine" : "series"; renderColls(); }
+  }
   else if (LAUNCH.open) { if (press("b")) hideLaunch(); }
   else {
-    if (press("l")) moveH(-1); if (press("r")) moveH(1); if (press("u")) moveV(-1); if (press("d")) moveV(1);
-    if (press("lb")) jump(-1); if (press("rb")) jump(1); if (press("st")) openSettings();
+    if (rep("l")) moveH(-1); if (rep("r")) moveH(1); if (rep("u")) moveV(-1); if (rep("d")) moveV(1);
+    if (press("lb")) jump(-1); if (press("rb")) jump(1); if (press("st")) openSettings(); if (press("sel")) openOpts();
     if (press("a")) activate(); if (press("y")) flip();
     if (press("b") && sel && sel.classList.contains("flip")) flip();
     if (press("x") && selGame()) toggleFav(selGame().id);
@@ -2009,6 +2278,7 @@ APP.onMenu(w => {
   if (w === "add-games") { closeSettings(); addGames(); }
   else if (w === "get-games") openGetGames();
   else if (w === "your-play") { closeSettings(); openTrophy(); }
+  else if (w === "collections") { closeSettings(); openColls(); }
   else if (w && w.cmd === "rename") openRename(w.id);
   else if (w && w.cmd === "find-cover") openPicker(w.id);
   else if (w && w.cmd === "new-shelf") openShelfSlip({id: w.id});
