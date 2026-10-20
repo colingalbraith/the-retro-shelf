@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0-beta.1
+
+- **The first test version of 0.4.0.** Nothing new to see yet: it checks that test versions reach you, and lays the
+  groundwork for what's coming (more consoles, settings for each game, and more languages).
+
 ## 0.3.1
 
 - **Test versions:** Settings → App → Get test versions, to try new features early.
