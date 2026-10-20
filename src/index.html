@@ -716,7 +716,7 @@ const el = (t, c, x) => { const e = document.createElement(t); if (c) e.classNam
 const clear = n => { while (n.firstChild) n.removeChild(n.firstChild); };
 const HTML = document.documentElement;
 
-let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], MEDIA = {};
+let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {};
 let UI = {accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines"};
 let PATHS = {}, STATUS = {running: null, covers: {}}, APPINFO = {};
 let q = "", sel = null, focusId = null, firstPaint = true;
@@ -748,17 +748,17 @@ function beep(f, d, v) {
   } catch (e) {}
 }
 function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
-const media = g => MEDIA[g.system] || "cart";
+/* each console's shelf details, from its entry in config.json: kind of box, short name, packaging, pile colors */
+const cons = s => CONS[s] || {};
+const media = g => cons(g.system).media || "cart";
 /* box proportions per kind of media: height, spine thickness (both x card size), cover aspect, zoom when turned over */
 const KIND = {cart: [1, .19, .72, 2.1], wide: [.72, .19, 1.38, 2.6], mini: [.6, .16, .95, 3.1], card: [.8, .09, .9, 2.6],
               cd: [.8, .075, 1, 2.4], dvd: [1, .1, .7, 2.1], umd: [.82, .1, .6, 2.6], board: [.95, .07, .72, 2.1]};
-const ABBR = {"NES": "NES", "SNES": "SNES", "Game Boy": "GB", "GBA": "GBA", "Genesis": "MD", "Master System": "SMS", "PC Engine": "PCE", "Atari 2600": "2600",
-              "N64": "N64", "PS1": "PS1", "Dreamcast": "DC", "DS": "DS", "PSP": "PSP", "Arcade": "ARC", "GameCube/Wii": "GCN", "PS2": "PS2"};
 const MEDIA_VERB = {cart: "Inserting cartridge", wide: "Inserting cartridge", mini: "Inserting cartridge", card: "Inserting card", cd: "Reading disc", dvd: "Reading disc", umd: "Reading disc", board: "Powering on"};
 /* printed colors [paper, ink] for spines and covers without art; one system band per console */
 const LABELS = [["#e9e1cf", "#1d1a16"], ["#d9a531", "#1d1a16"], ["#b8442f", "#f4ecdf"], ["#2f5a7a", "#f1ead9"], ["#3e6b4f", "#f1ead9"], ["#1d1b19", "#e9e1cf"], ["#c9c2b2", "#1d1a16"], ["#7a3b56", "#f1ead9"], ["#e4d9b8", "#7a2e1f"], ["#5b5f66", "#f1ead9"]];
 const BANDS = [["#141312", "#ece6d6"], ["#d8d3c8", "#26231f"], ["#8d1f1c", "#f3ead8"], ["#24384f", "#ece6d6"], ["#e6e1d4", "#8d1f1c"], ["#3a3a3a", "#e9c341"]];
-const abbr = s => ABBR[s] || s.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
+const abbr = s => cons(s).abbr || s.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
 function fmtDur(s) { if (!s) return "Never played"; if (s < 60) return "Under a minute"; const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h ? h + "h " : "") + m + "m"; }
 function fmtWhen(t) {
   if (!t) return "Never";
@@ -917,10 +917,7 @@ function paintSpine(c, g, im) {
 }
 const spineMode = () => UI.spine === "printed" || UI.tint === false ? "printed" : "cover";
 /* console packaging: livery (see CSS), material (card = cardboard, clam = plastic clamshell, jewel, keep case), uppercase titles */
-const LIVERY = {"NES": ["nes", "card"], "SNES": ["snes", "card"], "Game Boy": ["gb", "card"], "GBA": ["gba", "card"], "Genesis": ["genesis", "clam", 1],
-  "Master System": ["sms", "clam"], "PC Engine": ["pce", "clam"], "Atari 2600": ["atari", "card", 1], "N64": ["n64", "card"], "PS1": ["ps1", "jewel"],
-  "Dreamcast": ["dc", "jewel"], "DS": ["ds", "keep"], "PSP": ["psp", "keep"], "Arcade": ["arcade", "card", 1], "GameCube/Wii": ["gc", "keep"], "PS2": ["ps2", "keep"]};
-const livery = g => LIVERY[g.system] || ["", {cd: "jewel", dvd: "keep", umd: "keep"}[media(g)] || "card"];
+const livery = g => cons(g.system).look || ["", {cd: "jewel", dvd: "keep", umd: "keep"}[media(g)] || "card"];
 
 /* spine title: one size per kind of box. A subtitle ("A Link to the Past") gets its own smaller line, a long
    title wraps onto a second line when the spine is thick enough, and it only shrinks as a last resort */
@@ -1015,7 +1012,7 @@ function spineTitle(c, g) {
 
 /* ---------- data ---------- */
 function ingest(d) {
-  G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; MEDIA = d.media || {}; SHELVES = d.shelves || [];
+  G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; CONS = d.consoles || {}; SHELVES = d.shelves || [];
   if (!uiEdits) UI = d.settings.ui;
   PATHS = d.settings.paths; APPINFO = d.settings.app || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
   applyUI();
@@ -1941,7 +1938,8 @@ function openSettings() { if (isOpen("settings") || LAUNCH.open) return; leaveSc
 let BIOSST = null;
 function checkBios() { api("/api/bios", {}).then(r => { if (r.ok) { BIOSST = r.data.systems; if (isOpen("settings")) renderSettings(); } }); }
 /* the games a console's BIOS is for: PC Engine CD games only (not cards); for arcade there's no telling which are Neo Geo */
-const biosGames = c => c.system === "Arcade" ? 0 : G.filter(g => g.system === c.system && (c.system !== "PC Engine" || /\.(cue|chd)$/i.test(g.file || ""))).length;
+/* the games a BIOS is for: all of the console's, only its discs (PC Engine CD), or no telling which (Neo Geo among arcade games) */
+const biosGames = c => c.for === "unknown" ? 0 : G.filter(g => g.system === c.system && (c.for !== "discs" || /\.(cue|chd)$/i.test(g.file || ""))).length;
 function biosLine(c) {
   const has = c.files.filter(f => f.ok).map(f => f.name), wrong = c.files.filter(f => f.found && !f.ok).map(f => f.name);
   const n = biosGames(c), games = n ? " You have " + plural(n, "game", "games") + " for it." : "";
@@ -2127,11 +2125,6 @@ function renderSettings() {
 }
 
 /* ---------- your play: a trophy shelf of the most played games, and a stack of boxes per console ---------- */
-/* box colors for each console's pile: [body, the band down one side] */
-const STACK = {"NES": ["#2b2a28", "#c8312b"], "SNES": ["#cfcac0", "#5b4fa3"], "Game Boy": ["#bdb8aa", "#3f3b8f"], "GBA": ["#3b3a8a", "#d8d3c8"],
-  "Genesis": ["#141312", "#d8382f"], "Master System": ["#f0eee8", "#1f1f1f"], "PC Engine": ["#e8e4da", "#d2402c"], "Atari 2600": ["#1d1b19", "#c9a24a"],
-  "N64": ["#2b2a28", "#3c8d3e"], "PS1": ["#141312", "#e9e1cf"], "Dreamcast": ["#efece6", "#e85d1c"], "DS": ["#e9e6df", "#1d1b19"], "PSP": ["#141312", "#9aa4ad"],
-  "Arcade": ["#d9a531", "#1d1a16"], "GameCube/Wii": ["#5f4b9b", "#e9e1cf"], "PS2": ["#16294d", "#e9e1cf"]};
 function playStats(b, R) {
   const played = G.filter(g => g.time > 0), total = played.reduce((t, g) => t + g.time, 0);
   const op = el("button", "btn", "Open"); op.onclick = () => { closeSettings(); openTrophy(); };
@@ -2162,7 +2155,7 @@ function openTrophy() {
     const by = {}; played.forEach(g => { by[g.system] = (by[g.system] || 0) + g.time; });
     const rows = Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, 8), most = rows[0][1];
     rows.forEach(([sys, tm]) => {
-      const c = el("div", "stk-c"), col = STACK[sys] || ["#3a352f", "#e9e1cf"], n = Math.max(1, Math.round(12 * tm / most));
+      const c = el("div", "stk-c"), col = cons(sys).pile || ["#3a352f", "#e9e1cf"] /* the box's body, and the band down one side */, n = Math.max(1, Math.round(12 * tm / most));
       for (let k = 0; k < n; k++) {
         const sl = el("div", "slab"), h = hash(sys + k);
         sl.style.setProperty("--body", col[0]); sl.style.setProperty("--band", col[1]);

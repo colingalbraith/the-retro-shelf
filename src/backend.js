@@ -209,7 +209,7 @@ class Backend extends EventEmitter {
     if (first) st.pins = {};
     let series = [], bios = false;
     try { series = this.collections()[1].series; } catch {}
-    try { bios = biosStatus(this.folders.bios, null).some(c => c.state === "ok" || c.state === "partial"); } catch {}
+    try { bios = biosStatus(this.folders.bios, null, this.cfg.systems).some(c => c.state === "ok" || c.state === "partial"); } catch {}
     const res = pins.evaluate(pins.context([...this.games.values()], st, series, pins.genreGroup, { bios, now: now() }), Object.keys(this.cfg.systems));
     // a pin added in a newer version that was already earned also counts as earned earlier, without popping up
     const known = new Set(st.pinKeys || []), fresh = [];
@@ -302,7 +302,7 @@ class Backend extends EventEmitter {
       `Emulator: ${this.ownEmu() ? "own RetroArch (" + (this.cfg.retroarch.exe || "not set") + ")" : "built-in RetroArch " + (this.ra ? this.ra.version : "missing")}`,
       `Settings: picture ${ui.picture}, fullscreen ${ui.fullscreen}, resume ${ui.resume}, covers ${ui.autoCovers}, shelf ${ui.shelf}`,
       `Games: ${this.games.size} (${Object.entries(by).map(([k, v]) => k + " " + v).join(", ") || "none"})`,
-      `BIOS: ${biosStatus(this.folders.bios, arcade).map(c => c.label + " " + c.state).join(", ")}`,
+      `BIOS: ${biosStatus(this.folders.bios, arcade, this.cfg.systems).map(c => c.label + " " + c.state).join(", ")}`,
       `Last game exit: ${this.lastExit ? JSON.stringify(this.lastExit) : "none this session"}`,
       ...(this.setupError ? [`Setup problem: ${this.setupError}`] : []),
       "", "RetroArch log (last 60 lines):", log || "(empty)",
@@ -365,7 +365,7 @@ class Backend extends EventEmitter {
           const p = path.join(dir, e.name);
           if (e.isDirectory()) { if (depth < 8) walk(p, depth + 1); continue; }
           const lower = e.name.toLowerCase();
-          if (!exts.some(x => lower.endsWith(x)) || biosDest(lower)) continue;
+          if (!exts.some(x => lower.endsWith(x)) || biosDest(lower, this.cfg.systems)) continue;
           const stem = path.parse(e.name).name, id = gid(p);
           // arcade files are short codes ("sf2"); the full name is the title and what art is looked up by
           let full = s.names && (this.names[s.names] || {})[stem.toLowerCase()], year = "", pub = "", dev = "", genre = "";
@@ -1111,7 +1111,8 @@ class Backend extends EventEmitter {
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems),
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
-      media: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, v.media || "cart"])),
+      // how each console's games look on the shelf: the kind of box, its short name, packaging and the color of its pile
+      consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null }])),
       settings: this.settingsJson(), status: this.statusJson(),
     };
   }
@@ -1221,7 +1222,7 @@ class Backend extends EventEmitter {
       case "/api/import/check": return j(this.importCheck(d.paths));
       case "/api/covers/search": return j(await this.coverSearch(String(d.id || ""), d.q));
       case "/api/covers/pick": return j(await this.coverPick(String(d.id || ""), String(d.thumb || ""), String(d.name || "")));
-      case "/api/bios": return j([200, { systems: biosStatus(this.folders.bios, path.join(this.romsRoot(), this.cfg.systems.Arcade ? this.cfg.systems.Arcade.folder || "arcade" : "arcade")) }]);
+      case "/api/bios": return j([200, { systems: biosStatus(this.folders.bios, path.join(this.romsRoot(), this.cfg.systems.Arcade ? this.cfg.systems.Arcade.folder || "arcade" : "arcade"), this.cfg.systems) }]);
       case "/api/import": return j(this.importRun(d.items));
     }
     return { code: 404, body: { error: "not found" } };

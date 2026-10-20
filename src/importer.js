@@ -186,7 +186,7 @@ class Importer {
       if (owned.has(f) && owned.get(f) !== f) continue;
       if (IMG.includes(ext)) continue;
       // a BIOS file (scph5501.bin, neogeo.zip…) goes to the BIOS folder, not onto a shelf
-      const dest = biosDest(name);
+      const dest = biosDest(name, this.systems);
       if (dest) { bios.push({ src: f, name, dest }); continue; }
       const cands = this.byExt[ext];
       if (!cands) { if (!/^(readme|desktop\.ini|thumbs\.db)/i.test(name)) unknown.push(name); continue; }
