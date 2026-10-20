@@ -108,3 +108,16 @@ test("the bug report gives versions and setup without the home folder's path", (
   assert.match(text, /Games: 1 \(NES 1\)/);
   assert.ok(!text.includes(os.homedir()), "paths start with ~");
 });
+
+test("each sitting is logged when a game closes (not one that quit right away), and follows a game that moves", () => {
+  put("ps1/Crash (USA).cue", cue(["Crash (USA).bin"])); put("ps1/Crash (USA).bin");
+  be.scan();
+  const id = byTitle("Crash").id, t = Date.now() / 1000;
+  be.onExit({ id, since: t - 1800, alive: true, builtIn: false, stopping: false });
+  be.onExit({ id, since: t - 2, alive: true, builtIn: false, stopping: false });
+  assert.equal(be.state.sessions.length, 1);
+  assert.equal(be.state.sessions[0][0], id);
+  assert.ok(Math.abs(be.state.sessions[0][2] - 1800) < 5);
+  const [, moved] = be.moveTo(id, "PC Engine");
+  assert.equal(be.state.sessions[0][0], moved.id);
+});

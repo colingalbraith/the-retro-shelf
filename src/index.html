@@ -371,6 +371,23 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 /* consoles: boxes lying flat, a taller pile for more time */
 .stacks{gap:30px;margin-top:70px}
 .stk-c{position:relative;flex:none;display:flex;flex-direction:column-reverse;align-items:center;width:96px}
+.tcard{position:relative;max-width:660px;margin:84px auto 0;padding:30px 32px 26px;background:var(--paper);color:var(--ink);transform:rotate(-.7deg);
+  box-shadow:0 14px 28px rgba(0,0,0,.5),0 2px 3px rgba(0,0,0,.4)}
+/* the card hangs on a tack */
+.tcard::before{content:"";position:absolute;top:-9px;left:50%;width:18px;height:18px;margin-left:-9px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f08a74,#b8432c 60%,#7c2414);box-shadow:0 3px 4px rgba(0,0,0,.45)}
+.tch{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:9px;border-bottom:2px solid var(--ink);font:700 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
+.tcs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0 18px}
+.tcs b{display:block;font:700 23px/1.1 var(--disp)}
+.tcs span{font:600 10.5px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+.tgrid{display:grid;grid-template-columns:22px repeat(12,1fr);gap:4px;font:600 9.5px/1 var(--mono);color:var(--ink2);text-transform:uppercase}
+.tgrid .m{height:12px;white-space:nowrap}
+.tgrid .w{display:flex;align-items:center}
+/* a day: an empty box, or stamped in ink, darker for more play */
+.tgrid .d{aspect-ratio:1;border:1px dotted rgba(28,25,22,.3)}
+.tgrid .d.l1{background:rgba(178,52,38,.28);border-color:transparent}.tgrid .d.l2{background:rgba(178,52,38,.5);border-color:transparent}
+.tgrid .d.l3{background:rgba(178,52,38,.74);border-color:transparent}.tgrid .d.l4{background:rgba(160,40,28,.95);border-color:transparent}
+.tgrid .d.today{outline:1.5px solid var(--ink);outline-offset:1px}
+.tcf{margin-top:14px;font-size:12.5px;color:var(--ink2)}
 .slab{width:var(--w);height:13px;margin-top:1px;background:linear-gradient(90deg,var(--band) 0 9px,var(--body) 9px);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.35),0 1px 1px rgba(0,0,0,.4);transform:translateX(var(--x))}
 .seg{display:flex;flex:none;border:1.5px solid var(--ink)}
 .seg button{border:0;background:none;padding:5px 14px;font-weight:600;white-space:nowrap}
@@ -535,6 +552,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     <p class="tsum" id="tsum"></p>
     <div class="tshelf" id="ttop"></div>
     <div class="tshelf stacks" id="tcon"></div>
+    <div class="tcard" id="tcard"></div>
   </div>
 </div>
 
@@ -652,6 +670,21 @@ const SORTS = {
   played: (a, b) => (b.last || 0) - (a.last || 0) || byTitle(a, b),
 };
 let SHELVES = [];
+/* Settings → Arrange shelves by: the console (as boxes come), a genre, the decade, or whether you've played them */
+const GENRES = [[/role|rpg/i, "RPGs"], [/platform/i, "Platformers"], [/beat/i, "Beat 'em ups"], [/shoot|lightgun/i, "Shooters"], [/fight/i, "Fighting"],
+  [/rac/i, "Racing"], [/sport|hunting/i, "Sports"], [/puzzle|thinking|quiz/i, "Puzzle & quiz"], [/strategy|simulation/i, "Strategy & sim"],
+  [/adventure/i, "Adventure"], [/action/i, "Action"], [/board|card|gambling|casual/i, "Board, cards & casual"], [/music|danc/i, "Music"]];
+const PLAYED = ["Playing lately", "Played before", "Never played"];
+function groupOf(g, how, nowS) {
+  if (how === "genre") { const m = GENRES.find(([re]) => re.test(g.genre || "")); return m ? m[1] : "Other"; }
+  if (how === "decade") { const y = parseInt(g.year, 10); return y ? Math.floor(y / 10) * 10 + "s" : "Year unknown"; }
+  return g.last && nowS - g.last < 14 * 86400 ? PLAYED[0] : g.plays ? PLAYED[1] : PLAYED[2];
+}
+function groupOrder(how, groups) {
+  if (how === "decade") return (a, b) => (parseInt(a, 10) || 9999) - (parseInt(b, 10) || 9999);
+  if (how === "status") return (a, b) => PLAYED.indexOf(a) - PLAYED.indexOf(b);
+  return (a, b) => (a === "Other") - (b === "Other") || groups.get(b).length - groups.get(a).length || a.localeCompare(b);
+}
 
 let toastT;
 function toast(msg, bad) {
@@ -884,6 +917,9 @@ function sections() {
     if (rec.length) out.push({key: "recent", name: "Recently played", face: true, games: rec});
     const fav = v.filter(g => FAV.has(g.id)).sort(byTitle);
     if (fav.length) out.push({key: "fav", name: "Favorites", face: true, games: fav});
+    /* games added in the last month, unless the whole library is new */
+    const nowS = (Date.now() + offset) / 1000, fresh = v.filter(g => g.added && nowS - g.added < 30 * 86400);
+    if (fresh.length && fresh.length < v.length) out.push({key: "new", name: "Just added", face: true, games: fresh.sort((a, b) => b.added - a.added).slice(0, 8)});
   }
   const order = SORTS[UI.sort] || byTitle;
   /* shelves people made come first, each box still dressed for its own console */
@@ -891,11 +927,18 @@ function sections() {
     const ids = new Set(sh.ids), gs = v.filter(g => ids.has(g.id)).sort(order);
     if (gs.length) out.push({key: "shelf:" + sh.name, name: sh.name, face: UI.shelf === "covers", games: gs});
   }
-  for (const s of SYSTEMS) {
-    if (UI.hidden.indexOf(s) >= 0) continue;
-    const gs = v.filter(g => g.system === s && match(g)).sort(order);
-    if (gs.length) out.push({key: s, name: s, face: UI.shelf === "covers", games: gs});
+  const how = UI.arrange || "console";
+  if (how === "console") {
+    for (const s of SYSTEMS) {
+      if (UI.hidden.indexOf(s) >= 0) continue;
+      const gs = v.filter(g => g.system === s && match(g)).sort(order);
+      if (gs.length) out.push({key: s, name: s, face: UI.shelf === "covers", games: gs});
+    }
+    return out;
   }
+  const nowS = (Date.now() + offset) / 1000, groups = new Map();
+  v.filter(match).forEach(g => { const k = groupOf(g, how, nowS); (groups.get(k) || groups.set(k, []).get(k)).push(g); });
+  [...groups.keys()].sort(groupOrder(how, groups)).forEach(k => out.push({key: how + ":" + k, name: k, face: UI.shelf === "covers", games: groups.get(k).sort(order)}));
   return out;
 }
 
@@ -1427,7 +1470,7 @@ function refresh(force) {
 }
 async function loadLibrary(force) {
   const r = await api("/api/library"); if (!r.ok) return;
-  const sig = () => G.map(g => [g.id, g.cv ? 1 : 0, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden + UI.sort + JSON.stringify(SHELVES);
+  const sig = () => G.map(g => [g.id, g.cv ? 1 : 0, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden + UI.sort + UI.arrange + JSON.stringify(SHELVES);
   const before = sig(), art = new Map(G.map(g => [g.id, g.cv + "/" + g.lv]));
   ingest(r.data);
   if (force || sig() !== before) renderShelves(focusId);
@@ -1554,6 +1597,7 @@ function renderSettings() {
 
   H("Shelves");
   R("Shelf style", "Spines fit hundreds of games on a wall. Covers show every box face-out.", seg([["spines", "Spines"], ["covers", "Covers"]], UI.shelf, v => { UI.shelf = v; saveUI(); renderShelves(focusId); }));
+  R("Arrange shelves by", "A shelf for each console, or games grouped by genre, by decade, or by whether you've played them.", seg([["console", "Console"], ["genre", "Genre"], ["decade", "Decade"], ["status", "Played"]], UI.arrange || "console", v => { UI.arrange = v; saveUI(); renderShelves(focusId); }));
   R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
   R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
@@ -1735,6 +1779,51 @@ function openTrophy() {
   con.hidden = !played.length;
   blurActive(); $("#trophy").scrollTop = 0; $("#trophy").classList.add("show"); light(); beep(520);
   fitTrophy();
+  api("/api/sessions").then(r => { if (r.ok && isOpen("trophy")) timeCard(r.data.sessions || [], r.data.now); });
+}
+/* the time card: this month, the streak of days in a row, the longest sitting, and twelve weeks of days stamped in ink */
+function timeCard(sessions, nowS) {
+  const card = $("#tcard"); clear(card);
+  const now = new Date(nowS * 1000), day = t => { const d = new Date(t * 1000); return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate(); };
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const head = el("div", "tch"); head.appendChild(el("span", "", "Time card · The Retro Shelf")); head.appendChild(el("span", "", MONTHS[now.getMonth()] + " " + now.getFullYear()));
+  card.appendChild(head);
+  const perDay = new Map(); let month = 0, monthN = 0, longest = 0;
+  for (const [, start, dur] of sessions) {
+    perDay.set(day(start), (perDay.get(day(start)) || 0) + dur);
+    const d = new Date(start * 1000);
+    if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) { month += dur; monthN++; }
+    longest = Math.max(longest, dur);
+  }
+  /* days in a row with some play: the current run counts from today, or yesterday if today has none yet */
+  const back = n => { const d = new Date(now); d.setDate(d.getDate() - n); return day(d.getTime() / 1000); };
+  let streak = 0; for (let n = perDay.has(back(0)) ? 0 : 1; perDay.has(back(n)); n++) streak++;
+  const days = [...perDay.keys()].map(k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m, d).getTime(); }).sort((a, b) => a - b);
+  let best = 0, run = 0; days.forEach((t, i) => { run = i && Math.round((t - days[i - 1]) / 86400000) === 1 ? run + 1 : 1; best = Math.max(best, run); });
+  const stat = (v, label) => { const d = el("div"); d.appendChild(el("b", "", v)); d.appendChild(el("span", "", label)); return d; };
+  const st = el("div", "tcs");
+  st.appendChild(stat(month ? fmtDur(month) : "—", "This month"));
+  st.appendChild(stat(String(monthN), monthN === 1 ? "Session this month" : "Sessions this month"));
+  st.appendChild(stat(plural(streak, "day", "days"), "In a row · best " + best));
+  st.appendChild(stat(longest ? fmtDur(longest) : "—", "Longest sitting"));
+  card.appendChild(st);
+  /* twelve weeks, Monday to Sunday down each column, today in the last one */
+  const g = el("div", "tgrid"), first = new Date(now); first.setHours(0, 0, 0, 0); first.setDate(first.getDate() - ((first.getDay() + 6) % 7) - 77);
+  g.appendChild(el("span", "m", ""));
+  for (let w = 0; w < 12; w++) { const d = new Date(first); d.setDate(d.getDate() + w * 7); const prev = new Date(d); prev.setDate(prev.getDate() - 7); g.appendChild(el("span", "m", !w || prev.getMonth() !== d.getMonth() ? MONTHS[d.getMonth()] : "")); }
+  ["Mon", "", "Wed", "", "Fri", "", "Sun"].forEach((label, r) => {
+    g.appendChild(el("span", "w", label));
+    for (let w = 0; w < 12; w++) {
+      const d = new Date(first); d.setDate(d.getDate() + w * 7 + r);
+      const t = perDay.get(day(d.getTime() / 1000)) || 0, future = d > now;
+      const cell = el("i", "d" + (t ? " l" + (t < 1800 ? 1 : t < 3600 ? 2 : t < 7200 ? 3 : 4) : "") + (day(d.getTime() / 1000) === day(nowS) ? " today" : ""));
+      if (future) cell.style.visibility = "hidden";
+      if (t) cell.title = fmtDur(t);
+      g.appendChild(cell);
+    }
+  });
+  card.appendChild(g);
+  card.appendChild(el("p", "tcf", sessions.length ? "Each stamp is a day you played. Darker means longer." : "Your time card starts with the next game you play."));
 }
 /* everything stays on its plank: the trophies shrink together until they fit, and consoles that don't fit are left
    off (the least played go first); each pile is as wide as its plate */

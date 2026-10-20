@@ -26,7 +26,7 @@ const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
                      fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true,
-                     picture: "sharp", sort: "title", buttons: "auto" };
+                     picture: "sharp", sort: "title", buttons: "auto", arrange: "console" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -53,6 +53,7 @@ function cleanUi(d) {
   if (["sharp", "smooth", "crt"].includes(d.picture)) out.picture = d.picture;
   if (["title", "year", "played"].includes(d.sort)) out.sort = d.sort;
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
+  if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
   else if (["art", "color"].includes(d.spine)) out.spine = "cover";
   for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
@@ -153,7 +154,8 @@ class Backend extends EventEmitter {
     this.cfg = { ...base, ...user, systems: { ...base.systems, ...(user.systems || {}) }, retroarch: { ...(user.retroarch || {}) } };
     this.state = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []]]) if (!this.state[k]) this.state[k] = v;
+    // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -391,6 +393,11 @@ class Backend extends EventEmitter {
     rec.alive = false;
     const dt = now() - rec.since;
     this.state.time[rec.id] = (this.state.time[rec.id] || 0) + Math.floor(dt);
+    // a game that closed right away wasn't really played
+    if (dt >= 10) {
+      this.state.sessions.push([rec.id, Math.floor(rec.since), Math.floor(dt)]);
+      if (this.state.sessions.length > 20000) this.state.sessions.splice(0, this.state.sessions.length - 20000);
+    }
     if (this.running === rec) this.running = null;
     this.saveState();
     let error = "";
@@ -421,6 +428,7 @@ class Backend extends EventEmitter {
     for (const k of ["last", "plays", "time", "names"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
     for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(from); if (i >= 0) st[k][i] = to; }
     for (const sh of st.shelves) { const i = sh.ids.indexOf(from); if (i >= 0) sh.ids[i] = to; }
+    for (const ses of st.sessions) if (ses[0] === from) ses[0] = to;
   }
 
   /** shelves people make ("Couch co-op", "To finish"): create, rename, delete, and put games on them or take them off */
@@ -973,6 +981,7 @@ class Backend extends EventEmitter {
       if (pathname === "/licenses.html") return this.file(path.join(this.dirs.app, "licenses.html"), "text/html; charset=utf-8");
       if (pathname === "/api/library") return { code: 200, body: this.libraryJson() };
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };
+      if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.state.sessions, now: now() } };
       if (pathname === "/api/licenses") return { code: 200, body: this.licenses() };
       if (pathname.startsWith("/snap/")) {
         const g = this.games.get(pathname.slice(6));
