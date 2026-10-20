@@ -1418,7 +1418,7 @@ function renderSettings() {
     R("In a game", "Hold Start (or press Esc) to come back to the shelf. Hold Select (or press F1) for the emulator's menu: save slots, controls, restart.", null);
     const fb = el("div", "btns"), f1 = el("button", "btn", "Saves"), f2 = el("button", "btn", "BIOS");
     f1.onclick = () => APP.openFolder("saves"); f2.onclick = () => APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
-    R("Folders", "Game saves are kept in Documents › The Retro Shelf › Saves. BIOS files are only needed for PS2, and can improve PS1 and Dreamcast.", fb);
+    R("Folders", "Game saves are kept in Documents › The Retro Shelf › Saves. BIOS files are needed for PS2 and PC Engine CD games, and can improve PS1, Dreamcast and DS.", fb);
     R("Use my own RetroArch", "For people who already have RetroArch set up the way they like.", sw(!!UI.ownEmu, v => { UI.ownEmu = v; api("/api/settings", {ui: UI}).then(r => { if (r.ok) PATHS = r.data.paths; renderSettings(); }); }));
   }
   /* the RetroArch path fields only matter when using your own RetroArch */

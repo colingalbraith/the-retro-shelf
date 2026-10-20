@@ -131,7 +131,7 @@ function explain(logFile) {
   try { log = fs.readFileSync(logFile, "utf8"); } catch { return ""; }
   const errs = log.split(/\r?\n/).filter(l => /\[(ERROR|WARN)\]|error|fail/i.test(l)).join("\n");
   if (/bios|firmware/i.test(errs) && /missing|not found|required|could not|failed/i.test(errs))
-    return "This game needs a BIOS file from the original console. Put it in the BIOS folder (Settings → Emulators), then try again.";
+    return "This game needs a BIOS file from the original console. Put it in the BIOS folder (Settings → Emulator → Folders → BIOS), then try again.";
   if (/Failed to open libretro core|Failed to load core|dylib.*not|could not load library/i.test(errs))
     return "The emulator for this system didn't load. Reinstalling The Retro Shelf should fix it.";
   if (/(video driver|graphics).*(fail|could not|cannot)|failed to initialize video/i.test(errs))
