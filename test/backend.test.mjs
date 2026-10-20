@@ -99,3 +99,12 @@ test("shelves people make can be filled, renamed and deleted, and follow a game 
   be.shelfOp({ op: "delete", name: "Two players" });
   assert.deepEqual(be.state.shelves, []);
 });
+
+test("the bug report gives versions and setup without the home folder's path", () => {
+  put("nes/Tetris.nes");
+  be.scan();
+  const text = be.report("9.9.9");
+  assert.match(text, /^The Retro Shelf 9\.9\.9/);
+  assert.match(text, /Games: 1 \(NES 1\)/);
+  assert.ok(!text.includes(os.homedir()), "paths start with ~");
+});

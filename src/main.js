@@ -1,12 +1,12 @@
 "use strict";
 // The Retro Shelf desktop app: one window showing index.html over the arcade:// protocol, a backend in this
 // process, and RetroArch (bundled in Resources/emulators) launched for each game.
-const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu, screen } = require("electron");
+const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu, screen, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { Backend } = require("./backend");
 const { Updater } = require("./updater");
-const { zipFolder } = require("./zip");
+const { zipFolder, unzipInto } = require("./zip");
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "arcade", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -206,6 +206,13 @@ function ipc() {
     try { return { ok: true, count: zipFolder(saves, r.filePath), path: r.filePath }; }
     catch (e) { return { ok: false, error: "Couldn't make the backup: " + e.message }; }
   });
+  ipcMain.handle("restore-saves", async () => {
+    const r = await dialog.showOpenDialog(win, { title: "Restore saves", buttonLabel: "Restore", properties: ["openFile"], filters: [{ name: "Zip archive", extensions: ["zip"] }] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    try { fs.mkdirSync(backend.folders.saves, { recursive: true }); return { ok: true, ...unzipInto(r.filePaths[0], backend.folders.saves) }; }
+    catch (e) { return { ok: false, error: "Couldn't restore from that file: " + e.message }; }
+  });
+  ipcMain.handle("copy-report", () => { clipboard.writeText(backend.report(app.getVersion())); return true; });
   ipcMain.handle("update", (_, what) => {
     if (what === "check") return updater.check(true);
     if (what === "restart") return updater.restart();

@@ -344,6 +344,14 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .biosl b::before{content:"";display:inline-block;width:9px;height:9px;margin-right:8px;background:#b9b1a2;vertical-align:0}
 .biosl b.ok::before{background:#2f7d4f}.biosl b.need::before,.biosl b.bad::before{background:#c23b22}.biosl b.partial::before{background:#d29a2b}
 .biosl span{color:var(--ink2)}
+/* play stats: labeled bars */
+.stats{padding:12px 0 14px;border-bottom:1px solid rgba(28,25,22,.14)}
+.stats h4{margin:0 0 8px;font:600 15px var(--disp)}
+.srow{display:grid;grid-template-columns:minmax(0,15em) 1fr 6.5em;gap:12px;align-items:center;padding:3px 0;font-size:14px}
+.srow b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow span{color:var(--ink2);text-align:right;font:500 13px var(--mono)}
+.sbar{height:10px;background:rgba(28,25,22,.08)}
+.sbar i{display:block;height:100%;background:var(--acc)}
 .seg{display:flex;flex:none;border:1.5px solid var(--ink)}
 .seg button{border:0;background:none;padding:5px 14px;font-weight:600;white-space:nowrap}
 .seg button+button{border-left:1.5px solid var(--ink)}
@@ -1518,6 +1526,7 @@ function renderSettings() {
   H("Shelves");
   R("Shelf style", "Spines fit hundreds of games on a wall. Covers show every box face-out.", seg([["spines", "Spines"], ["covers", "Covers"]], UI.shelf, v => { UI.shelf = v; saveUI(); renderShelves(focusId); }));
   R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
+  R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
   rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
   R("Shelf size", "", rg);
@@ -1571,9 +1580,14 @@ function renderSettings() {
     const fb = el("div", "btns"), f1 = el("button", "btn", "Saves"), f2 = el("button", "btn", "BIOS");
     f1.onclick = () => APP.openFolder("saves"); f2.onclick = () => APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
     R("Folders", "Game saves are kept in Documents › The Retro Shelf › Saves. BIOS files are needed for PS2 and PC Engine CD games, and can improve PS1, Dreamcast and DS.", fb);
-    const bk = el("button", "btn", "Back up…");
+    const bb = el("div", "btns"), bk = el("button", "btn", "Back up…"), rs = el("button", "btn", "Restore…");
     bk.onclick = async () => { const r = await APP.backupSaves(); if (r.ok) toast("Backed up " + plural(r.count, "file", "files") + "."); else if (r.error) toast(r.error, true); };
-    R("Back up saves", "Puts all your saves and resume points in one .zip file. To restore them, unzip it into Documents › The Retro Shelf.", bk);
+    rs.onclick = async () => {
+      const r = await APP.restoreSaves(); if (!r.ok) { if (r.error) toast(r.error, true); return; }
+      toast("Restored " + plural(r.restored, "save", "saves") + (r.kept ? ". Kept " + r.kept + " newer ones you already had" : "") + "."); refresh(true);
+    };
+    bb.appendChild(bk); bb.appendChild(rs);
+    R("Back up saves", "Puts all your saves and resume points in one .zip file, or puts them back from one. A save newer than the backup is never replaced.", bb);
     R("BIOS files", "Copied from your own consoles. Drop them on this window and they go in the right place." + (BIOSST ? "" : " Checking…"), null);
     if (BIOSST) {
       const bl = el("div", "biosl");
@@ -1626,6 +1640,8 @@ function renderSettings() {
   const cb = el("div", "btns"); cb.appendChild(f2); cb.appendChild(f1);
   R("Fetch now", "Search again retries games with no match. Your own art always wins: save Game Name.png next to the ROM.", cb);
 
+  H("Your play");
+  playStats(b, R);
   H("About");
   const lb = el("button", "btn", "Licenses"); lb.onclick = () => APP.licenses();
   R("The Retro Shelf " + (APPINFO.version || ""), "Emulation by RetroArch and the libretro cores, free software by their authors. No games are included.", lb);
@@ -1633,7 +1649,32 @@ function renderSettings() {
   ub.disabled = UPD.status === "checking" || UPD.status === "downloading"; ub.onclick = updAction;
   R("Updates", updText(), ub);
   R("Check for updates by itself", "Looks for a new version on GitHub every few hours. Nothing about you or your games is sent.", sw(UI.updates !== false, v => { UI.updates = v; saveUI(); }));
+  const pb = el("div", "btns"), cp = el("button", "btn", "Copy info"), is = el("button", "btn", "Report a problem");
+  cp.onclick = async () => { await APP.copyReport(); toast("Copied. Paste it into your bug report."); };
+  is.onclick = () => APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new");
+  pb.appendChild(cp); pb.appendChild(is);
+  R("Something not working?", "Copy info puts your versions, setup and the last game's emulator log on the clipboard for a bug report. Nothing is sent until you paste it somewhere.", pb);
   updateCoverUI(); p.scrollTop = st;
+}
+
+/* ---------- your play: time played, most played, and time by console ---------- */
+function playStats(b, R) {
+  const played = G.filter(g => g.time > 0), total = played.reduce((t, g) => t + g.time, 0);
+  if (!played.length) { R("Nothing yet", "Play something and your stats show up here.", null); return; }
+  R("Time played", fmtDur(total) + " across " + plural(played.length, "game", "games") + " (of " + G.length + " on your shelves) · " + plural(G.reduce((t, g) => t + (g.plays || 0), 0), "session", "sessions") + ".", null);
+  const bars = (title, rows) => {
+    const box = el("div", "stats"), top = Math.max(...rows.map(r => r[1]));
+    box.appendChild(el("h4", "", title));
+    rows.forEach(([label, v]) => {
+      const r = el("div", "srow"), bar = el("i"); bar.style.width = Math.max(2, Math.round(v / top * 100)) + "%";
+      r.appendChild(el("b", "", label)); const t = el("div", "sbar"); t.appendChild(bar); r.appendChild(t); r.appendChild(el("span", "", fmtDur(v)));
+      box.appendChild(r);
+    });
+    b.appendChild(box);
+  };
+  bars("Most played", played.sort((x, y) => y.time - x.time).slice(0, 5).map(g => [g.title, g.time]));
+  const by = {}; played.forEach(g => { by[g.system] = (by[g.system] || 0) + g.time; });
+  bars("By console", Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, 8));
 }
 
 /* ---------- moving around the shelves ---------- */
@@ -1745,7 +1786,11 @@ window.addEventListener("gamepadconnected", () => { padOn = true; renderHints();
 setInterval(() => {
   const gp = navigator.getGamepads && Array.prototype.find.call(navigator.getGamepads(), p => p && p.connected); if (!gp) return;
   const bt = i => gp.buttons[i] && gp.buttons[i].pressed;
-  const n = {l: bt(14) || gp.axes[0] < -.6, r: bt(15) || gp.axes[0] > .6, u: bt(12) || gp.axes[1] < -.6, d: bt(13) || gp.axes[1] > .6, a: bt(0), b: bt(1), x: bt(2), y: bt(3), lb: bt(4), rb: bt(5), st: bt(9)};
+  /* buttons come by position (0 = bottom, 1 = right, 2 = left, 3 = top). A Nintendo controller has A on the right and X
+     on top, an Xbox one A at the bottom and X on the left */
+  const nin = UI.buttons === "nintendo" || (UI.buttons !== "xbox" && /nintendo|pro controller|joy-?con|057e/i.test(gp.id));
+  const n = {l: bt(14) || gp.axes[0] < -.6, r: bt(15) || gp.axes[0] > .6, u: bt(12) || gp.axes[1] < -.6, d: bt(13) || gp.axes[1] > .6,
+    a: bt(nin ? 1 : 0), b: bt(nin ? 0 : 1), x: bt(nin ? 3 : 2), y: bt(nin ? 2 : 3), lb: bt(4), rb: bt(5), st: bt(9)};
   if (!document.hasFocus()) { pad = n; return; }
   const any = Object.keys(n).some(k => n[k]); if (any) { setKb(true); if (!padOn) { padOn = true; renderHints(); showHintsBriefly(); } }
   const press = k => n[k] && !pad[k];

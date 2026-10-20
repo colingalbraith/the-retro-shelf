@@ -26,7 +26,7 @@ const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
                      fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true,
-                     picture: "sharp", sort: "title" };
+                     picture: "sharp", sort: "title", buttons: "auto" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -52,6 +52,7 @@ function cleanUi(d) {
   if (["cover", "printed"].includes(d.spine)) out.spine = d.spine;
   if (["sharp", "smooth", "crt"].includes(d.picture)) out.picture = d.picture;
   if (["title", "year", "played"].includes(d.sort)) out.sort = d.sort;
+  if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
   else if (["art", "color"].includes(d.spine)) out.spine = "cover";
   for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
@@ -221,6 +222,27 @@ class Backend extends EventEmitter {
   }
 
   saveState() { jsave(this.files.state, this.state); }
+
+  /** details for a bug report: versions, setup, BIOS, the last game's exit and RetroArch's log. Paths say ~ for home */
+  report(version) {
+    const ui = this.ui, by = {};
+    for (const g of this.games.values()) by[g.system] = (by[g.system] || 0) + 1;
+    let log = "";
+    try { log = fs.readFileSync(this.files.raLog, "utf8").split(/\r?\n/).filter(Boolean).slice(-60).join("\n"); } catch {}
+    const arcade = path.join(this.romsRoot(), (this.cfg.systems.Arcade || {}).folder || "arcade");
+    const text = [
+      `The Retro Shelf ${version}`,
+      `System: ${os.type()} ${os.release()}, ${process.platform} ${process.arch}, Electron ${process.versions.electron}`,
+      `Emulator: ${this.ownEmu() ? "own RetroArch (" + (this.cfg.retroarch.exe || "not set") + ")" : "built-in RetroArch " + (this.ra ? this.ra.version : "missing")}`,
+      `Settings: picture ${ui.picture}, fullscreen ${ui.fullscreen}, resume ${ui.resume}, covers ${ui.autoCovers}, shelf ${ui.shelf}`,
+      `Games: ${this.games.size} (${Object.entries(by).map(([k, v]) => k + " " + v).join(", ") || "none"})`,
+      `BIOS: ${biosStatus(this.folders.bios, arcade).map(c => c.label + " " + c.state).join(", ")}`,
+      `Last game exit: ${this.lastExit ? JSON.stringify(this.lastExit) : "none this session"}`,
+      ...(this.setupError ? [`Setup problem: ${this.setupError}`] : []),
+      "", "RetroArch log (last 60 lines):", log || "(empty)",
+    ].join("\n");
+    return text.split(os.homedir()).join("~");
+  }
   saveSettings() { jsave(this.files.settings, { ui: this.ui, paths: this.paths }); }
   romsRoot() {
     const p = (this.paths.roms_dir || "").trim();
