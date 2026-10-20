@@ -1,7 +1,7 @@
 {
   "name": "the-retro-shelf",
   "productName": "The Retro Shelf",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Your retro game collection as boxes on a shelf. Emulators built in, games not included.",
   "author": "Colin Galbraith",
   "license": "GPL-3.0-or-later",
@@ -60,27 +60,43 @@
         "to": "THIRD_PARTY_NOTICES.md"
       }
     ],
+    "afterPack": "scripts/after-pack.cjs",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "colingalbraith",
+        "repo": "the-retro-shelf",
+        "releaseType": "release"
+      }
+    ],
     "mac": {
       "target": [
         {
           "target": "dmg",
           "arch": [
-            "universal"
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
           ]
         }
       ],
+      "artifactName": "The-Retro-Shelf-${version}-mac-${arch}.${ext}",
       "category": "public.app-category.games",
       "icon": "build/icon.png",
       "identity": "-",
       "hardenedRuntime": false,
-      "x64ArchFiles": "Contents/Resources/emulators/**",
       "extendInfo": {
         "NSHumanReadableCopyright": "Emulators: RetroArch and libretro cores (see Licenses)"
       }
     },
     "dmg": {
-      "title": "The Retro Shelf",
-      "artifactName": "The-Retro-Shelf-${version}-mac.dmg"
+      "title": "The Retro Shelf"
     },
     "win": {
       "target": [
@@ -102,5 +118,8 @@
       "shortcutName": "The Retro Shelf",
       "artifactName": "The-Retro-Shelf-Setup-${version}.exe"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

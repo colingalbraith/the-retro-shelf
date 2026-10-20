@@ -33,6 +33,7 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 - **Pick up where you left off:** leaving a game saves your spot.
 - **Art and details are automatic:** covers, logos, year, publisher and genre for 38,000+ games.
 - **Controllers just work:** Xbox, PlayStation and Switch Pro.
+- **Updates itself** in the background.
 - **Private:** no account, no tracking.
 
 <table>
@@ -46,8 +47,12 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 
 Grab the latest version from [Releases](https://github.com/colingalbraith/the-retro-shelf/releases):
 
-- **Mac** (Apple silicon and Intel): open the `.dmg` and drag The Retro Shelf into Applications.
+- **Mac with Apple silicon** (M1 and newer): `mac-arm64.dmg`. **Mac with Intel**: `mac-x64.dmg`. Open it and drag
+  The Retro Shelf into Applications. Not sure which Mac you have? Apple menu → About This Mac: "Chip" means
+  Apple silicon, "Processor" means Intel.
 - **Windows** 10 and 11: run the `Setup .exe`.
+
+After that it updates itself.
 
 The app isn't signed yet, so the first launch needs one extra click. On a **Mac**, go to System Settings →
 Privacy & Security and click **Open Anyway**. On **Windows**, click **More info → Run anyway**.
@@ -89,7 +94,8 @@ npm test
 npm run dist:mac    # or dist:win
 ```
 
-Pushing a `v*` tag builds both installers in GitHub Actions and attaches them to a draft release.
+Pushing a `v*` tag builds the installers in GitHub Actions and attaches them to a draft release. Publishing it is
+what the app's updater picks up.
 
 ## License
 

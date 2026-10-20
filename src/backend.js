@@ -24,7 +24,7 @@ const GITHUB_API = "https://api.github.com/repos/libretro-thumbnails";
 const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
-                     fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false };
+                     fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -49,7 +49,7 @@ function cleanUi(d) {
   if (["spines", "covers"].includes(d.shelf)) out.shelf = d.shelf;
   if (["cover", "printed"].includes(d.spine)) out.spine = d.spine;
   else if (["art", "color"].includes(d.spine)) out.spine = "cover";
-  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden"]) if (typeof d[k] === "boolean") out[k] = d[k];
+  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
   if (Array.isArray(d.hidden)) out.hidden = d.hidden.map(String).slice(0, 100);
   return out;

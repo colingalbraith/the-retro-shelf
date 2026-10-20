@@ -5,6 +5,7 @@ const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu, screen 
 const fs = require("fs");
 const path = require("path");
 const { Backend } = require("./backend");
+const { Updater } = require("./updater");
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "arcade", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -32,7 +33,7 @@ const EMU = app.isPackaged ? path.join(process.resourcesPath, "emulators")
   : path.join(__dirname, "..", "vendor", { darwin: "mac", win32: "win" }[process.platform] || "linux");
 const WINDOW = () => path.join(app.getPath("userData"), "window.json");
 
-let win = null, backend = null, quitting = false;
+let win = null, backend = null, updater = null, quitting = false;
 
 async function fetchUrl(url, timeout) {
   const r = await net.fetch(url, { headers: { "User-Agent": "TheRetroShelf/1.0" }, signal: AbortSignal.timeout(timeout || 20000) });
@@ -186,6 +187,12 @@ function ipc() {
   ipcMain.handle("reveal-game", (_, id) => { const g = backend.games.get(String(id)); if (g) shell.showItemInFolder(g.path); });
   ipcMain.handle("game-menu", (_, id) => gameMenu(String(id)));
   ipcMain.handle("open-url", (_, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
+  ipcMain.handle("update", (_, what) => {
+    if (what === "check") return updater.check(true);
+    if (what === "restart") return updater.restart();
+    if (what === "page") return shell.openExternal(updater.page());
+    return updater.state;
+  });
 }
 
 app.on("second-instance", focusApp);
@@ -215,10 +222,15 @@ app.whenReady().then(() => {
       detail: `It needs to create "The Retro Shelf" in your Documents folder (${backend.setupError}). Check that it's allowed to use Documents: on a Mac in System Settings → Privacy & Security → Files and Folders, on Windows under Virus & threat protection → Controlled folder access.` }));
   }
   if (backend.ui.autoCovers) backend.coverJob([...backend.games.keys()]);
+  updater = new Updater();
+  updater.on("change", s => { if (win && !win.isDestroyed()) win.webContents.send("menu", { cmd: "update", state: s }); });
+  updater.start(() => backend.ui.updates !== false);
 });
 
 app.on("activate", () => { if (!win) createWindow(); else focusApp(); });
 app.on("window-all-closed", () => app.quit());
+// a downloaded Mac update takes the old app's place once this one has quit
+app.on("will-quit", () => { if (updater) updater.applyOnQuit(); });
 
 // Quitting mid-game: let RetroArch save and close first.
 app.on("before-quit", e => {

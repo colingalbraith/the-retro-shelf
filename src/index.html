@@ -271,6 +271,7 @@ html:not([data-fx="off"]) #light{transition:opacity .4s,--lx .35s cubic-bezier(.
   clip-path:polygon(5px 0,calc(100% - 5px) 0,100% 50%,calc(100% - 5px) 100%,5px 100%,0 50%);transform:rotate(-1deg)}
 #nowpill{transform:rotate(.8deg)}
 #nowpill::before{content:"▶ ";letter-spacing:0}
+#updpill{transform:rotate(.6deg);background:var(--paper);color:var(--ink);text-shadow:none}
 #qtape .caret{display:inline-block;width:.55em;height:.15em;background:currentColor;margin-left:.15em;vertical-align:-.05em;animation:blink 1s steps(2) infinite}
 html:not([data-fx="off"]) .tape{animation:tapein .25s ease-out}
 #q{position:fixed;left:-9999px;top:0;width:10px;opacity:0}
@@ -435,6 +436,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
 <div id="strip">
   <div id="qtape" class="tape" hidden></div>
   <button id="nowpill" class="tape" hidden></button>
+  <button id="updpill" class="tape" hidden></button>
 </div>
 <input id="q" autocomplete="off" spellcheck="false" aria-label="Search games">
 
@@ -1248,6 +1250,28 @@ function tick() {
 function updatePill() {
   const p = $("#nowpill"), r = STATUS.running;
   if (r && !LAUNCH.open) { const g = byId.get(r.id); p.hidden = false; p.textContent = "Playing " + (g ? g.title : "a game"); } else p.hidden = true;
+  paintUpd();
+}
+
+/* ---------- updates: the app checks GitHub for a new version and puts it in place when it quits ---------- */
+let UPD = {status: "idle", version: "", progress: 0, error: ""};
+function paintUpd() {
+  const p = $("#updpill"), on = !LAUNCH.open && !STATUS.running && (UPD.status === "ready" || UPD.status === "manual");
+  p.hidden = !on;
+  if (on) p.textContent = UPD.status === "ready" ? "Update ready · Restart" : "Version " + UPD.version + " is out";
+}
+function updText() {
+  const v = UPD.version;
+  return {checking: "Checking…", current: "You have the latest version.",
+    downloading: "Downloading version " + v + "… " + (UPD.progress || 0) + "%",
+    ready: "Version " + v + " is ready. It goes in when you quit, or now with Restart.",
+    manual: "Version " + v + " is out. Download it from the releases page." + (APP.platform === "darwin" ? " (Kept in your Applications folder, The Retro Shelf updates itself.)" : ""),
+    error: UPD.error}[UPD.status] || "Version " + (APPINFO.version || "");
+}
+function updAction() {
+  if (UPD.status === "ready") APP.update("restart");
+  else if (UPD.status === "manual") APP.update("page");
+  else APP.update("check");
 }
 async function play(g, o) {
   if (!g) return;
@@ -1440,6 +1464,10 @@ function renderSettings() {
   H("About");
   const lb = el("button", "btn", "Licenses"); lb.onclick = () => APP.licenses();
   R("The Retro Shelf " + (APPINFO.version || ""), "Emulation by RetroArch and the libretro cores, free software by their authors. No games are included.", lb);
+  const ub = el("button", "btn" + (UPD.status === "ready" ? " primary" : ""), {ready: "Restart now", manual: "Download"}[UPD.status] || "Check now");
+  ub.disabled = UPD.status === "checking" || UPD.status === "downloading"; ub.onclick = updAction;
+  R("Updates", updText(), ub);
+  R("Check for updates by itself", "Looks for a new version on GitHub every few hours. Nothing about you or your games is sent.", sw(UI.updates !== false, v => { UI.updates = v; saveUI(); }));
   updateCoverUI(); p.scrollTop = st;
 }
 
@@ -1492,6 +1520,7 @@ $("#settings").addEventListener("mousedown", e => { if (e.target === $("#setting
 $("#lhide").onclick = hideLaunch;
 $("#lstop").onclick = async () => { stopping = true; await api("/api/stop", {}); };
 $("#nowpill").onclick = () => { if (STATUS.running) showLaunch(byId.get(STATUS.running.id)); };
+$("#updpill").onclick = updAction;
 $("#qtape").onclick = () => { $("#q").focus(); paintQ(); };
 /* while the shelf scrolls under a still pointer, the boxes passing under it stay put; once it stops, the one
    under the pointer comes out */
@@ -1582,6 +1611,7 @@ document.addEventListener("drop", e => {
   importPaths(Array.prototype.map.call(e.dataTransfer.files, f => APP.pathFor(f)).filter(Boolean));
 });
 APP.onMenu(w => {
+  if (w && w.cmd === "update") { UPD = w.state; paintUpd(); if (isOpen("settings")) renderSettings(); return; }
   if (w && w.cmd === "refresh") { refresh(true).then(() => { if (w.focus) focusById(w.focus); }); return; }
   if (w && w.cmd === "error") { toast(w.text, true); return; }
   if (LAUNCH.open) return;
@@ -1607,6 +1637,7 @@ function hideSplash() { const s = $("#splash"); s.classList.add("out"); setTimeo
   await fonts;
   hideSplash();
   renderShelves(null); showHintsBriefly();
+  APP.update("state").then(s => { if (s) { UPD = s; paintUpd(); } });
   lastFound = STATUS.covers.found || 0; lastRun = !!STATUS.covers.running;
   if (STATUS.running) showLaunch(byId.get(STATUS.running.id));
   if (!UI.welcomed) setTimeout(() => { $("#welcome").classList.add("show"); light(); }, fxMode() === "off" ? 0 : 500);

@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld("arcade", {
   openUrl: url => ipcRenderer.invoke("open-url", url),
   revealGame: id => ipcRenderer.invoke("reveal-game", id),
   gameMenu: id => ipcRenderer.invoke("game-menu", id),
+  update: what => ipcRenderer.invoke("update", what),
   onMenu: fn => ipcRenderer.on("menu", (_, what) => fn(what)),
 });
