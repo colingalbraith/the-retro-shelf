@@ -3,7 +3,9 @@
 // profile, and limits it has to stay within: how long until the shelf is on screen, frames while scrolling all the
 // way down, how quickly a key press moves the selection, and memory. Prints the numbers either way.
 //   node scripts/perf-test.mjs [the app's executable] [--games 5000]     (default: this checkout, run with Electron)
-// On Linux, run it under xvfb-run. Computers without a graphics chip (CI) draw slower: the frame limits allow that.
+// On Linux, run it under xvfb-run. Without a graphics chip (GitHub's Linux machines) the 3D boxes are drawn in
+// software, about ten times slower than on a real computer: there the frame limits are loose enough to still catch
+// a real slowdown without failing on the machine itself.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -13,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 9344, argv = process.argv.slice(2);
 const N = +(argv[argv.indexOf("--games") + 1] || 0) || 5000, given = argv.find(a => !a.startsWith("--") && !/^\d+$/.test(a));
-const LIMITS = { readyS: 15, scrollP95Ms: 100, keyMedianMs: 150, heapMB: 600 };
+const LIMITS = { readyS: 15, scrollP95Ms: 100, keyMedianMs: 150, heapMB: 600 }, SOFTWARE = { scrollP95Ms: 300, keyMedianMs: 300 };
 const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "config.json"), "utf8"));
 const series = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "data", "franchises.json"), "utf8"));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -51,6 +53,18 @@ try {
   const send = (method, params = {}) => new Promise(r => { const n = ++id; pending.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
   const ev = async e => { const r = await send("Runtime.evaluate", { expression: e, awaitPromise: true, returnByValue: true }); if (r.result.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description); return r.result.result.value; };
   await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+  // whether pages are drawn with a graphics chip: the browser's own session knows, not the page's
+  const gpu = await (async () => {
+    try {
+      const b = new WebSocket((await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json()).webSocketDebuggerUrl);
+      await new Promise((ok, bad) => { b.onopen = ok; b.onerror = bad; });
+      const r = await new Promise(res => { b.onmessage = m => { const d = JSON.parse(m.data); if (d.id === 1) res(d); }; b.send(JSON.stringify({ id: 1, method: "SystemInfo.getInfo" })); });
+      b.close();
+      return ((r.result && r.result.gpu.featureStatus) || {}).gpu_compositing || "";
+    } catch { return ""; }
+  })();
+  out.drawing = /^enabled/.test(gpu) ? "graphics chip" : "software";
+  if (out.drawing === "software") Object.assign(LIMITS, SOFTWARE);
   for (let i = 0; i < 600; i++) { if (await ev(`typeof G !== "undefined" && !document.querySelector("#splash") && document.querySelectorAll("#shelves .card").length > 0 ? G.length : 0`)) break; await sleep(100); }
   out.games = await ev("G.length");
   out.readyS = +((Date.now() - t0) / 1000).toFixed(1);
