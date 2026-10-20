@@ -148,3 +148,27 @@ test("collections: series show which games you have, and your own ones can hold 
   be.shelfOp({ op: "unwant", name: "Wishlist", system: found[0].system, look: found[0].look });
   assert.equal(be.collections()[1].mine[0].items.length, 0);
 });
+
+test("pins: ones already earned when pins arrive don't pop up; a new one does, after the game", () => {
+  put("nes/Tetris.nes");
+  be.scan();
+  const id = byTitle("Tetris").id;
+  be.state.plays[id] = 3; be.state.time[id] = 12 * 3600; delete be.state.pins;
+  be.checkPins();
+  assert.equal(be.state.pins.hours10, 0, "earned before pins existed");
+  assert.deepEqual(be.newPins || [], []);
+  be.onExit({ id, since: Date.now() / 1000 - 3.5 * 3600, alive: true, builtIn: false, stopping: false });
+  assert.ok(be.newPins.includes("marathon"));
+  assert.ok(be.state.pins.marathon > 0);
+});
+
+test("covers are found for games with & in their name (the cover site writes it as _)", () => {
+  const names = ["Sonic _ Knuckles (World).png", "Sonic _ Knuckles (Europe).png", "Tetris (World).png"];
+  const nm = new Map();
+  const norm = s => s.replace(/[([][^)\]]*[)\]]/g, " ").toLowerCase().replace(/&/g, "and").trim().replace(/^(.*?),\s*(the|a|an)$/, "$2 $1").replace(/[^a-z0-9]+/g, "");
+  for (const n of names) { const k = norm(n.replace(/\.png$/, "")); (nm.get(k) || nm.set(k, []).get(k)).push(n); }
+  const idx = { names: new Set(names), nm };
+  assert.equal(be.matchName(idx, "Sonic & Knuckles (World)"), "Sonic _ Knuckles (World).png");
+  assert.equal(be.matchName(idx, "Sonic & Knuckles (USA)"), "Sonic _ Knuckles (World).png");
+  assert.equal(be.matchName(idx, "Tetris (World)"), "Tetris (World).png");
+});

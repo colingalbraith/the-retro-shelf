@@ -64,6 +64,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: out
@@ -71,7 +72,10 @@ jobs:
       # a draft, so nothing is public until you press Publish on the release page
       - name: Create draft release
         run: |
-          cat > notes.md <<'NOTES'
+          # what's new: this version's section of CHANGELOG.md
+          awk -v v="${GITHUB_REF_NAME#v}" '/^## /{p = ($2 == v); next} p' CHANGELOG.md > whatsnew.md
+          { [ -s whatsnew.md ] && { echo "## What's new"; cat whatsnew.md; echo; echo "## Download"; echo; }; } > notes.md
+          cat >> notes.md <<'NOTES'
           **Mac**: download the `.dmg` for your Mac, open it and drag The Retro Shelf to Applications.
           - Apple silicon (M1 and newer): `mac-arm64.dmg`
           - Intel: `mac-x64.dmg`

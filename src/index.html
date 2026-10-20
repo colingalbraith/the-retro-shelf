@@ -438,6 +438,35 @@ body.kb :is(#settings,#getg,#pick,#colls,#trophy,.over) :is(button,input,select)
 /* TV mode: the controls always show, and the pointer hides while a controller or keyboard is in use */
 html.tv #hintbar.gone{height:36px;opacity:1;border-top-color:#000}
 html.tv body.kb,html.tv body.kb *{cursor:none!important}
+/* ---------- pins: a corkboard of enamel pins, earned ones shiny, the rest pressed into the cork ---------- */
+.cork{position:relative;margin:70px auto 0;max-width:900px;padding:26px 30px 34px;border:10px solid #5b3d24;border-radius:3px;
+  background:radial-gradient(circle at 20% 30%,rgba(90,55,25,.35) 0 1px,transparent 1.5px) 0 0 / 11px 13px,
+    radial-gradient(circle at 70% 60%,rgba(255,230,190,.25) 0 1px,transparent 1.5px) 0 0 / 9px 7px,#b8875a;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.45),0 14px 28px rgba(0,0,0,.5)}
+.corkh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px}
+.corkh .tplate{position:static;transform:none;height:20px}
+.corkh span{color:#3d2814;font:600 13px var(--disp)}
+.pins{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:22px 14px}
+.pin{display:flex;flex-direction:column;align-items:center;text-align:center;color:#2a1b0d}
+.pin .badge{position:relative;width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 26px/1 var(--disp);
+  color:#fff8e6;text-shadow:0 1px 1px rgba(0,0,0,.45);box-shadow:0 4px 6px rgba(40,20,5,.55),inset 0 2px 0 rgba(255,255,255,.45),inset 0 -3px 4px rgba(0,0,0,.25)}
+.pin.bronze .badge{background:radial-gradient(circle at 35% 30%,#f0b27a,#b8692f 60%,#7c4318)}
+.pin.silver .badge{background:radial-gradient(circle at 35% 30%,#ffffff,#b9c1cb 55%,#7d8692)}
+.pin.gold .badge{background:radial-gradient(circle at 35% 30%,#fff1b0,#e2b33d 55%,#a6761b)}
+.pin .badge::after{content:"";position:absolute;inset:7px;border-radius:50%;border:2px solid rgba(255,255,255,.3)}
+.pin b{margin-top:10px;font:700 14px/1.15 var(--disp)}
+.pin small{margin-top:3px;font:500 12px/1.3 var(--disp);color:#4a3119;max-width:150px}
+.pin i{margin-top:5px;font:600 10.5px/1 var(--mono);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:#5a3c1e}
+.pin .prog{width:84px;height:5px;margin-top:6px;background:rgba(60,35,15,.25)}.pin .prog u{display:block;height:100%;background:#5a3c1e;text-decoration:none}
+/* not earned yet: pressed into the cork */
+.pin.locked .badge{background:rgba(70,42,18,.22);color:rgba(60,35,15,.55);text-shadow:none;box-shadow:inset 0 2px 5px rgba(40,20,5,.5)}
+.pin.locked .badge::after{border-color:rgba(60,35,15,.25)}
+.pin.locked b{color:#4a3119}
+#pinpop{position:fixed;right:24px;bottom:58px;z-index:170;display:flex;align-items:center;gap:14px;padding:12px 18px 12px 12px;background:var(--paper-hi);color:var(--ink);
+  box-shadow:0 12px 26px rgba(0,0,0,.5);border-left:4px solid var(--acc);transform:translateY(20px);opacity:0;visibility:hidden;transition:transform .25s ease,opacity .25s,visibility .25s}
+#pinpop.show{transform:none;opacity:1;visibility:visible}
+#pinpop .pin{flex-direction:row}#pinpop .badge{width:48px;height:48px;font-size:20px}
+#pinpop p{margin:0;font:500 13px/1.35 var(--disp);color:var(--ink2)}#pinpop p b{display:block;color:var(--ink);font:700 15px var(--disp)}
 .slab{width:var(--w);height:13px;margin-top:1px;background:linear-gradient(90deg,var(--band) 0 9px,var(--body) 9px);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.35),0 1px 1px rgba(0,0,0,.4);transform:translateX(var(--x))}
 .seg{display:flex;flex:none;border:1.5px solid var(--ink)}
 .seg button{border:0;background:none;padding:5px 14px;font-weight:600;white-space:nowrap}
@@ -603,6 +632,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     <div class="tshelf" id="ttop"></div>
     <div class="tshelf stacks" id="tcon"></div>
     <div class="tcard" id="tcard"></div>
+    <div class="cork" id="cork"></div>
   </div>
 </div>
 
@@ -644,7 +674,8 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   <ol>
     <li><b>Add your games.</b> Drag them onto this window or press Add games. They get sorted by console, and the box art is found for you.</li>
     <li><b>Play.</b> Browse with the arrow keys or a controller, then press Enter or A. To get back here from a game, hold Start or press Esc.</li>
-    <li><b>Turn a box over</b> with Space or Y to see when you last played and your saves. Right-click a box for more options.</li>
+    <li><b>Turn a box over</b> with Space or Y to see when you last played and your saves. Press O, Select on a controller, or right-click for more.</li>
+    <li><b>Look around.</b> Collections show the series your games belong to, and Your play keeps your hours and pins. Both are in the View menu.</li>
   </ol>
   <div class="btns"><button class="btn primary" id="wadd">Add games…</button><button class="btn" id="wdone">Got it</button></div></div></div>
 
@@ -659,6 +690,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
 </div>
 
 <div id="toast" role="status"></div>
+<div id="pinpop" role="status"></div>
 <div id="splash"><div id="swm">THE RETRO SHELF</div><p id="smsg">Loading your shelves</p><div class="track"><i></i></div></div>
 
 <script>
@@ -738,12 +770,9 @@ const SORTS = {
 };
 let SHELVES = [];
 /* Settings → Arrange shelves by: the console (as boxes come), a genre, the decade, or whether you've played them */
-const GENRES = [[/role|rpg/i, "RPGs"], [/platform/i, "Platformers"], [/beat/i, "Beat 'em ups"], [/shoot|lightgun/i, "Shooters"], [/fight/i, "Fighting"],
-  [/rac/i, "Racing"], [/sport|hunting/i, "Sports"], [/puzzle|thinking|quiz/i, "Puzzle & quiz"], [/strategy|simulation/i, "Strategy & sim"],
-  [/adventure/i, "Adventure"], [/action/i, "Action"], [/board|card|gambling|casual/i, "Board, cards & casual"], [/music|danc/i, "Music"]];
 const PLAYED = ["Playing lately", "Played before", "Never played"];
 function groupOf(g, how, nowS) {
-  if (how === "genre") { const m = GENRES.find(([re]) => re.test(g.genre || "")); return m ? m[1] : "Other"; }
+  if (how === "genre") return g.gg || "Other";
   if (how === "decade") { const y = parseInt(g.year, 10); return y ? Math.floor(y / 10) * 10 + "s" : "Year unknown"; }
   return g.last && nowS - g.last < 14 * 86400 ? PLAYED[0] : g.plays ? PLAYED[1] : PLAYED[2];
 }
@@ -1512,6 +1541,7 @@ async function poll() {
   const s = r.data; offset = s.now * 1000 - Date.now();
   const prev = lastRunning; lastRunning = s.running; STATUS.running = s.running; STATUS.covers = s.covers; STATUS.exit = s.exit; STATUS.import = s.import;
   importProgress(s.import);
+  if (s.newPins && s.newPins.length && !LAUNCH.open && !s.running) showNewPins(s.newPins);
   if (prev && !s.running) onExit(prev);
   if (!prev && s.running && !LAUNCH.open) showLaunch(byId.get(s.running.id));
   const c = s.covers;
@@ -2049,7 +2079,50 @@ function openTrophy() {
   blurActive(); $("#trophy").scrollTop = 0; $("#trophy").classList.add("show"); light(); beep(520);
   fitTrophy();
   api("/api/sessions").then(r => { if (r.ok && isOpen("trophy")) timeCard(r.data.sessions || [], r.data.now); });
+  api("/api/pins").then(r => { if (r.ok && isOpen("trophy")) corkboard(r.data); });
 }
+/* the pins: earned ones shiny with their date, the rest pressed into the cork with what earns them (secret ones keep it
+   to themselves) and how far along you are */
+function corkboard(d) {
+  const cork = $("#cork"); clear(cork);
+  const st = new Map(d.state.map(x => [x.key, x])), got = d.pins.filter(p => st.get(p.key).earned).length;
+  const h = el("div", "corkh"), pl = el("span", "tplate", "Pins"); pl.appendChild(el("small", "", got + " of " + d.pins.length));
+  h.appendChild(pl); h.appendChild(el("span", "", "Earned from how you play. Nothing leaves your computer.")); cork.appendChild(h);
+  const grid = el("div", "pins");
+  /* earned first (newest first), then the ones closest to earning */
+  const when = k => d.earned[k] === undefined ? -1 : d.earned[k];
+  const near = p => { const pr = st.get(p.key).progress; return pr ? pr[0] / pr[1] : 0; };
+  [...d.pins].sort((a, b) => (st.get(b.key).earned - st.get(a.key).earned) || (when(b.key) - when(a.key)) || (near(b) - near(a))).forEach(p => grid.appendChild(pinEl(p, st.get(p.key), d.earned[p.key])));
+  cork.appendChild(grid);
+}
+function pinEl(p, s, at) {
+  const secret = p.secret && !s.earned, e = el("div", "pin " + p.tier + (s.earned ? "" : " locked"));
+  e.appendChild(el("div", "badge", secret ? "?" : p.icon));
+  e.appendChild(el("b", "", secret ? "Secret" : p.title));
+  e.appendChild(el("small", "", secret ? "Keep playing to find out." : p.desc));
+  if (s.earned) e.appendChild(el("i", "", at ? new Date(at * 1000).toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}) : "Earned earlier"));
+  else if (s.progress && !secret) { const pr = el("div", "prog"), u = el("u"); u.style.width = Math.round(s.progress[0] / s.progress[1] * 100) + "%"; pr.appendChild(u); e.appendChild(pr); e.appendChild(el("i", "", s.progress[0] + " of " + s.progress[1])); }
+  return e;
+}
+/* a pin just earned pops up on the shelf, one after another */
+let PINCAT = null, pinQueue = [], pinShowing = false;
+const pinsShown = new Set();
+async function showNewPins(keys) {
+  api("/api/pins/seen", {keys});
+  keys = keys.filter(k => !pinsShown.has(k)); keys.forEach(k => pinsShown.add(k)); if (!keys.length) return;
+  if (!PINCAT) { const r = await api("/api/pins"); if (!r.ok) return; PINCAT = new Map(r.data.pins.map(p => [p.key, p])); }
+  keys.forEach(k => PINCAT.has(k) && pinQueue.push(PINCAT.get(k)));
+  if (!pinShowing) nextPin();
+}
+function nextPin() {
+  const p = pinQueue.shift(), pop = $("#pinpop"); if (!p) { pinShowing = false; return; }
+  pinShowing = true; clear(pop);
+  const e = el("div", "pin " + p.tier); e.appendChild(el("div", "badge", p.icon)); pop.appendChild(e);
+  const t = el("p"); t.appendChild(el("b", "", "Pin earned: " + p.title)); t.appendChild(document.createTextNode(p.desc)); pop.appendChild(t);
+  pop.classList.add("show"); beep(880, .08); setTimeout(() => beep(1175, .1), 110);
+  setTimeout(() => { pop.classList.remove("show"); setTimeout(nextPin, 350); }, 4200);
+}
+
 /* the time card: this month, the streak of days in a row, the longest sitting, and twelve weeks of days stamped in ink */
 function timeCard(sessions, nowS) {
   const card = $("#tcard"); clear(card);

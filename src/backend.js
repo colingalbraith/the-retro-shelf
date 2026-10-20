@@ -10,6 +10,7 @@ const { EventEmitter } = require("events");
 const ra = require("./retroarch");
 const { Importer, sheetFiles } = require("./importer");
 const { biosDest, biosStatus } = require("./bios");
+const pins = require("./pins");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
 const SHEETS = [".cue", ".gdi", ".m3u"];
@@ -169,6 +170,24 @@ class Backend extends EventEmitter {
     try { this.firstRun(); } catch (e) { this.setupError = e.message; }
     fs.rmSync(path.join(this.files.covers, ".previews"), { recursive: true, force: true });
     this.scan();
+    this.checkPins();
+  }
+
+  /**
+   * Which pins are earned. A newly earned one gets today's date and waits in newPins until the shelf shows it. The first
+   * time (an update from before pins) everything already earned is dated 0, "earned before pins", and nothing pops up.
+   */
+  checkPins() {
+    const st = this.state, first = !st.pins;
+    if (first) st.pins = {};
+    let series = [];
+    try { series = this.collections()[1].series; } catch {}
+    const res = pins.evaluate(pins.context([...this.games.values()], st, series, pins.genreGroup));
+    const fresh = res.filter(r => r.earned && !(r.key in st.pins)).map(r => r.key);
+    for (const k of fresh) st.pins[k] = first ? 0 : Math.floor(now());
+    if (fresh.length || first) this.saveState();
+    if (!first) this.newPins = [...(this.newPins || []), ...fresh];
+    return res;
   }
 
   /** the games folder moved (the app used to be called Arcade): ids come from paths, so each game's stats follow */
@@ -399,6 +418,7 @@ class Backend extends EventEmitter {
       this.state.sessions.push([rec.id, Math.floor(rec.since), Math.floor(dt)]);
       if (this.state.sessions.length > 20000) this.state.sessions.splice(0, this.state.sessions.length - 20000);
     }
+    try { this.checkPins(); } catch {}
     if (this.running === rec) this.running = null;
     this.saveState();
     let error = "";
@@ -461,6 +481,7 @@ class Backend extends EventEmitter {
       else return [400, { error: "Unknown change." }];
     }
     this.saveState();
+    this.checkPins();
     return [200, { shelves: st.shelves }];
   }
 
@@ -536,6 +557,7 @@ class Backend extends EventEmitter {
     const f = this.state.fav, i = f.indexOf(id);
     i >= 0 ? f.splice(i, 1) : f.push(id);
     this.saveState();
+    this.checkPins();
     return [200, { fav: [...f] }];
   }
 
@@ -594,8 +616,10 @@ class Backend extends EventEmitter {
   /** the file in an index that best matches a game's name, or null */
   matchName(idx, look) {
     if (!idx) return null;
-    if (idx.names.has(look + ".png")) return look + ".png";
-    const c = idx.nm.get(norm(look));
+    // the thumbnail site writes &*/:`<>?\| as _ in its file names ("Sonic _ Knuckles" for "Sonic & Knuckles")
+    const site = look.replace(/[&*/:`<>?\\|]/g, "_");
+    for (const n of [look, site]) if (idx.names.has(n + ".png")) return n + ".png";
+    const c = idx.nm.get(norm(look)) || idx.nm.get(norm(site));
     return c ? pick(c, look) : null;
   }
 
@@ -867,6 +891,7 @@ class Backend extends EventEmitter {
         const r = await this.importer.copy(items, this.romsRoot(), p => Object.assign(this.imp, p));
         Object.assign(this.imp, r, { error: r.errors[0] || "" });
         this.scan();
+        this.checkPins();
         if (this.ui.autoCovers) this.coverJob([...this.games.keys()], false, true);
       } catch (e) {
         this.imp.error = e.message;
@@ -953,7 +978,7 @@ class Backend extends EventEmitter {
   statusJson() {
     const r = this.running, live = !!(r && r.alive);
     return { running: live ? { id: r.id, since: r.since } : null, now: now(), covers: { ...this.cov },
-             import: { ...this.imp }, exit: this.lastExit };
+             import: { ...this.imp }, exit: this.lastExit, newPins: this.newPins || [] };
   }
 
   artVer(p) {
@@ -1012,7 +1037,7 @@ class Backend extends EventEmitter {
     return {
       games: [...this.games.values()].map(g => ({ id: g.id, title: g.title, tag: g.tag, system: g.system, cv: this.artVer(g.cover), lv: this.artVer(g.logo),
         plays: st.plays[g.id] || 0, time: st.time[g.id] || 0, last: st.last[g.id] || 0,
-        added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "",
+        added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "", gg: pins.genreGroup(g.genre),
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id],
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems),
@@ -1052,6 +1077,7 @@ class Backend extends EventEmitter {
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };
       if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.state.sessions, now: now() } };
       if (pathname === "/api/collections") return { code: 200, body: this.collections()[1] };
+      if (pathname === "/api/pins") { const res = this.checkPins(); return { code: 200, body: { pins: pins.catalog(), state: res, earned: this.state.pins } }; }
       if (pathname.startsWith("/ghost/")) {
         const rest = pathname.slice(7), i = rest.indexOf("/");
         let f = null;
@@ -1100,6 +1126,7 @@ class Backend extends EventEmitter {
       case "/api/fav": return j(this.toggleFav(String(d.id || "")));
       case "/api/shelves": return j(this.shelfOp(d));
       case "/api/games/search": return j(this.gameSearch(d.q));
+      case "/api/pins/seen": { const seen = new Set(Array.isArray(d.keys) ? d.keys : []); this.newPins = (this.newPins || []).filter(k => !seen.has(k)); return j([200, { ok: true }]); }
       case "/api/rescan":
         this.scan();
         if (this.ui.autoCovers) this.coverJob([...this.games.keys()], false, true);
