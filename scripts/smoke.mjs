@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Opens the built app the way someone would and checks it works: on Windows it runs the installer first, then the
-// app starts on an empty profile holding one tiny NES game, the shelf shows it, the game starts in the bundled
-// RetroArch (with the old-TV picture, which needs the right graphics driver) and closes again. CI runs it after each
-// build; a screenshot of the shelf and RetroArch's log end up in dist/smoke.
+// app starts on an empty profile holding tiny test programs for NES, Game Boy, GBA, Genesis and Master System (made
+// here: each loops on a blank screen, which is enough to see its emulator start), the shelf shows them, and each
+// starts in the bundled RetroArch (with the old-TV picture, which needs the right graphics driver) and closes
+// again. CI runs it after each build; a screenshot of the shelf and RetroArch's logs end up in dist/smoke.
 //   node scripts/smoke.mjs [path to the app's executable]
 import fs from "node:fs";
 import os from "node:os";
@@ -39,15 +40,52 @@ function findApp() {
   return path.join(DIST, dir, "The Retro Shelf.app", "Contents", "MacOS", "The Retro Shelf");
 }
 
-/** the smallest NES game: it loops forever on a black screen, which is enough to see the emulator start */
-function rom() {
+/** NES: one 16 KB program bank, no graphics ROM, mapper 0; sei; cld; loop: jmp loop (and an rti for interrupts) */
+function nes() {
   const b = Buffer.alloc(16 + 16384);
-  Buffer.from("NES\x1a\x01\x00", "latin1").copy(b);                  // one 16 KB program bank, no graphics ROM, mapper 0
-  Buffer.from([0x78, 0xd8, 0x4c, 0x02, 0x80, 0x40]).copy(b, 16);       // sei; cld; loop: jmp loop; (rti, for interrupts)
+  Buffer.from("NES\x1a\x01\x00", "latin1").copy(b);
+  Buffer.from([0x78, 0xd8, 0x4c, 0x02, 0x80, 0x40]).copy(b, 16);
   const vec = (at, to) => b.writeUInt16LE(to, 16 + at);
   vec(0x3ffa, 0x8005); vec(0x3ffc, 0x8000); vec(0x3ffe, 0x8005);       // NMI, reset, IRQ
   return b;
 }
+/** Game Boy: 32 KB, no mapper; at the entry point nop; jp $150, and there jr -2 */
+function gb() {
+  const b = Buffer.alloc(32768);
+  Buffer.from([0x00, 0xc3, 0x50, 0x01]).copy(b, 0x100);
+  Buffer.from("SMOKE TEST", "latin1").copy(b, 0x134);
+  let x = 0; for (let i = 0x134; i <= 0x14c; i++) x = (x - b[i] - 1) & 0xff; b[0x14d] = x;   // header checksum
+  Buffer.from([0x18, 0xfe]).copy(b, 0x150);
+  return b;
+}
+/** GBA: 64 KB; the ARM entry branches past the header to b . */
+function gba() {
+  const b = Buffer.alloc(65536);
+  b.writeUInt32LE(0xea00002e, 0);                                      // b $c0
+  Buffer.from("SMOKETEST", "latin1").copy(b, 0xa0);
+  b[0xb2] = 0x96;
+  let c = 0; for (let i = 0xa0; i <= 0xbc; i++) c = (c - b[i]) & 0xff; b[0xbd] = (c - 0x19) & 0xff;   // header checksum
+  b.writeUInt32LE(0xeafffffe, 0xc0);                                   // b .
+  return b;
+}
+/** Genesis: 128 KB; the stack and reset vectors, every other vector at the same loop, and there bra.s * */
+function md() {
+  const b = Buffer.alloc(131072);
+  b.writeUInt32BE(0x00fffe00, 0);
+  for (let v = 4; v < 0x100; v += 4) b.writeUInt32BE(0x200, v);
+  Buffer.from("SEGA MEGA DRIVE SMOKE TEST", "latin1").copy(b, 0x100);
+  b.writeUInt16BE(0x60fe, 0x200);
+  return b;
+}
+/** Master System: 32 KB; di; jr -2 */
+function sms() {
+  const b = Buffer.alloc(32768);
+  Buffer.from([0xf3, 0x18, 0xfe]).copy(b, 0);
+  Buffer.from("TMR SEGA", "latin1").copy(b, 0x7ff0);
+  return b;
+}
+const GAMES = [["nes", "Smoke Test (World).nes", nes], ["gb", "Smoke Test GB (World).gb", gb], ["gba", "Smoke Test GBA (World).gba", gba],
+  ["genesis", "Smoke Test MD (World).md", md], ["sms", "Smoke Test SMS (World).sms", sms]];
 
 /** a DevTools session with the app's page */
 async function connect() {
@@ -92,9 +130,11 @@ async function until(what, fn, ms) {
 }
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-smoke-"));
-const games = path.join(home, "The Retro Shelf", "Games", "nes"), log = path.join(home, "data", "logs", "retroarch.log");
-fs.mkdirSync(games, { recursive: true });
-fs.writeFileSync(path.join(games, "Smoke Test (World).nes"), rom());
+const log = path.join(home, "data", "logs", "retroarch.log");
+for (const [folder, file, make] of GAMES) {
+  fs.mkdirSync(path.join(home, "The Retro Shelf", "Games", folder), { recursive: true });
+  fs.writeFileSync(path.join(home, "The Retro Shelf", "Games", folder, file), make());
+}
 fs.mkdirSync(path.join(home, "data"), { recursive: true });
 // the old-TV picture, so the graphics driver has to be one that runs its shader; no update checks, this is about the build
 fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: { picture: "crt", welcomed: true, updates: false } }));
@@ -108,10 +148,9 @@ try {
   app.once("exit", code => { if (app) console.log("  (the app closed, code " + code + ")"); });
   const page = await connect();
 
-  const n = await until("the shelf never showed the game", () => page.evaluate(`typeof G !== "undefined" && !document.querySelector("#splash") && document.querySelectorAll(".card").length && G.length`), 60000);
-  const title = await page.evaluate("G[0].title");
-  if (n !== 1 || title !== "Smoke Test") throw new Error(`the shelf has ${n} games, the first "${title}"`);
-  step("the shelf shows " + title);
+  const n = await until("the shelf never showed the games", () => page.evaluate(`typeof G !== "undefined" && !document.querySelector("#splash") && document.querySelectorAll(".card").length && G.length`), 60000);
+  if (n !== GAMES.length) throw new Error(`the shelf has ${n} games, not ${GAMES.length}`);
+  step(`the shelf shows all ${n} test games`);
   // the profile looks like one from before 0.3.0 (welcomed, no version seen), so what's new shows: the changelog is in the build
   await until("the What's new card didn't show", () => page.evaluate(`isOpen("news") && $$("#nlist li").length`), 10000);
   await page.evaluate(`closeNews()`);
@@ -120,29 +159,33 @@ try {
   const shot = await page.send("Page.captureScreenshot", { format: "png" });
   fs.writeFileSync(path.join(OUT, "shelf.png"), Buffer.from(shot.result.data, "base64"));
 
-  const started = await page.evaluate(`api("/api/launch", {id: G[0].id}).then(r => r.ok ? "" : r.data.error || "error")`);
-  if (started) throw new Error("the game didn't start: " + started);
-  await sleep(8000);
-  const st = await page.evaluate(`api("/api/status").then(r => r.data)`), ra = fs.readFileSync(log, "utf8");
   // GitHub's Mac machines have a virtual graphics chip RetroArch's window can't open on (real Macs are fine): there,
-  // the check of the game ends once it has loaded into the emulator
-  let played = "runs it";
-  if (!st.running && process.platform === "darwin" && /Apple Paravirtual device/.test(ra) && /\[Core\] Geometry/.test(ra)) {
-    step("the game loaded; its window can't open on this machine's virtual graphics chip");
-    played = "loads it";
-  } else {
-    if (!st.running) throw new Error("the game closed by itself" + (st.exit && st.exit.error ? ": " + st.exit.error : ""));
-    if (!/\[Slang\] Compiling shader/.test(ra)) throw new Error("the game runs, but without the old-TV picture (see retroarch.log)");
-    step("the game is running, with the old-TV picture");
+  // the check of each game ends once it has loaded into its emulator
+  let played = "runs them";
+  for (const [, file] of GAMES) {
+    const title = file.replace(/ \(World\).*$/, ""), system = await page.evaluate(`(G.find(g => g.title === ${JSON.stringify(title)}) || {}).system`);
+    if (!system) throw new Error(`${title} isn't on the shelf`);
+    const started = await page.evaluate(`api("/api/launch", {id: G.find(g => g.title === ${JSON.stringify(title)}).id}).then(r => r.ok ? "" : r.data.error || "error")`);
+    if (started) throw new Error(`${system}: the game didn't start: ${started}`);
+    await sleep(7000);
+    const st = await page.evaluate(`api("/api/status").then(r => r.data)`), ra = fs.readFileSync(log, "utf8");
+    fs.writeFileSync(path.join(OUT, `retroarch-${system.replace(/\W+/g, "-").toLowerCase()}.log`), ra);
+    if (!st.running && process.platform === "darwin" && /Apple Paravirtual device/.test(ra) && /\[Core\] Geometry/.test(ra)) {
+      step(`${system}: loaded (its window can't open on this machine's virtual graphics chip)`);
+      played = "loads them";
+      continue;
+    }
+    if (!st.running) throw new Error(`${system}: the game closed by itself` + (st.exit && st.exit.error ? ": " + st.exit.error : ""));
+    if (!/\[Slang\] Compiling shader/.test(ra)) throw new Error(`${system}: the game runs, but without the old-TV picture (see its retroarch log)`);
     await page.evaluate(`api("/api/stop", {})`);
-    const ex = await until("the game didn't close when asked", () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
-    if (ex.error) throw new Error("the game closed with: " + ex.error);
-    step(`the game closed after ${Math.round(ex.dt)} s`);
+    const ex = await until(`${system}: the game didn't close when asked`, () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
+    if (ex.error) throw new Error(`${system}: the game closed with: ${ex.error}`);
+    step(`${system}: running with the old-TV picture, closed after ${Math.round(ex.dt)} s`);
   }
 
   if (page.errors.length) throw new Error("the page had errors:\n  " + page.errors.join("\n  "));
   page.ws.close();
-  console.log("ok: the app " + (process.platform === "win32" ? "installs, " : "") + "opens, finds the game and " + played);
+  console.log("ok: the app " + (process.platform === "win32" ? "installs, " : "") + "opens, finds the games and " + played);
 } catch (e) {
   failed = true;
   console.error("FAILED: " + e.message);
