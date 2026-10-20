@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const { PINS, context, evaluate, genreGroup } = createRequire(import.meta.url)("../src/pins.js");
-const at = (y, m, d, h = 15) => new Date(y, m - 1, d, h).getTime() / 1000;
+const at = (y, m, d, h = 15, min = 0) => new Date(y, m - 1, d, h, min).getTime() / 1000;
 const earned = (games, st, series = []) => evaluate(context(games, { fav: [], shelves: [], plays: {}, time: {}, sessions: [], ...st }, series, genreGroup)).filter(r => r.earned).map(r => r.key).sort();
 
 test("every pin has a title, a tier and something to show", () => {
@@ -42,4 +42,47 @@ test("variety and collecting: consoles, decades, genres, a whole series", () => 
   for (const k of ["hopper", "fullhouse", "decades", "genres", "pioneer", "complete", "disc"]) assert.ok(got.includes(k), k);
   const many = Array.from({ length: 100 }, (_, i) => ({ id: "x" + i, system: "NES" }));
   assert.ok(earned(many, {}).includes("archivist"));
+});
+
+const { build } = createRequire(import.meta.url)("../src/pins.js");
+const full = (games, st, series = [], extra = {}) => evaluate(context(games, { fav: [], shelves: [], plays: {}, time: {}, sessions: [], events: {}, ...st }, series, genreGroup, extra), ["NES", "SNES", "PS2"]);
+
+test("there are well over 90 pins, every key different", () => {
+  const all = build(["NES", "SNES", "Game Boy", "GBA", "Genesis", "Master System", "PC Engine", "Atari 2600", "N64", "PS1", "Dreamcast", "DS", "PSP", "Arcade", "GameCube/Wii", "PS2"]);
+  assert.ok(all.length > 90, String(all.length));
+  assert.equal(new Set(all.map(p => p.key)).size, all.length);
+});
+
+test("console pins show for consoles on your shelves, and count games and hours on that console", () => {
+  const g = Array.from({ length: 5 }, (_, i) => ({ id: "n" + i, system: "NES" }));
+  const st = { plays: Object.fromEntries(g.map(x => [x.id, 1])), time: Object.fromEntries(g.map(x => [x.id, 6 * 3600])) };
+  const r = new Map(full(g, st).map(x => [x.key, x]));
+  assert.ok(r.get("c5:NES").earned && r.get("c25:NES").earned && !r.get("c100:NES").earned);
+  assert.deepEqual(r.get("c100:NES").progress, [30, 100]);
+  assert.equal(r.get("c5:SNES").shown, false, "no SNES games, no SNES pins on the board");
+});
+
+test("series pins show once you have a game in the series, and are earned with all of it", () => {
+  const series = [{ name: "Metroid", have: 6, items: Array.from({ length: 6 }, () => ({})) }, { name: "Pokémon", have: 2, items: Array.from({ length: 17 }, () => ({})) }];
+  const r = new Map(full([], {}, series).map(x => [x.key, x]));
+  assert.ok(r.get("s:Metroid").earned);
+  assert.ok(r.get("s:Pokémon").shown && !r.get("s:Pokémon").earned);
+  assert.deepEqual(r.get("s:Pokémon").progress, [2, 17]);
+  assert.equal(r.get("s:Sonic").shown, false);
+});
+
+test("more habits: variety nights, a grand tour, loyalty, weekend binges, lunch, the new year", () => {
+  const g = Array.from({ length: 7 }, (_, i) => ({ id: "g" + i, system: "SNES" }));
+  const ses = g.map((x, i) => [x.id, at(2026, 6, 1 + i, 20), 1800]);                       // a different game each day, Mon 1 June to Sun 7 June
+  ses.push(["g1", at(2026, 6, 1, 21), 600], ["g2", at(2026, 6, 1, 22), 600]);               // three games on the first day
+  for (let d = 8; d < 18; d++) ses.push(["g0", at(2026, 6, d, 12, 30), 900]);               // g0 on 10 more days, some at lunch
+  ses.push(["g2", at(2026, 6, 6, 10), 4 * 3600], ["g2", at(2026, 6, 7, 10), 3600]);         // 5+ hours over the weekend of 6-7 June
+  ses.push(["g3", at(2026, 12, 31, 23, 30), 3600]);                                         // into the new year
+  const got = new Set(full(g, { plays: { g0: 1 }, sessions: ses }).filter(x => x.earned).map(x => x.key));
+  for (const k of ["varietynight", "grandtour", "loyal", "binge", "lunch", "newyear", "friday", "streak7"]) assert.ok(got.has(k), k);
+});
+
+test("firsts the app records: CRT, TV mode, a backup, a BIOS, a cover, a name", () => {
+  const got = new Set(full([], { events: { crt: 1, tv: 1, backup: 1, cover: 1, rename: 1, hide: 1, arrange: 1 } }, [], { bios: true }).filter(x => x.earned).map(x => x.key));
+  for (const k of ["crt", "tv", "backup", "bios", "cover", "rename", "tidy", "rearrange"]) assert.ok(got.has(k), k);
 });

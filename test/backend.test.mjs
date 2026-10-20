@@ -172,3 +172,25 @@ test("covers are found for games with & in their name (the cover site writes it 
   assert.equal(be.matchName(idx, "Sonic & Knuckles (USA)"), "Sonic _ Knuckles (World).png");
   assert.equal(be.matchName(idx, "Tetris (World)"), "Tetris (World).png");
 });
+
+test("a first, like the first backup, earns its pin once", () => {
+  be.checkPins();
+  be.newPins = [];
+  be.event("backup");
+  be.event("backup");
+  assert.deepEqual(be.newPins, ["backup"]);
+  assert.ok(be.state.pins.backup > 0);
+});
+
+test("pins added in a newer version that were already earned don't all pop up at once", () => {
+  put("nes/Tetris.nes");
+  be.scan();
+  const id = byTitle("Tetris").id;
+  be.state.plays[id] = 1; be.state.time[id] = 30 * 3600;
+  be.checkPins();
+  be.newPins = [];
+  delete be.state.pins.hours25; be.state.pinKeys = be.state.pinKeys.filter(k => k !== "hours25");   // as if "Settling In" were new
+  be.checkPins();
+  assert.equal(be.state.pins.hours25, 0);
+  assert.deepEqual(be.newPins, []);
+});

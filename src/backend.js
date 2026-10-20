@@ -157,7 +157,7 @@ class Backend extends EventEmitter {
     this.state = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
     // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []]]) if (!this.state[k]) this.state[k] = v;
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -175,19 +175,36 @@ class Backend extends EventEmitter {
 
   /**
    * Which pins are earned. A newly earned one gets today's date and waits in newPins until the shelf shows it. The first
-   * time (an update from before pins) everything already earned is dated 0, "earned before pins", and nothing pops up.
+   * time (an update from before pins) everything already earned is dated 0, "earned earlier", and nothing pops up.
    */
   checkPins() {
     const st = this.state, first = !st.pins;
     if (first) st.pins = {};
-    let series = [];
+    let series = [], bios = false;
     try { series = this.collections()[1].series; } catch {}
-    const res = pins.evaluate(pins.context([...this.games.values()], st, series, pins.genreGroup));
-    const fresh = res.filter(r => r.earned && !(r.key in st.pins)).map(r => r.key);
-    for (const k of fresh) st.pins[k] = first ? 0 : Math.floor(now());
-    if (fresh.length || first) this.saveState();
-    if (!first) this.newPins = [...(this.newPins || []), ...fresh];
+    try { bios = biosStatus(this.folders.bios, null).some(c => c.state === "ok" || c.state === "partial"); } catch {}
+    const res = pins.evaluate(pins.context([...this.games.values()], st, series, pins.genreGroup, { bios, now: now() }), Object.keys(this.cfg.systems));
+    // a pin added in a newer version that was already earned also counts as earned earlier, without popping up
+    const known = new Set(st.pinKeys || []), fresh = [];
+    let changed = first || res.length !== known.size;
+    for (const r of res) {
+      if (!r.earned || r.key in st.pins) continue;
+      const quiet = first || !known.has(r.key);
+      st.pins[r.key] = quiet ? 0 : Math.floor(now()); changed = true;
+      if (!quiet) fresh.push(r.key);
+    }
+    st.pinKeys = res.map(r => r.key);
+    if (changed) this.saveState();
+    this.newPins = [...(this.newPins || []), ...fresh];
     return res;
+  }
+
+  /** a first worth a pin (the first CRT game, backup, cover picked by hand…): remembered once */
+  event(kind) {
+    if (this.state.events[kind]) return;
+    this.state.events[kind] = Math.floor(now());
+    this.saveState();
+    try { this.checkPins(); } catch {}
   }
 
   /** the games folder moved (the app used to be called Arcade): ids come from paths, so each game's stats follow */
@@ -400,6 +417,8 @@ class Backend extends EventEmitter {
     }
     proc.stdin.on("error", () => {});
     const rec = { id, since: now(), proc, alive: true, builtIn: built.builtIn, stopping: false };
+    if (built.builtIn && this.ui.picture === "crt") this.event("crt");
+    if (this.ui.tv) this.event("tv");
     this.running = rec;
     this.state.last[id] = Math.floor(rec.since);
     this.state.plays[id] = (this.state.plays[id] || 0) + 1;
@@ -490,6 +509,7 @@ class Backend extends EventEmitter {
     const t = String(title || "").trim().slice(0, 200);
     if (t) this.state.names[id] = t; else delete this.state.names[id];
     this.saveState();
+    if (t) this.event("rename");
     return [200, { ok: true }];
   }
 
@@ -498,6 +518,7 @@ class Backend extends EventEmitter {
     if (hidden && i < 0) h.push(id);
     if (!hidden && i >= 0) h.splice(i, 1);
     this.saveState();
+    if (hidden) this.event("hide");
     return [200, { ok: true }];
   }
 
@@ -519,6 +540,7 @@ class Backend extends EventEmitter {
       return [500, { error: "Couldn't save the picture: " + e.message }];
     }
     g[kind] = dest;
+    if (kind === "cover") this.event("cover");
     return [200, { ok: true }];
   }
 
@@ -743,6 +765,7 @@ class Backend extends EventEmitter {
     try { f = await this.coverFile(thumb, String(name)); } catch { return [502, { error: "Couldn't download that cover. Check your internet connection." }]; }
     if (!f) return [404, { error: "That cover isn't available." }];
     this.saveArt(g, "cover", fs.readFileSync(f));
+    this.event("cover");
     return [200, { ok: true }];
   }
 
@@ -957,6 +980,7 @@ class Backend extends EventEmitter {
       const before = this.ownEmu();
       this.ui = cleanUi({ ...this.ui, ...data.ui });
       this.saveSettings();
+      if (this.ui.arrange !== "console") this.event("arrange");
       if (before !== this.ownEmu() && this.ownEmu() && !this.exeOk()) this.autodetect();
     }
     const p = data.paths;
@@ -1077,7 +1101,7 @@ class Backend extends EventEmitter {
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };
       if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.state.sessions, now: now() } };
       if (pathname === "/api/collections") return { code: 200, body: this.collections()[1] };
-      if (pathname === "/api/pins") { const res = this.checkPins(); return { code: 200, body: { pins: pins.catalog(), state: res, earned: this.state.pins } }; }
+      if (pathname === "/api/pins") { const res = this.checkPins(); return { code: 200, body: { pins: pins.catalog(Object.keys(this.cfg.systems)), cats: pins.CATS, state: res, earned: this.state.pins } }; }
       if (pathname.startsWith("/ghost/")) {
         const rest = pathname.slice(7), i = rest.indexOf("/");
         let f = null;

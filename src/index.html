@@ -447,6 +447,8 @@ html.tv body.kb,html.tv body.kb *{cursor:none!important}
 .corkh .tplate{position:static;transform:none;height:20px}
 .corkh span{color:#3d2814;font:600 13px var(--disp)}
 .pins{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:22px 14px}
+.corkg{margin:30px 0 16px;padding-bottom:6px;border-bottom:2px dashed rgba(60,35,15,.35);color:#2a1b0d;font:700 15px var(--disp);letter-spacing:.04em;text-transform:uppercase}
+.corkg small{margin-left:10px;font:600 12px var(--mono);color:#5a3c1e;letter-spacing:0}
 .pin{display:flex;flex-direction:column;align-items:center;text-align:center;color:#2a1b0d}
 .pin .badge{position:relative;width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 26px/1 var(--disp);
   color:#fff8e6;text-shadow:0 1px 1px rgba(0,0,0,.45);box-shadow:0 4px 6px rgba(40,20,5,.55),inset 0 2px 0 rgba(255,255,255,.45),inset 0 -3px 4px rgba(0,0,0,.25)}
@@ -455,6 +457,7 @@ html.tv body.kb,html.tv body.kb *{cursor:none!important}
 .pin.gold .badge{background:radial-gradient(circle at 35% 30%,#fff1b0,#e2b33d 55%,#a6761b)}
 .pin .badge::after{content:"";position:absolute;inset:7px;border-radius:50%;border:2px solid rgba(255,255,255,.3)}
 .pin b{margin-top:10px;font:700 14px/1.15 var(--disp)}
+.pin .badge.num{font-size:19px;letter-spacing:-.02em}
 .pin small{margin-top:3px;font:500 12px/1.3 var(--disp);color:#4a3119;max-width:150px}
 .pin i{margin-top:5px;font:600 10.5px/1 var(--mono);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:#5a3c1e}
 .pin .prog{width:84px;height:5px;margin-top:6px;background:rgba(60,35,15,.25)}.pin .prog u{display:block;height:100%;background:#5a3c1e;text-decoration:none}
@@ -2085,19 +2088,25 @@ function openTrophy() {
    to themselves) and how far along you are */
 function corkboard(d) {
   const cork = $("#cork"); clear(cork);
-  const st = new Map(d.state.map(x => [x.key, x])), got = d.pins.filter(p => st.get(p.key).earned).length;
-  const h = el("div", "corkh"), pl = el("span", "tplate", "Pins"); pl.appendChild(el("small", "", got + " of " + d.pins.length));
+  /* pins for consoles or series you don't have stay off the board until you do */
+  const st = new Map(d.state.map(x => [x.key, x])), shown = d.pins.filter(p => st.get(p.key).shown), got = shown.filter(p => st.get(p.key).earned).length;
+  const h = el("div", "corkh"), pl = el("span", "tplate", "Pins"); pl.appendChild(el("small", "", got + " of " + shown.length));
   h.appendChild(pl); h.appendChild(el("span", "", "Earned from how you play. Nothing leaves your computer.")); cork.appendChild(h);
-  const grid = el("div", "pins");
-  /* earned first (newest first), then the ones closest to earning */
+  /* in each group: earned first (newest first), then the ones closest to earning */
   const when = k => d.earned[k] === undefined ? -1 : d.earned[k];
   const near = p => { const pr = st.get(p.key).progress; return pr ? pr[0] / pr[1] : 0; };
-  [...d.pins].sort((a, b) => (st.get(b.key).earned - st.get(a.key).earned) || (when(b.key) - when(a.key)) || (near(b) - near(a))).forEach(p => grid.appendChild(pinEl(p, st.get(p.key), d.earned[p.key])));
-  cork.appendChild(grid);
+  for (const [cat, label] of d.cats) {
+    const list = shown.filter(p => p.cat === cat); if (!list.length) continue;
+    const n = list.filter(p => st.get(p.key).earned).length, gh = el("h4", "corkg", label); gh.appendChild(el("small", "", n + " of " + list.length));
+    cork.appendChild(gh);
+    const grid = el("div", "pins");
+    list.sort((a, b) => (st.get(b.key).earned - st.get(a.key).earned) || (when(b.key) - when(a.key)) || (near(b) - near(a))).forEach(p => grid.appendChild(pinEl(p, st.get(p.key), d.earned[p.key])));
+    cork.appendChild(grid);
+  }
 }
 function pinEl(p, s, at) {
   const secret = p.secret && !s.earned, e = el("div", "pin " + p.tier + (s.earned ? "" : " locked"));
-  e.appendChild(el("div", "badge", secret ? "?" : p.icon));
+  e.appendChild(el("div", "badge" + (/^\d+$/.test(p.icon) ? " num" : ""), secret ? "?" : p.icon));
   e.appendChild(el("b", "", secret ? "Secret" : p.title));
   e.appendChild(el("small", "", secret ? "Keep playing to find out." : p.desc));
   if (s.earned) e.appendChild(el("i", "", at ? new Date(at * 1000).toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}) : "Earned earlier"));

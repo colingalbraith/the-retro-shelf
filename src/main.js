@@ -212,7 +212,7 @@ function ipc() {
     const r = await dialog.showSaveDialog(win, { title: "Back up saves", buttonLabel: "Back Up",
       defaultPath: path.join(app.getPath("documents"), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: "Zip archive", extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
-    try { return { ok: true, count: zipFolder(saves, r.filePath), path: r.filePath }; }
+    try { const count = zipFolder(saves, r.filePath); backend.event("backup"); return { ok: true, count, path: r.filePath }; }
     catch (e) { return { ok: false, error: "Couldn't make the backup: " + e.message }; }
   });
   ipcMain.handle("restore-saves", async () => {
