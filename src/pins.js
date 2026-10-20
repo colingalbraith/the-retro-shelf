@@ -147,7 +147,8 @@ const build = systems => [...STATIC, ...consolePins(systems), ...seriesPins()];
  */
 function context(games, st, series, genreOf, extra = {}) {
   const byId = new Map(games.map(g => [g.id, g]));
-  const played = new Set(games.filter(g => (st.plays[g.id] || 0) > 0 || (st.time[g.id] || 0) > 0).map(g => g.id));
+  // played means for at least a few seconds: a game that closed straight away (no BIOS, a bad file) doesn't count
+  const played = new Set(games.filter(g => (st.time[g.id] || 0) >= 10).map(g => g.id));
   const pg = [...played].map(id => byId.get(id));
   const times = games.map(g => st.time[g.id] || 0);
   const sessions = (st.sessions || []).slice().sort((a, b) => a[1] - b[1]);

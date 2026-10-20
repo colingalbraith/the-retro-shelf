@@ -25,7 +25,7 @@ function unzip(file) {
   return out;
 }
 
-test("saves are zipped under their folder's name and come back out intact", () => {
+test("saves are zipped under their folder's name and come back out intact", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-zip-"));
   try {
     const saves = path.join(dir, "Saves");
@@ -34,7 +34,7 @@ test("saves are zipped under their folder's name and come back out intact", () =
     fs.writeFileSync(path.join(saves, "States", "Tetris (World).state.auto"), "x");
     fs.writeFileSync(path.join(saves, ".DS_Store"), "hidden");
     const out = path.join(dir, "backup.zip");
-    assert.equal(zipFolder(saves, out), 2);
+    assert.equal(await zipFolder(saves, out), 2);
     assert.deepEqual(zipEntries(out).map(e => e.name).sort(), ["Saves/Pokémon - Red Version (USA).srm", "Saves/States/Tetris (World).state.auto"]);
     const files = unzip(out);
     assert.equal(files["Saves/Pokémon - Red Version (USA).srm"], "battery save ".repeat(500));
@@ -42,7 +42,7 @@ test("saves are zipped under their folder's name and come back out intact", () =
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("restoring puts saves back, keeps ones newer than the backup, and never writes outside the folder", () => {
+test("restoring puts saves back, keeps ones newer than the backup, and never writes outside the folder", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-restore-"));
   try {
     const saves = path.join(dir, "Saves"), zip = path.join(dir, "backup.zip");
@@ -52,13 +52,13 @@ test("restoring puts saves back, keeps ones newer than the backup, and never wri
     fs.writeFileSync(path.join(saves, "States", "Gone (USA).state.auto"), "resume point");
     const past = new Date(Date.now() - 86400000);
     for (const f of ["Old (USA).srm", "Played since (USA).srm", "States/Gone (USA).state.auto"]) fs.utimesSync(path.join(saves, f), past, past);
-    zipFolder(saves, zip);
+    await zipFolder(saves, zip);
     fs.writeFileSync(path.join(saves, "Old (USA).srm"), "overwritten later, but older");
     fs.utimesSync(path.join(saves, "Old (USA).srm"), new Date(past.getTime() - 86400000), new Date(past.getTime() - 86400000));
     fs.writeFileSync(path.join(saves, "Played since (USA).srm"), "newer progress");
     fs.rmSync(path.join(saves, "States"), { recursive: true });
-    const r = unzipInto(zip, saves);
-    assert.deepEqual(r, { restored: 2, kept: 1, skipped: 0 });
+    const r = await unzipInto(zip, saves);
+    assert.deepEqual(r, { restored: 2, kept: 1, skipped: 0, failed: 0 });
     assert.equal(fs.readFileSync(path.join(saves, "Old (USA).srm"), "utf8"), "from the backup");
     assert.equal(fs.readFileSync(path.join(saves, "Played since (USA).srm"), "utf8"), "newer progress");
     assert.equal(fs.readFileSync(path.join(saves, "States", "Gone (USA).state.auto"), "utf8"), "resume point");
@@ -67,10 +67,27 @@ test("restoring puts saves back, keeps ones newer than the backup, and never wri
     const evil = path.join(dir, "evil"), ez = path.join(dir, "evil.zip");
     fs.mkdirSync(evil);
     fs.writeFileSync(path.join(evil, "x.srm"), "x");
-    zipFolder(evil, ez);
+    await zipFolder(evil, ez);
     // same length as "evil/x.srm", so the zip stays valid and only the path is the problem
     fs.writeFileSync(ez, Buffer.from(fs.readFileSync(ez).toString("latin1").replaceAll("evil/x.srm", "../../x.sr"), "latin1"));
-    assert.deepEqual(unzipInto(ez, saves), { restored: 0, kept: 0, skipped: 1 });
+    assert.deepEqual(await unzipInto(ez, saves), { restored: 0, kept: 0, skipped: 1, failed: 0 });
     assert.ok(!fs.existsSync(path.join(dir, "x.sr")) && !fs.existsSync(path.join(path.dirname(dir), "x.sr")));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a save that can't be written doesn't stop the rest from coming back", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-restore-"));
+  try {
+    const saves = path.join(dir, "Saves"), zip = path.join(dir, "backup.zip"), to = path.join(dir, "to");
+    fs.mkdirSync(path.join(saves, "Locked"), { recursive: true });
+    fs.writeFileSync(path.join(saves, "A (USA).srm"), "a");
+    fs.writeFileSync(path.join(saves, "Locked", "B (USA).srm"), "b");
+    fs.writeFileSync(path.join(saves, "Z (USA).srm"), "z");
+    await zipFolder(saves, zip);
+    // a file where the folder "Locked" has to go: that entry can't be written, like a save another program holds
+    fs.mkdirSync(to); fs.writeFileSync(path.join(to, "Locked"), "in the way");
+    assert.deepEqual(await unzipInto(zip, to), { restored: 2, kept: 0, skipped: 0, failed: 1 });
+    assert.equal(fs.readFileSync(path.join(to, "Z (USA).srm"), "utf8"), "z");
+    assert.ok(!fs.readdirSync(to).some(f => f.endsWith(".part")));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

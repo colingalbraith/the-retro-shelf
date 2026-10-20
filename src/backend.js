@@ -610,10 +610,16 @@ class Backend extends EventEmitter {
   // ---------------------------------------------------------------- covers
   coverBase() { return String(this.cfg.cover_base_url || "https://thumbnails.libretro.com").replace(/\/+$/, ""); }
 
-  /** file names available for one system and kind of art. No logos for a system is fine; no box art is an error */
-  async indexFor(thumb, kind) {
+  /** file names available for one system and kind of art. No logos for a system is fine; no box art is an error.
+      Asked for many times at once (Collections' boxes), the list is still downloaded once */
+  indexFor(thumb, kind) {
     const key = kind + "|" + thumb;
-    if (this._idx.has(key)) return this._idx.get(key);
+    if (this._idx.has(key)) return Promise.resolve(this._idx.get(key));
+    this._idxWait = this._idxWait || new Map();
+    if (!this._idxWait.has(key)) this._idxWait.set(key, this.loadIndex(thumb, kind, key).finally(() => this._idxWait.delete(key)));
+    return this._idxWait.get(key);
+  }
+  async loadIndex(thumb, kind, key) {
     const cp = path.join(this.files.covers, ".index", safe(thumb) + (kind === "cover" ? "" : "." + kind) + ".json");
     let names = null;
     try { if (now() - fs.statSync(cp).mtimeMs / 1000 < 7 * 86400) names = jload(cp, null); } catch {}
@@ -788,8 +794,9 @@ class Backend extends EventEmitter {
     let f = null;
     try { f = await this.coverFile(thumb, String(name)); } catch { return [502, { error: "Couldn't download that cover. Check your internet connection." }]; }
     if (!f) return [404, { error: "That cover isn't available." }];
-    this.saveArt(g, "cover", fs.readFileSync(f));
-    this.event("cover");
+    // next to the game, like a picture of your own, so it wins over any image already there or in _covers; in the
+    // app's covers folder when the games folder can't be written to
+    if (this.setArt(id, "cover", f)[0] !== 200) { this.saveArt(g, "cover", fs.readFileSync(f)); this.event("cover"); }
     return [200, { ok: true }];
   }
 

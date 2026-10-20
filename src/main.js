@@ -6,7 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { Backend } = require("./backend");
 const { Updater } = require("./updater");
-const { zipFolder, unzipInto } = require("./zip");
+const { zipFolder, unzipInto, filesIn } = require("./zip");
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "arcade", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -208,17 +208,22 @@ function ipc() {
   ipcMain.handle("open-url", (_, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
   ipcMain.handle("backup-saves", async () => {
     const saves = backend.folders.saves;
-    if (!fs.existsSync(saves) || !fs.readdirSync(saves).some(f => !f.startsWith("."))) return { ok: false, error: "There are no saves to back up yet." };
+    // folders RetroArch makes on the first launch don't count: only actual save files
+    let any = false;
+    try { any = filesIn(saves).length > 0; } catch {}
+    if (!any) return { ok: false, error: "There are no saves to back up yet." };
     const r = await dialog.showSaveDialog(win, { title: "Back up saves", buttonLabel: "Back Up",
       defaultPath: path.join(app.getPath("documents"), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: "Zip archive", extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
-    try { const count = zipFolder(saves, r.filePath); backend.event("backup"); return { ok: true, count, path: r.filePath }; }
+    try { const count = await zipFolder(saves, r.filePath); backend.event("backup"); return { ok: true, count, path: r.filePath }; }
     catch (e) { return { ok: false, error: "Couldn't make the backup: " + e.message }; }
   });
   ipcMain.handle("restore-saves", async () => {
+    // a running game would write its save over the restored one when it closes
+    if (backend.running && backend.running.alive) return { ok: false, error: "Close the game first, then restore." };
     const r = await dialog.showOpenDialog(win, { title: "Restore saves", buttonLabel: "Restore", properties: ["openFile"], filters: [{ name: "Zip archive", extensions: ["zip"] }] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
-    try { fs.mkdirSync(backend.folders.saves, { recursive: true }); return { ok: true, ...unzipInto(r.filePaths[0], backend.folders.saves) }; }
+    try { fs.mkdirSync(backend.folders.saves, { recursive: true }); return { ok: true, ...(await unzipInto(r.filePaths[0], backend.folders.saves)) }; }
     catch (e) { return { ok: false, error: "Couldn't restore from that file: " + e.message }; }
   });
   ipcMain.handle("tv-mode", (_, on) => tvMode(!!on));

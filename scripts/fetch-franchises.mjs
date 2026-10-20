@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Builds src/data/franchises.json: series name -> its games, as [console, name] in release order, from the franchise
 // lists in libretro-database. Only English releases from the West count (a Japanese release has its own name, like
-// "Pocket Monsters - Aka" for Pokemon Red, and would count twice); regional versions, revisions and re-releases of a
-// game count once, the original USA one preferred; betas, prototypes and demos are left out. Collections compare
-// these names with the games in the library.
+// "Pocket Monsters - Aka" for Pokemon Red, and would count twice); regional versions and revisions of a game count
+// once, the original USA one preferred, and a European name for a game released in the USA under another (Lylat
+// Wars for Star Fox 64) isn't counted again. Left out: betas, prototypes, demos, unlicensed and homebrew games,
+// re-releases (Virtual Console, mini consoles) and compilations, so having "every game" of a series means the
+// games themselves. Collections compare these names with the games in the library.
 //   node scripts/fetch-franchises.mjs
 import fs from "node:fs";
 import path from "node:path";
@@ -11,7 +13,10 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BASE = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/franchise";
-const SKIP = /\((?:[^)]*\b(?:Beta|Proto|Prototype|Demo|Sample|Kiosk|Debug|Promo|Pirate|Hack)\b[^)]*)\)|\[BIOS\]/i;
+const SKIP = /\((?:[^)]*\b(?:Beta|Proto|Prototype|Demo|Sample|Kiosk|Debug|Promo|Pirate|Hack|Unl|Aftermarket|Homebrew|Virtual Console|Classic Mini|Genesis Mini|Mega Drive Mini|Switch Online|Evercade|Retro-Bit|Limited Run|Arcade Archives)\b[^)]*)\)|\[BIOS\]/i;
+// several games in one box (by the name, not a "(… Collection)" tag saying where a single game came from): their games
+// are in the series on their own
+const PACK = / \+ |\b\d+ Games in 1\b|Combo Pack|Double Pack|Compilation|Collection\b|Anthology|Classic NES Series|NES Classics|Famicom Mini/i;
 
 const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "config.json"), "utf8"));
 // the same name matching the app uses (backend.js norm): no brackets, no punctuation, "Legend of Zelda, The" = "The Legend of Zelda"
@@ -39,7 +44,7 @@ for (const [name, s] of Object.entries(cfg.systems)) {
     if (!r.ok) continue;
     for (const block of (await r.text()).split(/\ngame \(/).slice(1)) {
       const title = /^\s*(?:comment|name) "((?:[^"\\]|\\.)*)"/m.exec(block), fr = /^\s*franchise "([^"]+)"/m.exec(block);
-      if (!title || !fr || SKIP.test(title[1]) || !WEST.test(title[1]) || !english(title[1])) continue;
+      if (!title || !fr || SKIP.test(title[1]) || PACK.test(title[1].replace(/\s*\([^)]*\)/g, "")) || !WEST.test(title[1]) || !english(title[1])) continue;
       const look = title[1], key = name + "|" + norm(look);
       // "Legend of Zelda" and "The Legend of Zelda" are one series, under the name with "The"
       const bare = fr[1].replace(/^the\s+/i, ""), sname = [...series.keys()].find(k => k.replace(/^the\s+/i, "").toLowerCase() === bare.toLowerCase()) || fr[1];
@@ -51,10 +56,14 @@ for (const [name, s] of Object.entries(cfg.systems)) {
     }
   }
 }
+const US = /\((?:[^)]*\b)?(?:USA|World)\b[^)]*\)/;
 const out = {};
 for (const [name, games] of [...series].sort((a, b) => a[0].localeCompare(b[0]))) {
-  if (games.size < 2) continue;
-  out[name] = [...games.values()].sort((a, b) => (a.year || "9999").localeCompare(b.year || "9999") || a.look.localeCompare(b.look)).map(g => [g.system, g.look]);
+  // a release only outside the USA in the same year, on the same console, as one in the USA is that game renamed
+  const list = [...games.values()].filter(g => US.test(g.look) || !g.year
+    || ![...games.values()].some(o => o !== g && o.system === g.system && o.year === g.year && US.test(o.look)));
+  if (list.length < 2) continue;
+  out[name] = list.sort((a, b) => (a.year || "9999").localeCompare(b.year || "9999") || a.look.localeCompare(b.look)).map(g => [g.system, g.look]);
 }
 const file = path.join(ROOT, "src", "data", "franchises.json");
 fs.writeFileSync(file, JSON.stringify(out));
