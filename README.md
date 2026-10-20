@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/shelf.jpg" alt="Favorites face-out on the top shelf, then each console's games spines-out on its own shelf">
+  <img src="docs/images/demo.gif" width="840" alt="Moving along the shelf: boxes slide out when picked, turn over to show play history, and each console's games stand spines-out on their own shelf">
 </p>
 
 Drag your games onto the window and they land on the right shelf with their box art, ready to play with a
@@ -66,9 +66,36 @@ No games are included, and the app doesn't link to sites that hand out commercia
 cartridges and discs you own, play free homebrew, or buy official re-releases. The app has a guide to all of
 these under **Help → Where to Get Games**.
 
-**Supported:** NES, SNES, Game Boy / Color / Advance, Genesis, Master System, Game Gear, PC Engine, Atari 2600,
-N64, DS, PlayStation, PSP, Dreamcast, GameCube / Wii and Arcade (FinalBurn Neo). PS2 works if you install PCSX2
-yourself.
+## Supported consoles
+
+NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Genesis / Mega Drive, Master System, Game Gear, PC Engine,
+Atari 2600, N64, DS, PlayStation, PSP, Dreamcast, GameCube, Wii and Arcade. Their emulators come with the app.
+
+<details>
+<summary>Which emulator runs each one</summary>
+
+| Console | Emulator | BIOS file |
+| --- | --- | --- |
+| NES | FCEUmm | Not needed |
+| SNES | Snes9x | Not needed |
+| Game Boy, Game Boy Color | Gambatte | Not needed |
+| Game Boy Advance | mGBA | Not needed |
+| Genesis / Mega Drive, Master System, Game Gear | Genesis Plus GX | Not needed |
+| PC Engine / TurboGrafx-16 | Beetle PCE Fast | Only for CD games |
+| Atari 2600 | Stella | Not needed |
+| Nintendo 64 | Mupen64Plus-Next | Not needed |
+| PlayStation | PCSX ReARMed | Optional, improves compatibility |
+| Dreamcast | Flycast | Optional |
+| Nintendo DS | melonDS DS | Optional |
+| PSP | PPSSPP | Not needed |
+| GameCube, Wii | Dolphin | Not needed |
+| Arcade | FinalBurn Neo | Not needed (romsets named like `sf2.zip`) |
+| PlayStation 2 | PCSX2, installed separately | Required |
+
+All of them run inside [RetroArch](https://www.retroarch.com), which comes with the app. BIOS files are copied from
+your own console and go in Settings → Emulator → Folders → BIOS.
+
+</details>
 
 ## Controls
 
