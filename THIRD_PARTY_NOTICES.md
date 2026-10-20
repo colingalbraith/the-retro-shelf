@@ -50,6 +50,11 @@ https://buildbot.libretro.com/assets/system/PPSSPP.zip (the `assets` folder of h
 GNU General Public License v2 or later, with the notices in `PPSSPP/LICENSE.TXT`; the Roboto fonts are Apache 2.0
 and Inconsolata is SIL Open Font License 1.1.
 
+## zfast-crt shader
+
+The CRT picture setting uses zfast-crt by Greg Hogan (SoltanGris42), from https://github.com/libretro/slang-shaders.
+GNU General Public License v2 or later.
+
 ## Electron
 
 MIT License. Electron bundles Chromium, Node.js and other components; their notices ship in the app as

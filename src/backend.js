@@ -25,7 +25,8 @@ const GITHUB_API = "https://api.github.com/repos/libretro-thumbnails";
 const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
-                     fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true };
+                     fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true,
+                     picture: "sharp", sort: "title" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -49,6 +50,8 @@ function cleanUi(d) {
   if (["full", "reduced", "off"].includes(d.fx)) out.fx = d.fx;
   if (["spines", "covers"].includes(d.shelf)) out.shelf = d.shelf;
   if (["cover", "printed"].includes(d.spine)) out.spine = d.spine;
+  if (["sharp", "smooth", "crt"].includes(d.picture)) out.picture = d.picture;
+  if (["title", "year", "played"].includes(d.sort)) out.sort = d.sort;
   else if (["art", "color"].includes(d.spine)) out.spine = "cover";
   for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
@@ -148,8 +151,8 @@ class Backend extends EventEmitter {
     const user = jload(this.files.cfg, {});
     this.cfg = { ...base, ...user, systems: { ...base.systems, ...(user.systems || {}) }, retroarch: { ...(user.retroarch || {}) } };
     this.state = jload(this.files.state, {});
-    // names: titles people gave games; hidden: games taken off the shelves
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []]]) if (!this.state[k]) this.state[k] = v;
+    // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -326,11 +329,12 @@ class Backend extends EventEmitter {
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
-      return { cmd: [this.ra.exe, "-L", core, g.path, "--config", this.files.raCfg, "--log-file", this.files.raLog, "--verbose", ...(slot !== null ? ["-e", String(slot)] : [])], builtIn: true };
+      const crt = this.ui.picture === "crt" && fs.existsSync(this.ra.crt) ? ["--set-shader", this.ra.crt] : [];
+      return { cmd: [this.ra.exe, "-L", core, g.path, "--config", this.files.raCfg, "--log-file", this.files.raLog, "--verbose", ...crt, ...(slot !== null ? ["-e", String(slot)] : [])], builtIn: true };
     }
     const r = this.cfg.retroarch;
     const exe = r.exe && this.resolveApp(r.exe.replace(/^~(?=$|[\\/])/, os.homedir()));
-    if (!exe) throw new Error("Couldn't find your RetroArch. Check the path in Settings → Emulators, or switch back to the built-in one.");
+    if (!exe) throw new Error("Couldn't find your RetroArch. Check the path in Settings → Emulator, or switch back to the built-in one.");
     const cores = (r.cores_dir || "").replace(/^~(?=$|[\\/])/, os.homedir());
     return { cmd: [exe, "-L", ra.corePath(cores, s.core), g.path, ...(r.args || ["-f"])], builtIn: false };
   }
@@ -394,6 +398,34 @@ class Backend extends EventEmitter {
     const st = this.state;
     for (const k of ["last", "plays", "time", "names"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
     for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(from); if (i >= 0) st[k][i] = to; }
+    for (const sh of st.shelves) { const i = sh.ids.indexOf(from); if (i >= 0) sh.ids[i] = to; }
+  }
+
+  /** shelves people make ("Couch co-op", "To finish"): create, rename, delete, and put games on them or take them off */
+  shelfOp(d) {
+    const st = this.state, op = String(d.op || ""), name = String(d.name || "").trim().slice(0, 40);
+    const find = n => st.shelves.find(s => s.name.toLowerCase() === n.toLowerCase());
+    if (op === "create") {
+      if (!name) return [400, { error: "Give the shelf a name." }];
+      if (find(name)) return [409, { error: "There's already a shelf called that." }];
+      st.shelves.push({ name, ids: this.games.has(String(d.id || "")) ? [String(d.id)] : [] });
+    } else {
+      const sh = find(name);
+      if (!sh) return [404, { error: "There's no shelf called that." }];
+      if (op === "add" || op === "remove") {
+        const id = String(d.id || "");
+        sh.ids = sh.ids.filter(x => x !== id);
+        if (op === "add" && this.games.has(id)) sh.ids.push(id);
+      } else if (op === "rename") {
+        const to = String(d.to || "").trim().slice(0, 40), other = find(to);
+        if (!to) return [400, { error: "Give the shelf a name." }];
+        if (other && other !== sh) return [409, { error: "There's already a shelf called that." }];
+        sh.name = to;
+      } else if (op === "delete") st.shelves = st.shelves.filter(s => s !== sh);
+      else return [400, { error: "Unknown change." }];
+    }
+    this.saveState();
+    return [200, { shelves: st.shelves }];
   }
 
   rename(id, title) {
@@ -885,6 +917,7 @@ class Backend extends EventEmitter {
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id],
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems),
+      shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)) })),
       media: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, v.media || "cart"])),
       settings: this.settingsJson(), status: this.statusJson(),
     };
@@ -957,6 +990,7 @@ class Backend extends EventEmitter {
       case "/api/game/hide": return j(this.hide(String(d.id || ""), d.hidden !== false));
       case "/api/stop": await this.stop(); return j([200, { ok: true }]);
       case "/api/fav": return j(this.toggleFav(String(d.id || "")));
+      case "/api/shelves": return j(this.shelfOp(d));
       case "/api/rescan":
         this.scan();
         if (this.ui.autoCovers) this.coverJob([...this.games.keys()], false, true);

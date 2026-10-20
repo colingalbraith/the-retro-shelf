@@ -81,3 +81,21 @@ test("play history follows games when the games folder moves (the Arcade rename)
   assert.ok(be.state.fav.includes(id));
   assert.ok(fs.existsSync(p));
 });
+
+test("shelves people make can be filled, renamed and deleted, and follow a game that moves", () => {
+  put("snes/Chrono Trigger (USA).sfc"); put("snes/EarthBound (USA).sfc"); put("ps1/Crash (USA).cue", cue(["Crash (USA).bin"])); put("ps1/Crash (USA).bin");
+  be.scan();
+  const chrono = byTitle("Chrono Trigger").id, crash = byTitle("Crash").id;
+  assert.equal(be.shelfOp({ op: "create", name: "Couch co-op", id: crash })[0], 200);
+  assert.equal(be.shelfOp({ op: "create", name: "couch CO-OP" })[0], 409, "names don't repeat, whatever their case");
+  be.shelfOp({ op: "add", name: "Couch co-op", id: chrono });
+  be.shelfOp({ op: "add", name: "Couch co-op", id: chrono });
+  assert.deepEqual(be.state.shelves[0].ids, [crash, chrono], "a game is on a shelf once");
+  const [, moved] = be.moveTo(crash, "PC Engine");
+  assert.deepEqual(be.state.shelves[0].ids, [moved.id, chrono]);
+  be.shelfOp({ op: "rename", name: "Couch co-op", to: "Two players" });
+  be.shelfOp({ op: "remove", name: "Two players", id: chrono });
+  assert.deepEqual(be.libraryJson().shelves, [{ name: "Two players", ids: [moved.id] }]);
+  be.shelfOp({ op: "delete", name: "Two players" });
+  assert.deepEqual(be.state.shelves, []);
+});

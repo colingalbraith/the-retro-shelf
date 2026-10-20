@@ -512,6 +512,9 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   </div>
 </div>
 
+<div id="nsh" class="over"><div class="slip"><h2 id="nsht">New shelf</h2><p id="nshp">Name it, like Couch co-op or To finish.</p>
+  <input type="text" id="nshname" spellcheck="false" autocomplete="off" maxlength="40"><div class="btns"><button class="btn primary" id="nshok">Make shelf</button><button class="btn" id="nshcancel">Cancel</button></div></div></div>
+
 <div id="ren" class="over"><div class="slip"><h2>Rename</h2><p>The name on the box and spine. Leave it empty to go back to the original.</p>
   <input type="text" id="rname" spellcheck="false" autocomplete="off"><div class="btns"><button class="btn primary" id="rok">Save</button><button class="btn" id="rcancel">Cancel</button></div></div></div>
 
@@ -605,6 +608,13 @@ function setAcc(rgb) { HTML.style.setProperty("--acc", "rgb(" + rgb.join(",") + 
 function blurActive() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
 const isOpen = id => $("#" + id).classList.contains("show");
 const byTitle = (a, b) => a.title.localeCompare(b.title, undefined, {numeric: true, sensitivity: "base"});
+/* Settings → Sort by: title, release year (unknown years last), or most recently played (never played last) */
+const SORTS = {
+  title: byTitle,
+  year: (a, b) => ((parseInt(a.year, 10) || 9999) - (parseInt(b.year, 10) || 9999)) || byTitle(a, b),
+  played: (a, b) => (b.last || 0) - (a.last || 0) || byTitle(a, b),
+};
+let SHELVES = [];
 
 let toastT;
 function toast(msg, bad) {
@@ -823,7 +833,7 @@ function spineTitle(c, g) {
 
 /* ---------- data ---------- */
 function ingest(d) {
-  G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; MEDIA = d.media || {};
+  G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; MEDIA = d.media || {}; SHELVES = d.shelves || [];
   if (!uiEdits) UI = d.settings.ui;
   PATHS = d.settings.paths; APPINFO = d.settings.app || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
   applyUI();
@@ -838,9 +848,15 @@ function sections() {
     const fav = v.filter(g => FAV.has(g.id)).sort(byTitle);
     if (fav.length) out.push({key: "fav", name: "Favorites", face: true, games: fav});
   }
+  const order = SORTS[UI.sort] || byTitle;
+  /* shelves people made come first, each box still dressed for its own console */
+  if (!q) for (const sh of SHELVES) {
+    const ids = new Set(sh.ids), gs = v.filter(g => ids.has(g.id)).sort(order);
+    if (gs.length) out.push({key: "shelf:" + sh.name, name: sh.name, face: UI.shelf === "covers", games: gs});
+  }
   for (const s of SYSTEMS) {
     if (UI.hidden.indexOf(s) >= 0) continue;
-    const gs = v.filter(g => g.system === s && match(g)).sort(byTitle);
+    const gs = v.filter(g => g.system === s && match(g)).sort(order);
     if (gs.length) out.push({key: s, name: s, face: UI.shelf === "covers", games: gs});
   }
   return out;
@@ -1060,7 +1076,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "imp", "getg", "pick", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "welcome"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth; markUnder();
@@ -1176,7 +1192,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("ren") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1374,7 +1390,7 @@ function refresh(force) {
 }
 async function loadLibrary(force) {
   const r = await api("/api/library"); if (!r.ok) return;
-  const sig = () => G.map(g => [g.id, g.cv ? 1 : 0, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden;
+  const sig = () => G.map(g => [g.id, g.cv ? 1 : 0, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden + UI.sort + JSON.stringify(SHELVES);
   const before = sig(), art = new Map(G.map(g => [g.id, g.cv + "/" + g.lv]));
   ingest(r.data);
   if (force || sig() !== before) renderShelves(focusId);
@@ -1419,6 +1435,31 @@ async function pickCover(x) {
 $("#pclose").onclick = closePicker;
 $("#pgo").onclick = searchCovers;
 $("#pick").addEventListener("mousedown", e => { if (e.target === $("#pick")) closePicker(); });
+
+/* ---------- your own shelves: make one from a game's right-click menu, rename or delete it in Settings ---------- */
+let nsh = null;   // {id} making a shelf with this game on it, or {from} renaming that shelf
+function openShelfSlip(o) {
+  nsh = o; const ren = !!o.from;
+  $("#nsht").textContent = ren ? "Rename shelf" : "New shelf";
+  $("#nshp").textContent = ren ? "The name on its plate." : "Name it, like Couch co-op or To finish.";
+  $("#nshok").textContent = ren ? "Save" : "Make shelf";
+  $("#nshname").value = ren ? o.from : "";
+  if (isOpen("settings")) $("#settings").classList.remove("show");
+  $("#nsh").classList.add("show"); light();
+  setTimeout(() => { $("#nshname").focus(); $("#nshname").select(); }, 50);
+}
+function closeShelfSlip() { if (!isOpen("nsh")) return; $("#nsh").classList.remove("show"); nsh = null; focusById(focusId); light(); }
+async function saveShelfSlip() {
+  const o = nsh, name = $("#nshname").value.trim(); if (!o) return;
+  if (!name) return toast("Give the shelf a name.", true);
+  const r = await api("/api/shelves", o.from ? {op: "rename", name: o.from, to: name} : {op: "create", name, id: o.id});
+  if (!r.ok) return toast(r.data.error || "Couldn't save the shelf.", true);
+  closeShelfSlip(); await refresh(true);
+  if (o.id) focusById(o.id);
+  toast(o.from ? "Shelf renamed." : "Made the shelf “" + name + "”.");
+}
+$("#nshok").onclick = saveShelfSlip;
+$("#nshcancel").onclick = closeShelfSlip;
 
 /* ---------- rename ---------- */
 let renId = null;
@@ -1476,6 +1517,7 @@ function renderSettings() {
 
   H("Shelves");
   R("Shelf style", "Spines fit hundreds of games on a wall. Covers show every box face-out.", seg([["spines", "Spines"], ["covers", "Covers"]], UI.shelf, v => { UI.shelf = v; saveUI(); renderShelves(focusId); }));
+  R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
   rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
   R("Shelf size", "", rg);
@@ -1501,6 +1543,14 @@ function renderSettings() {
   R("Add games", "Or drag game files onto the window. They're copied into the games folder, sorted by system.", ab);
   const gg = el("button", "btn", "Open"); gg.onclick = openGetGames;
   R("Where to get games", "Copying games you own, free homebrew, and official re-releases.", gg);
+  if (!SHELVES.length) R("Your shelves", "Right-click any game and choose Add to Shelf to make one, like Couch co-op or To finish.", null);
+  SHELVES.forEach(sh => {
+    const bs = el("div", "btns"), rn = el("button", "btn", "Rename"), del = el("button", "btn", "Delete");
+    rn.onclick = () => openShelfSlip({from: sh.name});
+    del.onclick = async () => { const r = await api("/api/shelves", {op: "delete", name: sh.name}); if (!r.ok) return toast(r.data.error || "Couldn't delete it.", true); await refresh(true); renderSettings(); toast("Deleted the shelf. Its games are still on their console shelves."); };
+    bs.appendChild(rn); bs.appendChild(del);
+    R(sh.name, "Your shelf · " + plural(sh.ids.length, "game", "games"), bs);
+  });
   const rf = field(PATHS.roms_dir, PATHS.roms_ok, "roms");
   R("Games folder", PATHS.roms_ok ? G.length + " games found." : "Folder not found.", rf);
   const chips = el("div", "chips");
@@ -1515,11 +1565,15 @@ function renderSettings() {
     const bi = PATHS.builtin, ok = el("div", "fld"); ok.appendChild(el("i", "dot " + (PATHS.own ? "bad" : "ok")));
     R("Built-in emulators", "RetroArch " + bi.version + " with emulators for " + bi.systems + " systems, ready to go." + (PATHS.own ? " Not in use: you're using your own RetroArch." : ""), ok);
     R("Play fullscreen", "Games fill the screen. Turn off to play in a window.", sw(UI.fullscreen !== false, v => { UI.fullscreen = v; saveUI(); }));
+    R("Picture", "How games look: crisp pixels, softened, or with the scanlines of an old TV.", seg([["sharp", "Sharp"], ["smooth", "Smooth"], ["crt", "CRT"]], UI.picture || "sharp", v => { UI.picture = v; saveUI(); }));
     R("Pick up where you left off", "Saves your spot when you leave a game and starts there next time.", sw(UI.resume !== false, v => { UI.resume = v; saveUI(); }));
     R("In a game", "Hold Start (or press Esc) to come back to the shelf. Hold Select (or press F1) for the emulator's menu: save slots, controls, restart.", null);
     const fb = el("div", "btns"), f1 = el("button", "btn", "Saves"), f2 = el("button", "btn", "BIOS");
     f1.onclick = () => APP.openFolder("saves"); f2.onclick = () => APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
     R("Folders", "Game saves are kept in Documents › The Retro Shelf › Saves. BIOS files are needed for PS2 and PC Engine CD games, and can improve PS1, Dreamcast and DS.", fb);
+    const bk = el("button", "btn", "Back up…");
+    bk.onclick = async () => { const r = await APP.backupSaves(); if (r.ok) toast("Backed up " + plural(r.count, "file", "files") + "."); else if (r.error) toast(r.error, true); };
+    R("Back up saves", "Puts all your saves and resume points in one .zip file. To restore them, unzip it into Documents › The Retro Shelf.", bk);
     R("BIOS files", "Copied from your own consoles. Drop them on this window and they go in the right place." + (BIOSST ? "" : " Checking…"), null);
     if (BIOSST) {
       const bl = el("div", "biosl");
@@ -1654,6 +1708,7 @@ document.addEventListener("keydown", e => {
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
+  if (isOpen("nsh")) { if (k === "Escape") closeShelfSlip(); else if (k === "Enter") saveShelfSlip(); return; }
   if (isOpen("welcome")) { if (k === "Escape" || k === "Enter") closeWelcome(); return; }
   if (isOpen("getg")) { if (k === "Escape") closeGetGames(); return; }
   if (isOpen("settings")) { if (k === "Escape") closeSettings(); return; }
@@ -1697,6 +1752,7 @@ setInterval(() => {
   if (isOpen("imp")) { if (press("b")) $("#icancel").click(); }
   else if (isOpen("ren")) { if (press("b")) closeRename(); }
   else if (isOpen("pick")) { if (press("b")) closePicker(); }
+  else if (isOpen("nsh")) { if (press("b")) closeShelfSlip(); }
   else if (isOpen("welcome")) { if (press("a") || press("b")) closeWelcome(); }
   else if (isOpen("getg")) { if (press("b")) closeGetGames(); }
   else if (isOpen("settings")) { if (press("b")) closeSettings(); }
@@ -1732,6 +1788,7 @@ APP.onMenu(w => {
   else if (w === "get-games") openGetGames();
   else if (w && w.cmd === "rename") openRename(w.id);
   else if (w && w.cmd === "find-cover") openPicker(w.id);
+  else if (w && w.cmd === "new-shelf") openShelfSlip({id: w.id});
   else if (w && w.cmd === "play") play(byId.get(w.id), {fresh: w.fresh});
 });
 $("#lhint").textContent = "Hold Start or press Esc to come back here.";

@@ -27,6 +27,7 @@ function bundled(emuDir) {
     autoconfig: firstDir(path.join(emuDir, "autoconfig"), path.join(raDir, "autoconfig")),
     dolphinSys: path.join(emuDir, "dolphin-Sys"),
     ppsspp: path.join(emuDir, "PPSSPP"),
+    crt: path.join(emuDir, "shaders", "crt", "zfast-crt.slangp"),
   };
 }
 
@@ -63,6 +64,9 @@ function enforced(ra, dirs, opts) {
     savestate_auto_save: opts.resume ? "true" : "false",
     // a launch from a chosen save slot, or "start fresh", skips the resume point
     savestate_auto_load: opts.resume && opts.load !== false ? "true" : "false",
+    // the picture: sharp pixels, smoothed, or the scanlines of an old TV (a shader, passed with --set-shader)
+    video_smooth: opts.picture === "smooth" ? "true" : "false",
+    video_shader_enable: opts.picture === "crt" ? "true" : "false",
     // a picture with every save, shown on the back of the box
     savestate_thumbnail_enable: "true",
     autosave_interval: "10",

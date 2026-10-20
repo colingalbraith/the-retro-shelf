@@ -31,8 +31,12 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 - **Pull a box out to play,** or turn it over to see last played, playtime and your saves.
 - **Drag-and-drop import** that works out which console each file is for.
 - **Pick up where you left off:** leaving a game saves your spot.
-- **Art and details are automatic:** covers, logos, year, publisher and genre for 38,000+ games.
+- **Art and details are automatic:** covers, logos, year, publisher and genre for 38,000+ games. Wrong cover? Pick
+  the right one from a list.
+- **Your own shelves,** like "Couch co-op" or "To finish", and sorting by title, year or last played.
+- **CRT look:** play with sharp pixels, smoothed, or the scanlines of an old TV.
 - **Controllers just work:** Xbox, PlayStation and Switch Pro.
+- **Saves are safe:** back them all up to one file, and see which BIOS files each console has.
 - **Updates itself** in the background.
 - **Private:** no account, no tracking.
 

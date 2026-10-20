@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { Backend } = require("./backend");
 const { Updater } = require("./updater");
+const { zipFolder } = require("./zip");
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "arcade", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -143,6 +144,14 @@ function gameMenu(id) {
     { label: saves && saves.resume ? "Continue" : "Play", click: () => send({ cmd: "play", id: g.id }) },
     ...(saves && saves.resume ? [{ label: "Start Fresh", click: () => send({ cmd: "play", id: g.id, fresh: true }) }] : []),
     { type: "separator" },
+    { label: "Add to Shelf", submenu: [
+      ...backend.state.shelves.map(sh => ({ label: sh.name, type: "checkbox", checked: sh.ids.includes(g.id), click: () => {
+        backend.shelfOp({ op: sh.ids.includes(g.id) ? "remove" : "add", name: sh.name, id: g.id });
+        send({ cmd: "refresh", focus: g.id });
+      } })),
+      ...(backend.state.shelves.length ? [{ type: "separator" }] : []),
+      { label: "New Shelf…", click: () => send({ cmd: "new-shelf", id: g.id }) },
+    ] },
     { label: "Rename…", click: () => send({ cmd: "rename", id: g.id }) },
     { label: "Find Cover…", click: () => send({ cmd: "find-cover", id: g.id }) },
     { label: "Use My Own Cover…", click: () => pickPicture("cover") },
@@ -188,6 +197,15 @@ function ipc() {
   ipcMain.handle("reveal-game", (_, id) => { const g = backend.games.get(String(id)); if (g) shell.showItemInFolder(g.path); });
   ipcMain.handle("game-menu", (_, id) => gameMenu(String(id)));
   ipcMain.handle("open-url", (_, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
+  ipcMain.handle("backup-saves", async () => {
+    const saves = backend.folders.saves;
+    if (!fs.existsSync(saves) || !fs.readdirSync(saves).some(f => !f.startsWith("."))) return { ok: false, error: "There are no saves to back up yet." };
+    const r = await dialog.showSaveDialog(win, { title: "Back up saves", buttonLabel: "Back Up",
+      defaultPath: path.join(app.getPath("documents"), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: "Zip archive", extensions: ["zip"] }] });
+    if (r.canceled || !r.filePath) return { ok: false };
+    try { return { ok: true, count: zipFolder(saves, r.filePath), path: r.filePath }; }
+    catch (e) { return { ok: false, error: "Couldn't make the backup: " + e.message }; }
+  });
   ipcMain.handle("update", (_, what) => {
     if (what === "check") return updater.check(true);
     if (what === "restart") return updater.restart();
