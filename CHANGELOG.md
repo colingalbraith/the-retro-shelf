@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0-beta.5
+
+- **Progress, ratings and notes:** mark a game backlog, playing, beaten or 100%, give it one to five stars, and write
+  a note on the back of its box. Arrange the shelves by progress, sort by rating, and see a Top rated shelf.
+- **Watched folders:** Settings → Library → Watch a folder. Games there show on the shelves where they are, without
+  being copied, and new ones appear by themselves. When a file could be for more than one console, you choose.
+- **Games from RetroArch:** if RetroArch is installed with playlists, Settings offers to bring those games in.
+- **Search** forgives spelling ("zelad" finds Zelda) and understands consoles, years, decades, genres and progress:
+  try "snes rpg" or "90s".
+- **Pick several games** with ⌘/Ctrl-click (or X) to put them on a shelf, set their progress or hide them at once.
+- **Surprise me** (R, or in the options) picks a game you haven't played.
+- **The same game twice:** Settings lists games you have more than one copy of, to keep one. Hidden games have a list
+  too, to bring them back.
+
 ## 0.4.0-beta.4
 
 - **Eight more consoles:** Atari 7800, ColecoVision, Intellivision, Vectrex, MSX, 3DO, Neo Geo CD and Pokémon Mini.

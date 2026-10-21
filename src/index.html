@@ -392,6 +392,13 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .tplate small{font-size:10px;opacity:.75;letter-spacing:.06em}
 /* consoles: boxes lying flat, a taller pile for more time */
 .stacks{gap:30px;margin-top:70px}
+/* a box picked to do something to several at once: a tick at the top */
+.pk{position:absolute;z-index:3;display:grid;place-items:center;border-radius:50%;background:var(--acc);color:var(--accf);font:700 11px/1 var(--disp);box-shadow:0 1px 2px rgba(0,0,0,.5)}
+.sp .pk{width:16px;height:16px;left:50%;margin-left:-8px;top:max(6px,var(--h) * .06)}
+.cv .pk{width:15%;aspect-ratio:1;height:auto;top:4%;left:5%;font-size:calc(var(--cw) * .08)}
+#pickbar{position:fixed;left:50%;bottom:52px;z-index:120;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;transform:translate(-50%,20px);opacity:0;visibility:hidden;background:var(--paper);color:var(--ink);box-shadow:0 14px 34px rgba(0,0,0,.6);transition:transform .18s,opacity .18s,visibility .18s;font:600 14px var(--disp)}
+#pickbar.show{transform:translate(-50%,0);opacity:1;visibility:visible}
+#pickbar .btn{padding:6px 10px;font-size:13px}
 .stk-c{position:relative;flex:none;display:flex;flex-direction:column-reverse;align-items:center;width:96px}
 .tcard{position:relative;max-width:660px;margin:84px auto 0;padding:30px 32px 26px;background:var(--paper);color:var(--ink);transform:rotate(-.7deg);
   box-shadow:0 14px 28px rgba(0,0,0,.5),0 2px 3px rgba(0,0,0,.4)}
@@ -626,6 +633,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
 <div id="app">
   <main id="shelves" tabindex="-1"></main>
   <footer id="hintbar"></footer>
+  <div id="pickbar" role="toolbar" aria-label="Picked games"><span id="pickn"></span><button class="btn" id="pkshelf">Put on a shelf…</button><button class="btn" id="pkprog">Progress…</button><button class="btn" id="pkhide">Hide</button><button class="btn primary" id="pkclear">Done</button></div>
 </div>
 <div id="light"></div>
 <div id="strip">
@@ -1179,7 +1187,9 @@ function loadCover(c, g) {
   im.src = src;
 }
 function stickers(c, g) {
-  c.querySelectorAll(".stk").forEach(s => s.remove());
+  c.querySelectorAll(".stk,.pk").forEach(s => s.remove());
+  c.classList.toggle("picked", PICKED.has(g.id));
+  if (PICKED.has(g.id)) { c.querySelector(".sp").appendChild(el("span", "pk", "✓")); c.querySelector(".cv").appendChild(el("span", "pk", "✓")); }
   if (!FAV.has(g.id)) return;
   c.querySelector(".sp").appendChild(el("span", "stk"));
   c.querySelector(".cv").appendChild(el("span", "stk", "★"));
@@ -1277,7 +1287,11 @@ function slot(g, face, i) {
   c.appendChild(box(c, g)); stickers(c, g);
   if (face || (g.cv && SEEN.has("/cover/" + g.id + "?v=" + g.cv))) fillCover(c, g); else if (g.cv && io) io.observe(c);
   hookSlot(c);
-  c.onclick = e => { if (e.target.closest("button")) return; if (sel !== c) c.focus({preventScroll: true}); else flip(); };
+  c.onclick = e => {
+    if (e.target.closest("button")) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey) { togglePick(g.id); return; }
+    if (sel !== c) c.focus({preventScroll: true}); else flip();
+  };
   c.ondblclick = e => { if (!e.target.closest("button")) play(g); };
   c.oncontextmenu = e => { e.preventDefault(); c.focus({preventScroll: true}); APP.gameMenu(g.id); };
   return c;
@@ -1781,6 +1795,23 @@ function openOpts(sub) {
     $("#optst").textContent = "Put " + g.title + " on a shelf";
     SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast((on ? "Took it off " : "Put it on ") + sh.name + "."); }); });
     item("New shelf…", () => openShelfSlip({id: g.id}));
+  } else if (sub === "shelfMany" || sub === "progressMany") {
+    /* the same thing for every picked game */
+    const ids = [...PICKED];
+    if (sub === "shelfMany") {
+      $("#optst").textContent = t("Put {n} on a shelf", {n: plural(ids.length, "game", "games")});
+      SHELVES.forEach(sh => item(sh.name, async () => {
+        for (const id of ids) if (!sh.ids.includes(id)) await api("/api/shelves", {op: "add", name: sh.name, id});
+        clearPicks(); await refresh(true); toast(t("Put {n} on {shelf}.", {n: plural(ids.length, "game", "games"), shelf: sh.name}));
+      }));
+      item(t("New shelf…"), () => openShelfSlip({ids}));
+    } else {
+      $("#optst").textContent = t("How far are you with these {n}?", {n: ids.length});
+      [...Object.entries(PROGRESS), [null, "Not set"]].forEach(([k, name]) => item(t(name), async () => {
+        for (const id of ids) await api("/api/game/info", {id, progress: k});
+        clearPicks(); await refresh(true);
+      }));
+    }
   } else if (g && (sub === "progress" || sub === "rating")) {
     /* how far you are, or how good it is */
     const set = v => async () => {
@@ -1823,6 +1854,13 @@ function openOpts(sub) {
       item("Rename…", () => openRename(g.id));
       item(g.hidden ? "Show on shelves" : "Hide from shelves", async () => { await api("/api/game/hide", {id: g.id, hidden: !g.hidden}); refresh(true); });
       list.appendChild(el("i", "sep"));
+    }
+    if (g) item(PICKED.has(g.id) ? t("Unpick") : t("Pick (to do things to several at once)"), () => togglePick(g.id));
+    if (PICKED.size) {
+      item(t("Picked ({n}): put on a shelf…", {n: PICKED.size}), () => setTimeout(() => openOpts("shelfMany"), 30));
+      item(t("Picked ({n}): progress…", {n: PICKED.size}), () => setTimeout(() => openOpts("progressMany"), 30));
+      item(t("Picked ({n}): hide", {n: PICKED.size}), () => hidePicked());
+      item(t("Let go of the picked games"), () => clearPicks());
     }
     item(t("Surprise me"), () => surprise());
     item("Search…", () => { $("#q").focus(); paintQ(); if (Date.now() - padAt < 2000) openOsk($("#q")); });
@@ -2029,8 +2067,10 @@ function closeShelfSlip() { if (!isOpen("nsh")) return; $("#nsh").classList.remo
 async function saveShelfSlip() {
   const o = nsh, name = $("#nshname").value.trim(); if (!o) return;
   if (!name) return toast("Give the shelf a name.", true);
-  const r = await api("/api/shelves", o.from ? {op: "rename", name: o.from, to: name} : {op: "create", name, id: o.id});
+  const r = await api("/api/shelves", o.from ? {op: "rename", name: o.from, to: name} : {op: "create", name, id: o.id || (o.ids || [])[0]});
   if (!r.ok) return toast(r.data.error || "Couldn't save the shelf.", true);
+  /* a new shelf for picked games: all of them go on it */
+  if (o.ids) { for (const id of o.ids.slice(1)) await api("/api/shelves", {op: "add", name, id}); clearPicks(); }
   closeShelfSlip(); await refresh(true);
   if (o.id) focusById(o.id);
   if (isOpen("colls")) openColls("mine");
@@ -2078,6 +2118,25 @@ function closeNews() { if (!isOpen("news")) return; $("#news").classList.remove(
 function leaveScreens(keep) {
   for (const id of ["settings", "getg", "colls", "trophy"]) if (id !== keep && isOpen(id)) { $("#" + id).classList.remove("show"); if (id === "colls" && collIO) collIO.disconnect(); }
 }
+
+/* ---------- picking several games, to put them on a shelf, set their progress or hide them all at once ---------- */
+const PICKED = new Set();
+function paintPicks() {
+  for (const c of $$("#shelves .card")) { const g = byId.get(c.dataset.id); if (g && c.classList.contains("picked") !== PICKED.has(g.id)) stickers(c, g); }
+  $("#pickn").textContent = t("{n} picked", {n: PICKED.size});
+  $("#pickbar").classList.toggle("show", PICKED.size > 0);
+}
+function togglePick(id) { if (PICKED.has(id)) PICKED.delete(id); else PICKED.add(id); paintPicks(); beep(PICKED.has(id) ? 700 : 500, .03); }
+function clearPicks() { PICKED.clear(); paintPicks(); }
+async function hidePicked() {
+  const ids = [...PICKED];
+  for (const id of ids) await api("/api/game/hide", {id, hidden: true});
+  clearPicks(); await refresh(true); toast(t("Hid {n}. Settings → Library lists hidden games.", {n: plural(ids.length, "game", "games")}));
+}
+$("#pkclear").onclick = clearPicks;
+$("#pkhide").onclick = hidePicked;
+$("#pkshelf").onclick = () => openOpts("shelfMany");
+$("#pkprog").onclick = () => openOpts("progressMany");
 
 /* ---------- a list of games, each with something to do: hidden games, copies of one game ---------- */
 let listFill = null;
@@ -2743,7 +2802,8 @@ document.addEventListener("keydown", e => {
   else if (k === "ArrowDown") { e.preventDefault(); moveV(1); }
   else if (k === "ArrowUp") { e.preventDefault(); moveV(-1); }
   else if (k === " ") { e.preventDefault(); flip(); }
-  else if (k === "Escape") { if (sel && sel.classList.contains("flip")) flip(); else if (q) setQ(""); }
+  else if (k === "Escape") { if (sel && sel.classList.contains("flip")) flip(); else if (q) setQ(""); else if (PICKED.size) clearPicks(); }
+  else if ((k === "x" || k === "X") && selGame()) togglePick(selGame().id);
   else if (k === "q" || k === "Q") jump(-1);
   else if (k === "e" || k === "E") jump(1);
   else if (k === "s" || k === "S") openSettings();
