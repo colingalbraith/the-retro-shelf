@@ -37,7 +37,7 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
   sort by title, year or last played.
 - **Collections:** every series your games belong to, with the ones you don't have yet standing faded, and wishlists
   of your own.
-- **Your play:** a trophy shelf of your most played games, a time card stamped with the days you played, and 147
+- **Your play:** a trophy shelf of your most played games, a time card stamped with the days you played, and 208
   pins to earn, no account needed.
 - **TV mode:** fullscreen and bigger, and everything works from a controller, with an on-screen keyboard for search.
 - **CRT look:** play with sharp pixels, smoothed, or the scanlines of an old TV.
