@@ -45,7 +45,6 @@
  "A dark wall like a den, or a light one like a living room.": "隠れ家のような暗い壁か、リビングのような明るい壁。",
  "A game is already running.": "すでにゲームが起動しています。",
  "A line or two for yourself, like where you're stuck. It goes on the back of the box.": "自分用のひとことメモです。詰まっている場所などを書いておけます。箱の裏に表示されます。",
- "A new tune.": "新しい曲です。",
  "A rating goes from 1 to 5.": "評価は 1 から 5 までです。",
  "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.": "ゲーム機ごとの棚にするか、ジャンル、年代、進み具合でまとめます。",
  "A types · X deletes · Y space · B done": "A 入力 · X 削除 · Y スペース · B 完了",
@@ -78,7 +77,6 @@
  "Already adding games.": "すでにゲームを追加中です。",
  "Always show controls": "操作ガイドを常に表示",
  "Animations": "アニメーション",
- "Another tune": "別の曲",
  "Any game for these consoles, yours or not. The ones you don't have yet stand faded.": "これらのゲーム機のゲームを、持っているかどうかに関係なくすべて表示します。まだ持っていないものは薄く表示されます。",
  "App": "アプリ",
  "Apply": "適用",
@@ -392,7 +390,6 @@
  "Lifer": "筋金入り",
  "Light": "明るい",
  "List": "一覧",
- "Little chiptunes on the shelves, made up by the app as it plays them. They stop while you play.": "棚で流れる小さなチップチューンです。アプリがその場で作曲して演奏します。ゲーム中は止まります。",
  "Living Room Legend": "リビングの伝説",
  "Loading your shelves": "棚を準備中",
  "Long List": "ほしいものリスト",
@@ -896,5 +893,8 @@
  "Your trophy shelf": "トロフィー棚",
  "yours": "所持",
  "Yours": "マイコレクション",
- "Zip archive": "Zip アーカイブ"
+ "Zip archive": "Zip アーカイブ",
+ "Next track": "次の曲",
+ "Chiptunes on the shelves, free for anyone to use. They stop while you play.": "棚で流れるチップチューンです。誰でも自由に使える曲です。ゲーム中は止まります。",
+ "Now: {title} by {by}.": "再生中：{by}の「{title}」。"
 }

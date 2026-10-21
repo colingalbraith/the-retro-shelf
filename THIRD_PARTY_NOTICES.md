@@ -93,6 +93,17 @@ license (in `blueMSX/Machines/*/cbios.txt`), with blueMSX's game databases. Both
 MIT License. Electron bundles Chromium, Node.js and other components; their notices ship in the app as
 `LICENSES.chromium.html` and `LICENSE.electron.txt`.
 
+## Menu music
+
+From OpenGameArt, each given to the public domain by its maker (CC0 1.0,
+https://creativecommons.org/publicdomain/zero/1.0/). Credited with thanks, though CC0 doesn't ask for it.
+
+- “Stage Select” by Juhani Junkala, from Chiptune Adventures: https://opengameart.org/content/4-chiptunes-adventure
+- “Title Screen” by Juhani Junkala, from 5 Chiptunes (Action): https://opengameart.org/content/5-chiptunes-action
+- “forgotten path” by johndekale: https://opengameart.org/content/forgotten-path
+- “Title Screen” by Aureolus_Omicron, from 15 Melodic RPG Chiptunes: https://opengameart.org/content/15-melodic-rpg-chiptunes
+- “Town” by Aureolus_Omicron, from 15 Melodic RPG Chiptunes: https://opengameart.org/content/15-melodic-rpg-chiptunes
+
 ## IBM Plex
 
 IBM Plex Sans Condensed and IBM Plex Mono, SIL Open Font License 1.1 (`src/fonts/OFL.txt`).

@@ -45,7 +45,6 @@
  "A dark wall like a den, or a light one like a living room.": "Eine dunkle Wand wie im Hobbykeller oder eine helle wie im Wohnzimmer.",
  "A game is already running.": "Es läuft schon ein Spiel.",
  "A line or two for yourself, like where you're stuck. It goes on the back of the box.": "Ein, zwei Zeilen für dich, etwa wo du feststeckst. Sie kommen auf die Rückseite der Hülle.",
- "A new tune.": "Eine neue Melodie.",
  "A rating goes from 1 to 5.": "Bewertungen gehen von 1 bis 5.",
  "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.": "Ein Regal pro Konsole – oder Spiele nach Genre, Jahrzehnt oder danach, wie weit du bist.",
  "A types · X deletes · Y space · B done": "A tippt · X löscht · Y Leerzeichen · B fertig",
@@ -78,7 +77,6 @@
  "Already adding games.": "Spiele werden schon hinzugefügt.",
  "Always show controls": "Steuerung immer zeigen",
  "Animations": "Animationen",
- "Another tune": "Andere Melodie",
  "Any game for these consoles, yours or not. The ones you don't have yet stand faded.": "Jedes Spiel für diese Konsolen, ob deins oder nicht. Die, die du noch nicht hast, stehen blass da.",
  "App": "App",
  "Apply": "Übernehmen",
@@ -392,7 +390,6 @@
  "Lifer": "Alter Hase",
  "Light": "Hell",
  "List": "Liste",
- "Little chiptunes on the shelves, made up by the app as it plays them. They stop while you play.": "Kleine Chiptunes in den Regalen, die die App beim Abspielen selbst erfindet. Sie verstummen, während du spielst.",
  "Living Room Legend": "Wohnzimmerlegende",
  "Loading your shelves": "Deine Regale werden geladen",
  "Long List": "Wunschzettel",
@@ -896,5 +893,8 @@
  "Your trophy shelf": "Dein Trophäenregal",
  "yours": "deins",
  "Yours": "Eigene",
- "Zip archive": "Zip-Archiv"
+ "Zip archive": "Zip-Archiv",
+ "Next track": "Nächster Titel",
+ "Chiptunes on the shelves, free for anyone to use. They stop while you play.": "Chiptunes in den Regalen, frei für alle. Sie verstummen, während du spielst.",
+ "Now: {title} by {by}.": "Gerade: {title} von {by}."
 }

@@ -45,7 +45,6 @@
  "A dark wall like a den, or a light one like a living room.": "Un mur sombre façon tanière, ou clair façon salon.",
  "A game is already running.": "Un jeu est déjà lancé.",
  "A line or two for yourself, like where you're stuck. It goes on the back of the box.": "Une ligne ou deux pour vous, par exemple là où vous bloquez. Elle va au dos de la boîte.",
- "A new tune.": "Un nouvel air.",
  "A rating goes from 1 to 5.": "Une note va de 1 à 5.",
  "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.": "Une étagère par console, ou les jeux groupés par genre, par décennie ou selon où vous en êtes.",
  "A types · X deletes · Y space · B done": "A écrit · X efface · Y espace · B terminé",
@@ -78,7 +77,6 @@
  "Already adding games.": "Ajout de jeux déjà en cours.",
  "Always show controls": "Toujours afficher les commandes",
  "Animations": "Animations",
- "Another tune": "Un autre air",
  "Any game for these consoles, yours or not. The ones you don't have yet stand faded.": "N'importe quel jeu de ces consoles, à vous ou non. Ceux qui vous manquent sont pâlis.",
  "App": "Application",
  "Apply": "Appliquer",
@@ -392,7 +390,6 @@
  "Lifer": "Abonné à vie",
  "Light": "Clair",
  "List": "Liste",
- "Little chiptunes on the shelves, made up by the app as it plays them. They stop while you play.": "De petites musiques chiptune sur les étagères, inventées par l'app à mesure qu'elle les joue. Elles s'arrêtent pendant que vous jouez.",
  "Living Room Legend": "Légende du salon",
  "Loading your shelves": "Chargement de vos étagères",
  "Long List": "Longue liste",
@@ -896,5 +893,8 @@
  "Your trophy shelf": "Votre étagère à trophées",
  "yours": "à vous",
  "Yours": "À vous",
- "Zip archive": "Archive zip"
+ "Zip archive": "Archive zip",
+ "Next track": "Piste suivante",
+ "Chiptunes on the shelves, free for anyone to use. They stop while you play.": "Des musiques chiptune sur les étagères, libres pour tout le monde. Elles s'arrêtent pendant que vous jouez.",
+ "Now: {title} by {by}.": "En ce moment : {title}, de {by}."
 }

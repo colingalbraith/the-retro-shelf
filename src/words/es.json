@@ -45,7 +45,6 @@
  "A dark wall like a den, or a light one like a living room.": "Una pared oscura como un estudio, o una clara como un salón.",
  "A game is already running.": "Ya hay un juego abierto.",
  "A line or two for yourself, like where you're stuck. It goes on the back of the box.": "Una o dos líneas para ti, como dónde te has atascado. Va en la parte de atrás de la caja.",
- "A new tune.": "Una melodía nueva.",
  "A rating goes from 1 to 5.": "La puntuación va de 1 a 5.",
  "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.": "Un estante por consola, o juegos agrupados por género, por década o por lo avanzado que vas.",
  "A types · X deletes · Y space · B done": "A escribe · X borra · Y espacio · B listo",
@@ -78,7 +77,6 @@
  "Already adding games.": "Ya se están añadiendo juegos.",
  "Always show controls": "Mostrar siempre los controles",
  "Animations": "Animaciones",
- "Another tune": "Otra melodía",
  "Any game for these consoles, yours or not. The ones you don't have yet stand faded.": "Cualquier juego de estas consolas, tuyo o no. Los que aún no tienes aparecen atenuados.",
  "App": "App",
  "Apply": "Aplicar",
@@ -392,7 +390,6 @@
  "Lifer": "Veterano",
  "Light": "Clara",
  "List": "Lista",
- "Little chiptunes on the shelves, made up by the app as it plays them. They stop while you play.": "Pequeñas melodías chiptune en los estantes, que la app inventa mientras suenan. Se paran mientras juegas.",
  "Living Room Legend": "Leyenda del salón",
  "Loading your shelves": "Cargando tus estantes",
  "Long List": "Lista de deseos",
@@ -896,5 +893,8 @@
  "Your trophy shelf": "Tu vitrina de trofeos",
  "yours": "tuyo",
  "Yours": "Tuyas",
- "Zip archive": "Archivo zip"
+ "Zip archive": "Archivo zip",
+ "Next track": "Siguiente pista",
+ "Chiptunes on the shelves, free for anyone to use. They stop while you play.": "Música chiptune en los estantes, libre para que cualquiera la use. Se para mientras juegas.",
+ "Now: {title} by {by}.": "Ahora: {title}, de {by}."
 }

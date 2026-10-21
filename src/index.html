@@ -2361,84 +2361,46 @@ setInterval(() => {
   else if (!SAVER && UI.tv && UI.saver > 0 && idle > UI.saver * 60000 && !STATUS.running && !LAUNCH.open && !anyScreen() && document.hasFocus()) startSaver();
 }, 5000);
 
-/* ---------- menu music: little tunes the app makes up as it plays them, so there's no recording to license ---------- */
-const MUSIC = {on: false, timer: 0, next: 0, step: 0, loops: 0, tune: null, out: null, seed: Math.floor(Math.random() * 1e9)};
-const MUSIC_VOL = {quiet: .05, medium: .1, loud: .18};
-/* a tune from a number: the same number makes the same tune. Four bars of a chord progression, twice, with a bass,
-   an arpeggio, a melody that leans on the chords' notes, and a soft hi-hat */
-function makeTune(seed) {
-  let x = (seed >>> 0) || 1;
-  const rnd = () => (x = (Math.imul(x, 1103515245) + 12345) >>> 0) / 4294967296, pick = a => a[Math.floor(rnd() * a.length)];
-  const minor = rnd() < .35, scale = minor ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
-  const prog = pick(minor ? [[0, 5, 6, 4], [0, 3, 4, 0], [0, 6, 5, 4], [0, 5, 3, 4]] : [[0, 5, 3, 4], [0, 3, 4, 0], [0, 4, 5, 3], [3, 4, 0, 5], [0, 3, 0, 4]]);
-  const root = 45 + pick([0, 2, 3, 5, 7]), bpm = 88 + Math.floor(rnd() * 36);
-  const note = (deg, oct) => root + 12 * (oct + Math.floor(deg / 7)) + scale[((deg % 7) + 7) % 7];
-  const steps = [];
-  let deg = 7 + prog[0] + pick([0, 2, 4]);
-  const bars = [];
-  for (let b = 0; b < 4; b++) {
-    const ch = prog[b], tones = [ch, ch + 2, ch + 4], bar = [];
-    for (let i = 0; i < 8; i++) {
-      const s = {bass: i % 4 === 0 ? note(ch, 0) : i % 4 === 2 && rnd() < .5 ? note(ch, 1) : null, arp: note(tones[i % 3] + 7, 0), hat: i % 2 === 1, lead: null, len: 1};
-      /* the melody: on the beat a note of the chord, between beats a step up or down; a rest now and then */
-      if (rnd() < (i % 2 ? .55 : .8)) {
-        if (i % 2 === 0) { const c = tones.map(t => t + 7 * Math.round((deg - t) / 7)); deg = c.reduce((a, b) => Math.abs(b - deg) < Math.abs(a - deg) ? b : a); }
-        else deg += pick([-1, 1, 1, -2, 2]);
-        deg = Math.max(5, Math.min(16, deg));
-        s.lead = note(deg, 1); s.len = rnd() < .3 ? 2 : 1;
-      }
-      bar.push(s);
-    }
-    bars.push(bar);
-  }
-  /* bar three answers bar one; the last bar comes home to the first chord's note */
-  bars[2] = bars[2].map((s, i) => i < 4 && bars[0][i].lead ? {...s, lead: bars[0][i].lead} : s);
-  bars[3][6] = {...bars[3][6], lead: note(7 + prog[0], 1), len: 2}; bars[3][7] = {...bars[3][7], lead: null};
-  for (let r = 0; r < 2; r++) for (const bar of bars) for (const s of bar) steps.push(s);
-  return {bpm, steps};
-}
-let DUTY = null;
-function voice(type, midi, t, dur, vol) {
-  const o = AC.createOscillator(), g = AC.createGain();
-  if (type === "pulse") { DUTY = DUTY || AC.createPeriodicWave(...(() => { const n = 24, re = new Float32Array(n), im = new Float32Array(n); for (let k = 1; k < n; k++) im[k] = 2 / (k * Math.PI) * Math.sin(k * Math.PI * .25); return [re, im]; })()); o.setPeriodicWave(DUTY); }
-  else o.type = type;
-  o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
-  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(vol * .45, t + dur * .6); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  o.connect(g); g.connect(MUSIC.out); o.start(t); o.stop(t + dur + .02);
-}
-let HAT = null;
-function hat(t) {
-  if (!HAT) {
-    const len = Math.floor(AC.sampleRate * .03), d = (HAT = AC.createBuffer(1, len, AC.sampleRate)).getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-  }
-  const src = AC.createBufferSource(), hp = AC.createBiquadFilter(), g = AC.createGain();
-  hp.type = "highpass"; hp.frequency.value = 7000; g.gain.value = .12;
-  src.buffer = HAT; src.connect(hp); hp.connect(g); g.connect(MUSIC.out); src.start(t);
+/* ---------- menu music: chiptunes anyone may use (CC0, from OpenGameArt; credits on the Licenses page), shuffled. Each
+   loops seamlessly for about a minute and a half, at most four times round, then fades into the next ---------- */
+const MUSIC = {on: false, out: null, cur: null, timer: 0, tracks: null, order: [], last: -1, n: 0};
+const MUSIC_VOL = {quiet: .18, medium: .35, loud: .6};
+async function musicTracks() {
+  if (!MUSIC.tracks) { try { MUSIC.tracks = await (await fetch("/music/tracks.json")).json(); } catch (e) { MUSIC.tracks = []; } }
+  return MUSIC.tracks;
 }
 function musicVolume() { if (MUSIC.out) MUSIC.out.gain.setTargetAtTime(MUSIC.on ? MUSIC_VOL[UI.musicVol] || MUSIC_VOL.medium : 0, AC.currentTime, .4); }
-function newTune() { MUSIC.seed = (MUSIC.seed + 7919) % 1e9; MUSIC.tune = makeTune(MUSIC.seed); MUSIC.step = 0; MUSIC.loops = 0; }
+/* the one playing fades out over a second */
+function musicFade(cur) {
+  if (!cur) return;
+  try { const t = AC.currentTime; cur.g.gain.cancelScheduledValues(t); cur.g.gain.setValueAtTime(cur.g.gain.value, t); cur.g.gain.linearRampToValueAtTime(.0001, t + 1); cur.src.stop(t + 1.05); } catch (e) {}
+}
+async function nextTrack() {
+  const tracks = await musicTracks(), n = ++MUSIC.n;
+  if (!tracks.length || !MUSIC.on) return;
+  /* shuffled, a new order each time round, never the same one twice running */
+  if (!MUSIC.order.length) { MUSIC.order = tracks.map((_, i) => i).sort(() => Math.random() - .5); if (MUSIC.order[0] === MUSIC.last && MUSIC.order.length > 1) MUSIC.order.push(MUSIC.order.shift()); }
+  const i = MUSIC.order.shift(), tr = tracks[i]; MUSIC.last = i;
+  let buf;
+  try { buf = await AC.decodeAudioData(await (await fetch("/music/" + tr.file)).arrayBuffer()); } catch (e) { return; }
+  if (n !== MUSIC.n || !MUSIC.on) return;
+  musicFade(MUSIC.cur);
+  const src = AC.createBufferSource(), g = AC.createGain(), level = tr.gain || 1;
+  src.buffer = buf; src.loop = true; src.connect(g); g.connect(MUSIC.out);
+  const t = AC.currentTime + .05, plays = Math.max(1, Math.min(4, Math.round(90 / buf.duration))), end = t + plays * buf.duration;
+  g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(level, t + .6);
+  g.gain.setValueAtTime(level, end - 2); g.gain.linearRampToValueAtTime(.0001, end); src.start(t); src.stop(end + .05);
+  MUSIC.cur = {src, g, track: tr};
+  clearTimeout(MUSIC.timer); MUSIC.timer = setTimeout(nextTrack, (end - AC.currentTime - 1) * 1000);
+}
 function startMusic() {
   try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
   if (AC.state === "suspended") AC.resume();
-  if (!MUSIC.out) { const lp = AC.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200; MUSIC.out = AC.createGain(); MUSIC.out.gain.value = 0; MUSIC.out.connect(lp); lp.connect(AC.destination); }
-  if (!MUSIC.tune) newTune();
-  MUSIC.on = true; musicVolume(); MUSIC.next = AC.currentTime + .1;
-  clearInterval(MUSIC.timer);
-  MUSIC.timer = setInterval(() => {
-    /* a little ahead of time, so the notes land on the beat */
-    while (MUSIC.next < AC.currentTime + .25) {
-      const tu = MUSIC.tune, s = tu.steps[MUSIC.step], e = 30 / tu.bpm;
-      if (s.lead) voice("pulse", s.lead, MUSIC.next, e * s.len * .95, .16);
-      if (s.bass) voice("triangle", s.bass, MUSIC.next, e * 1.8, .3);
-      voice("square", s.arp, MUSIC.next, e * .5, .025);
-      if (s.hat) hat(MUSIC.next);
-      MUSIC.next += e;
-      if (++MUSIC.step >= tu.steps.length) { MUSIC.step = 0; if (++MUSIC.loops >= 3) { newTune(); MUSIC.next += e * 4; } }
-    }
-  }, 60);
+  if (!MUSIC.out) { MUSIC.out = AC.createGain(); MUSIC.out.gain.value = 0; MUSIC.out.connect(AC.destination); }
+  MUSIC.on = true; musicVolume(); nextTrack();
 }
-function stopMusic() { MUSIC.on = false; musicVolume(); clearInterval(MUSIC.timer); MUSIC.timer = 0; }
+/* paused for a game or another window: the track fades out, and a new one starts when it comes back */
+function stopMusic() { MUSIC.on = false; MUSIC.n++; clearTimeout(MUSIC.timer); musicVolume(); musicFade(MUSIC.cur); MUSIC.cur = null; }
 /* on the shelves only: not during a game, and not while the window is behind others */
 function musicTick() {
   const want = !!UI.music && !STATUS.running && !LAUNCH.open && document.hasFocus();
@@ -3095,11 +3057,11 @@ function renderSettings() {
   R(t("Screensaver"), t("In TV mode, after a while with nothing pressed: the shelves drift and pictures from your games fade through. Any button wakes it."),
     seg([[0, t("Off")], [5, t("5 min")], [10, t("10 min")], [20, t("20 min")]], UI.saver ?? 5, v => { UI.saver = v; saveUI(); }));
   R("Sound", "Short clicks when you move and select.", sw(UI.sound, v => { UI.sound = v; saveUI(); if (v) beep(660); }));
-  const mu = el("div", "btns"), nx = el("button", "btn", t("Another tune"));
-  nx.onclick = () => { newTune(); toast(t("A new tune.")); };
+  const mu = el("div", "btns"), nx = el("button", "btn", t("Next track"));
+  nx.onclick = () => nextTrack();
   mu.appendChild(sw(!!UI.music, v => { UI.music = v; saveUI(); musicTick(); renderSettings(); }));
   if (UI.music) mu.appendChild(nx);
-  R(t("Menu music"), t("Little chiptunes on the shelves, made up by the app as it plays them. They stop while you play."), mu);
+  R(t("Menu music"), t("Chiptunes on the shelves, free for anyone to use. They stop while you play.") + (MUSIC.cur ? " " + t("Now: {title} by {by}.", {title: MUSIC.cur.track.title, by: MUSIC.cur.track.by}) : ""), mu);
   if (UI.music) R(t("Music volume"), "", seg([["quiet", t("Quiet")], ["medium", t("Medium")], ["loud", t("Loud")]], UI.musicVol || "medium", v => { UI.musicVol = v; saveUI(); musicVolume(); }));
   R("Always show controls", "Otherwise they show for a few seconds at start.", sw(UI.hints, v => { UI.hints = v; applyUI(); saveUI(); if (!v) showHintsBriefly(); }));
   const fs = el("button", "btn", "Go fullscreen"); fs.onclick = () => { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else HTML.requestFullscreen && HTML.requestFullscreen(); };
