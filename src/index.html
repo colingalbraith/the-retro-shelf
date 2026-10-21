@@ -317,7 +317,7 @@ kbd{font:600 11.5px/1 var(--disp);color:var(--chalk);border:1px solid #4a453e;bo
 #toast.bad{border-left-color:#c23b22}
 
 /* ---------- launch: the box turns to face you on its own shelf ---------- */
-#launch{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:none;align-items:center;justify-content:center;
+#launch{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:none;align-items:safe center;justify-content:center;overflow-y:auto;
   background:radial-gradient(circle 420px at 50% 38%,rgba(255,206,150,.09),transparent 70%),var(--floor)}
 #launch.show{display:flex}
 html:not([data-fx="off"]) #launch.show{animation:fade .2s ease}
@@ -406,6 +406,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .cv .pk{width:15%;aspect-ratio:1;height:auto;top:4%;left:5%;font-size:calc(var(--cw) * .08)}
 #pickbar{position:fixed;left:50%;bottom:52px;z-index:120;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;transform:translate(-50%,20px);opacity:0;visibility:hidden;background:var(--paper);color:var(--ink);box-shadow:0 14px 34px rgba(0,0,0,.6);transition:transform .18s,opacity .18s,visibility .18s;font:600 14px var(--disp)}
 #pickbar.show{transform:translate(-50%,0);opacity:1;visibility:visible}
+.playing #pickbar{visibility:hidden}
 #pickbar .btn{padding:6px 10px;font-size:13px}
 .stk-c{position:relative;flex:none;display:flex;flex-direction:column-reverse;align-items:center;width:96px}
 .tcard{position:relative;max-width:660px;margin:84px auto 0;padding:30px 32px 26px;background:var(--paper);color:var(--ink);transform:rotate(-.7deg);
@@ -1452,7 +1453,12 @@ function renderShelves(keep) {
   firstPaint = false;
   const secs = sections(); let n = 0, row = null, face = null;
   CARDPX = cardPx();
-  if (!secs.length) { POOL = null; root.appendChild(emptyShelf()); light(); return; }
+  if (!secs.length) {
+    POOL = null; root.appendChild(emptyShelf()); light();
+    /* its buttons can be pressed straight away, with Enter or a controller's A */
+    setTimeout(() => { if (!topPanel() && !LAUNCH.open && !root.contains(document.activeElement)) { const b = root.querySelector(".note button"); if (b) b.focus({preventScroll: true}); } }, 60);
+    return;
+  }
   secs.forEach(S => {
     if (!row || face !== S.face) { const sc = el("section", "sec"); row = el("div", "row" + (S.face ? " face" : "")); sc.appendChild(row); root.appendChild(sc); face = S.face; }
     else row.appendChild(el("div", "bookend"));
@@ -1549,16 +1555,22 @@ function fitPlates() {
 function emptyShelf() {
   const s = el("section", "sec"), row = el("div", "row"); row.style.height = "calc(var(--rowh) * 2)"; row.style.position = "relative"; s.appendChild(row);
   const n = el("div", "note");
-  if (G.length) {
+  const settingsBtn = () => { const b = el("button", "btn", t("Settings")); b.style.marginLeft = "8px"; b.onclick = openSettings; return b; };
+  if (q) {
     n.appendChild(el("h2", "", t("Nothing matches “{q}”", {q})));
     n.appendChild(el("p", "", t("Try another name. Esc clears the search.")));
+  } else if (G.length) {
+    /* games, but none showing: every console's shelf, or every game, hidden in Settings */
+    n.appendChild(el("h2", "", t("Every game is hidden")));
+    n.appendChild(el("p", "", t("Settings shows the consoles and hidden games again.")));
+    const b = settingsBtn(); b.style.marginLeft = "0"; n.appendChild(b);
   } else {
     n.appendChild(el("h2", "", t("The shelves are empty")));
     n.appendChild(el("p", "", t("Drag game files onto this window and they'll go on the right shelf. Zips, discs and whole folders are fine.")));
     n.appendChild(el("p", "fine", t("The Retro Shelf doesn't come with games. Use copies of games you own.")));
     const a = el("button", "btn primary", t("Add games…")); a.id = "hadd"; a.onclick = addGames;
     const b = el("button", "btn", t("Where to get games")); b.id = "hget"; b.style.marginLeft = "8px"; b.onclick = openGetGames;
-    n.appendChild(a); n.appendChild(b);
+    n.appendChild(a); n.appendChild(b); n.appendChild(settingsBtn());
   }
   row.appendChild(n); return s;
 }
@@ -1632,7 +1644,8 @@ function light() {
 async function toggleFav(id) {
   const r = await api("/api/fav", {id}); if (!r.ok) return;
   FAV = new Set(r.data.fav); beep(660);
-  renderShelves(id);
+  /* the box you're on now, which may not be the one starred if you moved meanwhile */
+  renderShelves(focusId);
 }
 async function rescan() {
   busy(true); await api("/api/rescan", {}); await refresh(true); busy(false); toast(t("Found {n}.", {n: plural(G.length, "game", "games")}));
@@ -1686,13 +1699,16 @@ function askSystems(items) {
       l.appendChild(el("b", "", gs.length === 1 ? gs[0].name : t("{n} .{ext} files", {n: gs.length, ext: gs[0].name.split(".").pop()})));
       if (gs.length > 1) l.appendChild(el("span", "", gs.slice(0, 3).map(g => g.name).join(", ") + (gs.length > 3 ? ", …" : "")));
       const sg = el("div", "seg"), opts = gs[0].choices.concat([""]);
-      const draw = () => { clear(sg); opts.forEach((o, i) => { const bt = el("button", pick.get(gs) === o ? "on" : "", o || "Skip"); bt.onclick = () => { const f = document.activeElement === bt; pick.set(gs, o); draw(); if (f) sg.children[i].focus(); beep(520); }; sg.appendChild(bt); }); };
+      const draw = () => { clear(sg); opts.forEach((o, i) => { const bt = el("button", pick.get(gs) === o ? "on" : "", o || t("Skip")); bt.onclick = () => { const f = document.activeElement === bt; pick.set(gs, o); draw(); if (f) sg.children[i].focus(); beep(520); }; sg.appendChild(bt); }); };
       paint.push(draw); draw(); r.appendChild(l); r.appendChild(sg); b.appendChild(r);
     });
-    const close = v => { $("#imp").classList.remove("show"); $("#iok").onclick = $("#icancel").onclick = null; done(v); };
+    const from = opener();
+    const close = v => { $("#imp").classList.remove("show"); $("#iok").onclick = $("#icancel").onclick = null; backTo(from); light(); done(v); };
     $("#iok").onclick = () => { const out = {}; groups.forEach(gs => { const v = pick.get(gs); if (v) gs.forEach(g => { out[g.id] = v; }); }); close(out); };
     $("#icancel").onclick = () => close(null);
-    $("#imp").classList.add("show"); light();
+    blurActive(); $("#imp").classList.add("show"); light();
+    /* the first choice has focus, so arrows, Enter and a controller work straight away */
+    setTimeout(() => { const f = $("#ibody .seg button") || $("#iok"); if (f) f.focus({preventScroll: true}); }, 40);
   });
 }
 let impRun = false;
@@ -1757,7 +1773,9 @@ function setQ(v) { $("#q").value = v; q = v.trim().toLowerCase(); renderShelves(
 /* ---------- launch screen ---------- */
 function showLaunch(g) {
   if (!g) return;
-  LAUNCH.open = true; LAUNCH.id = g.id; blurActive();
+  LAUNCH.open = true; LAUNCH.id = g.id; blurActive(); HTML.classList.add("playing");
+  /* its buttons can be reached (a moment later, so the Enter or A that started the game doesn't press one) */
+  setTimeout(() => { if (LAUNCH.open && !topPanel()) $("#lhide").focus({preventScroll: true}); }, 400);
   const L = $("#launch"); L.classList.remove("closing");
   $("#ltitle").textContent = g.title; $("#ltitle").translate = false;
   const holder = $(".lart"); clear(holder);
@@ -1779,7 +1797,9 @@ function hideLaunch() {
   const L = $("#launch");
   if (fxMode() !== "off") { L.classList.add("closing"); setTimeout(() => { if (!LAUNCH.open) L.classList.remove("show", "closing"); }, 200); }
   else L.classList.remove("show");
-  setTimeout(() => { focusById(focusId); light(); }, 220); updatePill();
+  HTML.classList.remove("playing");
+  /* back on the shelf, unless a panel opened meanwhile (it keeps its focus) */
+  setTimeout(() => { if (!LAUNCH.open && !topPanel()) focusById(focusId); light(); }, 220); updatePill();
 }
 /* select a game and scroll its shelf into the middle of the window */
 function showGame(id) {
@@ -1980,10 +2000,11 @@ function padPress(root) {
 function openOpts(sub) {
   if (LAUNCH.open) return;
   const g = selGame(), list = $("#optl"); clear(list);
-  const item = (label, fn, cls) => { const b = el("button", cls || "", label); b.onclick = () => { closeOpts(true); fn(); }; list.appendChild(b); };
+  /* own: the label is someone's own name (a shelf's), not translated */
+  const item = (label, fn, cls, own) => { const b = el("button", cls || "", label); if (own) b.translate = false; b.onclick = () => { closeOpts(true); fn(); }; list.appendChild(b); };
   if (g && sub === "shelf") {
     $("#optst").textContent = t("Put {title} on a shelf", {title: g.title});
-    SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast((on ? "Took it off " : "Put it on ") + sh.name + "."); }); });
+    SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast(on ? t("Took it off {shelf}.", {shelf: sh.name}) : t("Put it on {shelf}.", {shelf: sh.name})); }, "", true); });
     item("New shelf…", () => openShelfSlip({id: g.id}));
   } else if (sub === "shelfMany" || sub === "progressMany") {
     /* the same thing for every picked game */
@@ -1993,7 +2014,7 @@ function openOpts(sub) {
       SHELVES.forEach(sh => item(sh.name, async () => {
         for (const id of ids) if (!sh.ids.includes(id)) await api("/api/shelves", {op: "add", name: sh.name, id});
         clearPicks(); await refresh(true); toast(t("Put {n} on {shelf}.", {n: plural(ids.length, "game", "games"), shelf: sh.name}));
-      }));
+      }, "", true));
       item(t("New shelf…"), () => openShelfSlip({ids}));
     } else {
       $("#optst").textContent = t("How far are you with these {n}?", {n: ids.length});
@@ -2378,7 +2399,7 @@ function stopSaver() {
 }
 /* anything pressed wakes it, and does nothing else */
 let wokeByClick = false;
-const woke = e => { lastInput = Date.now(); if (stopSaver() && e.cancelable) { e.preventDefault(); e.stopImmediatePropagation(); if (e.type === "mousedown") wokeByClick = true; } };
+const woke = e => { lastInput = Date.now(); if (stopSaver() && e.cancelable) { e.preventDefault(); e.stopImmediatePropagation(); if (e.type === "mousedown" && e.button === 0) wokeByClick = true; } };
 for (const type of ["keydown", "mousedown"]) window.addEventListener(type, woke, {capture: true});
 /* scrolling doesn't wait for this: the wheel and touches only wake it */
 for (const type of ["wheel", "touchstart"]) window.addEventListener(type, () => { lastInput = Date.now(); stopSaver(); }, {capture: true, passive: true});
@@ -2884,7 +2905,9 @@ function keepFocus(root) {
 function renderSettings() {
   const p = $("#spanel"), st = p.scrollTop, b = $("#sbody"), refocus = keepFocus(b); clear(b);
   const H = t => b.appendChild(el("h3", "", t));
-  const R = (label, desc, ctl) => { const r = el("div", "row2"), l = el("div", "rl"); l.appendChild(el("b", "", label)); if (desc) l.appendChild(el("span", "", desc)); r.appendChild(l); if (ctl) r.appendChild(ctl); b.appendChild(r); return r; };
+  /* a row: its label, a line about it, its control. A label that's someone's own name (a shelf, a folder) comes as
+     {own: "…"}, and isn't translated */
+  const R = (label, desc, ctl) => { const r = el("div", "row2"), l = el("div", "rl"), lb = el("b", "", label && label.own !== undefined ? label.own : label); if (label && label.own !== undefined) lb.translate = false; l.appendChild(lb); if (desc) l.appendChild(el("span", "", desc)); r.appendChild(l); if (ctl) r.appendChild(ctl); b.appendChild(r); return r; };
   const sw = (on, fn) => { const l = el("label", "sw"), i = document.createElement("input"); i.type = "checkbox"; i.checked = on; i.onchange = () => fn(i.checked); l.appendChild(i); l.appendChild(el("span", "sl")); return l; };
   const seg = (opts, val, fn) => { const s = el("div", "seg"); opts.forEach(o => { const bt = el("button", o[0] === val ? "on" : "", o[1]); bt.onclick = () => { fn(o[0]); renderSettings(); }; s.appendChild(bt); }); return s; };
   const field = (val, ok, ph) => { const w = el("div", "fld"), i = document.createElement("input"); i.type = "text"; i.value = val || ""; i.placeholder = ph || ""; i.spellcheck = false; w.appendChild(i); w.appendChild(el("i", "dot " + (ok ? "ok" : "bad"))); w.input = i; return w; };
@@ -2900,7 +2923,7 @@ function renderSettings() {
   R("Arrange shelves by", "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.", seg([["console", "Console"], ["genre", "Genre"], ["decade", "Decade"], ["status", t("Progress")]], UI.arrange || "console", v => { UI.arrange = v; saveUI(); renderShelves(focusId); }));
   R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"], ["rating", t("Rating")]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
-  rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
+  rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); saveUI(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
   R("Shelf size", "", rg);
   R("Spines", "Every console has its own packaging look. Cover art runs a strip of each box's art down its spine; Printed uses plain label colors.",
     seg([["cover", "Cover art"], ["printed", "Printed"]], spineMode(), v => { UI.spine = v; UI.tint = v !== "printed"; saveUI(); PAL.clear(); renderShelves(focusId); }));
@@ -2923,7 +2946,7 @@ function renderSettings() {
     stop.onclick = async () => { await api("/api/watch/remove", {dir: w.dir}); await refresh(true); renderSettings(); };
     if (w.unsure) { const ch = el("button", "btn", t("Choose consoles…")); ch.onclick = openUnsure; wb.appendChild(ch); }
     wb.appendChild(stop);
-    R(w.dir.split(/[\\/]/).filter(Boolean).pop() || w.dir, w.dir + " · " + plural(w.games, "game", "games") + (w.unsure ? " · " + t("{n} not sure which console", {n: w.unsure}) : ""), wb);
+    R({own: w.dir.split(/[\\/]/).filter(Boolean).pop() || w.dir}, w.dir + " · " + plural(w.games, "game", "games") + (w.unsure ? " · " + t("{n} not sure which console", {n: w.unsure}) : ""), wb);
   }
   const wf = el("button", "btn", t("Watch a folder…"));
   wf.onclick = async () => {
@@ -2961,7 +2984,7 @@ function renderSettings() {
       const r = await api("/api/shelves", {op: "delete", name: sh.name}); if (!r.ok) return toast(r.data.error || "Couldn't delete it.", true); await refresh(true); renderSettings(); toast("Deleted the shelf. Its games are still on their console shelves.");
     };
     bs.appendChild(rn); bs.appendChild(del);
-    R(sh.name, t("Your shelf · {n}", {n: plural(sh.ids.length, "game", "games")}), bs);
+    R({own: sh.name}, t("Your shelf · {n}", {n: plural(sh.ids.length, "game", "games")}), bs);
   });
   const chips = el("div", "chips");
   SYSTEMS.forEach(s => { const n = G.filter(g => g.system === s).length; if (!n) return; const hid = UI.hidden.indexOf(s) >= 0; const c = el("button", hid ? "" : "on", s + " " + n);
@@ -3318,6 +3341,7 @@ function reveal(c) {
   if (by) { root.scrollBy({top: by, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, 400); }
 }
 function moveH(d) {
+  const note = $("#shelves .note"); if (note && !sel) { padNav(note, d > 0 ? "r" : "l"); return; }
   const cs = slots(); if (!cs.length) return;
   const i = cs.indexOf(sel); if (i < 0) return goTo(cs[0]);
   goTo(cs[Math.max(0, Math.min(cs.length - 1, i + d))]);
@@ -3336,15 +3360,22 @@ function moveV(d) {
 }
 function jump(d) {
   const fs = $$("#shelves .card.first"); if (!fs.length) return;
-  const i = sel ? fs.findIndex(c => c.dataset.group === sel.dataset.group) : -1, c = fs[(i + d + fs.length) % fs.length];
+  /* from no shelf (the Manual box, say): forward goes to the first, back to the last */
+  const i = sel ? fs.findIndex(c => c.dataset.group === sel.dataset.group) : -1, c = fs[i < 0 ? (d > 0 ? 0 : fs.length - 1) : (i + d + fs.length) % fs.length];
   c.focus({preventScroll: true});
   const root = $("#shelves"), r = c.getBoundingClientRect(), R = root.getBoundingClientRect();
   root.scrollBy({top: r.top - R.top - 40, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, 450); beep(520);
 }
 function selGame() { return sel && !sel._manual ? byId.get(sel.dataset.id) : null; }
-function activate() { if (!sel) return; if (sel._manual) openSettings(); else play(selGame()); }
+function activate() {
+  /* no box to play (an empty shelf): its button with focus is pressed */
+  if (!sel) { const b = document.activeElement; if (b && b.tagName === "BUTTON" && b.closest("#shelves")) b.click(); return; }
+  if (sel._manual) openSettings(); else play(selGame());
+}
 
-$("#q").addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); renderShelves(null); paintQ(); });
+/* the shelves are rebuilt a moment after typing stops: with thousands of games, not for every letter */
+let qT = 0;
+$("#q").addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); paintQ(); clearTimeout(qT); qT = setTimeout(() => renderShelves(null), 120); });
 $("#q").addEventListener("blur", paintQ);
 $("#sclose").onclick = closeSettings;
 $("#gclose").onclick = closeGetGames;
@@ -3382,6 +3413,17 @@ document.addEventListener("keydown", e => {
     else if (k === "Enter") padPress($("#osk")); else if (k.length === 1) oskType(k);
     return;
   }
+  /* Enter or Space held down doesn't repeat into the next thing (a panel's Save, then playing the game behind it) */
+  if (e.repeat && (k === "Enter" || k === " ")) { e.preventDefault(); return; }
+  /* Tab goes round the panel or screen on top, not through the shelf behind it */
+  if (k === "Tab") {
+    const tp = topPanel(), root = LAUNCH.open ? $("#launch") : tp ? $("#" + tp[0]) : null;
+    if (root) {
+      const f = focusables(root);
+      if (f.length) { e.preventDefault(); const i = f.indexOf(document.activeElement); f[e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i + 1) % f.length].focus(); }
+      return;
+    }
+  }
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
   /* Esc closes the panel on top, the same one a controller's B would */
   if (k === "Escape" && !LISTEN) { const tp = topPanel(); if (tp) { e.preventDefault(); tp[1](); return; } }
@@ -3394,7 +3436,7 @@ document.addEventListener("keydown", e => {
   if (isOpen("keys")) { if (k === "Escape" || k === "Enter" || k === "?") closeKeys(); return; }
   if (isOpen("recap")) { if (k === "Escape") closeRecap(); else if (arrow) { e.preventDefault(); padNav($("#recap"), arrow); } return; }
   if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
-  if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
+  if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); else if (arrow) { e.preventDefault(); padNav($("#imp"), arrow); } return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
   if (isOpen("nsh")) { if (k === "Escape") closeShelfSlip(); else if (k === "Enter") saveShelfSlip(); return; }
@@ -3405,15 +3447,13 @@ document.addEventListener("keydown", e => {
   if (isOpen("news")) { if (k === "Escape" || k === "Enter") closeNews(); return; }
   if (isOpen("getg")) { if (k === "Escape") closeGetGames(); return; }
   if (isOpen("settings")) { if (k === "Escape") closeSettings(); return; }
-  if (LAUNCH.open) { setKb(true); if (k === "Escape" || k === "Backspace") hideLaunch(); return; }
+  if (LAUNCH.open) { setKb(true); if (k === "Escape" || k === "Backspace") hideLaunch(); else if (arrow) { e.preventDefault(); padNav($("#launch"), arrow); } return; }
   setKb(true);
   if (e.target === $("#q")) {
     if (k === "Escape") { e.preventDefault(); if (e.target.value) setQ(""); e.target.blur(); focusById(focusId); paintQ(); }
     else if (k === "ArrowDown" || k === "Enter") { e.preventDefault(); e.target.blur(); focusById(null); paintQ(); }
     return;
   }
-  /* Enter or Space held down after a panel closed (its Save, say) doesn't repeat into playing or turning a box */
-  if (e.repeat && (k === "Enter" || k === " ")) { e.preventDefault(); return; }
   if (k === "/") { e.preventDefault(); $("#q").focus(); paintQ(); }
   else if (k === "ArrowRight") { e.preventDefault(); moveH(1); }
   else if (k === "ArrowLeft") { e.preventDefault(); moveH(-1); }
@@ -3474,7 +3514,7 @@ setInterval(() => {
   const n = {l: bt(14) || gp.axes[0] < -.6, r: bt(15) || gp.axes[0] > .6, u: bt(12) || gp.axes[1] < -.6, d: bt(13) || gp.axes[1] > .6,
     a: bt(nin ? 1 : 0), b: bt(nin ? 0 : 1), x: bt(nin ? 3 : 2), y: bt(nin ? 2 : 3), lb: bt(4), rb: bt(5), sel: bt(8), st: bt(9), raw: gp.buttons.map(b => b.pressed)};
   if (!document.hasFocus()) { pad = n; for (const k of ["l", "r", "u", "d"]) if (n[k]) padHeld[k] = Infinity; return; }
-  if (SAVER && n.raw.some((on, i) => on && !(pad.raw || [])[i])) { stopSaver(); pad = n; return; }
+  if (SAVER && (n.raw.some((on, i) => on && !(pad.raw || [])[i]) || ["l", "r", "u", "d"].some(k => n[k] && !pad[k]))) { stopSaver(); pad = n; return; }
   const any = Object.keys(n).some(k => k !== "raw" && n[k]); if (any) { padAt = Date.now(); setKb(true); if (!padOn) { padOn = true; renderHints(); showHintsBriefly(); } }
   const press = k => n[k] && !pad[k];
   /* the d-pad repeats when held: once, then after a moment every tenth of a second */
@@ -3490,7 +3530,12 @@ setInterval(() => {
     if (press("b")) panel[1]();
     if (panel[0] === "colls" && (press("lb") || press("rb"))) { collTab = collTab === "series" ? "mine" : "series"; renderColls(); }
   }
-  else if (LAUNCH.open) { if (press("b")) hideLaunch(); }
+  else if (LAUNCH.open) {
+    /* its buttons with the d-pad and A: Back to the shelf, or Stop game */
+    for (const k of ["l", "r", "u", "d"]) if (rep(k)) padNav($("#launch"), k);
+    if (press("a")) padPress($("#launch"));
+    if (press("b")) hideLaunch();
+  }
   else {
     if (rep("l")) moveH(-1); if (rep("r")) moveH(1); if (rep("u")) moveV(-1); if (rep("d")) moveV(1);
     if (press("lb")) jump(-1); if (press("rb")) jump(1); if (press("st")) openSettings(); if (press("sel")) openOpts();
@@ -3547,7 +3592,7 @@ function t(text, vars) {
    The shelves' own text (game names, console plates) is the games', and stays as it is */
 const LANGS = [["auto", "Automatic"], ["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["pt", "Português"], ["ja", "日本語"]];
 const LOCALES = {es: "es", fr: "fr", de: "de", pt: "pt-BR", ja: "ja"};
-const T_ATTRS = ["aria-label", "title", "placeholder"], T_SKIP = "#shelves,script,style,.card,.ci,.tro,#saver,#nlist,[translate=no]";
+const T_ATTRS = ["aria-label", "title", "placeholder"], T_SKIP = "#shelves,script,style,.card,.ci,.tro,.lslot,#saver,#nlist,#oskv,[translate=no]";
 let langObs = null, HARVEST = null;
 function trText(n) {
   if (n.__en !== undefined && n.nodeValue !== n.__tr) n.__en = undefined;   // the app wrote new text into it since
