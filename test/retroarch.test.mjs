@@ -73,3 +73,18 @@ test("rewind, fast-forward and less lag: on light consoles, the triggers only wh
   assert.deepEqual(e({}), ["false", "nul", "nul", "false"]);                                          // PS1: R2 is a button there
   assert.deepEqual(e({ light: true, freeTriggers: true, rewind: false, lessLag: false }), ["false", "nul", "+5", "false"]);
 });
+
+test("achievements: signing in hands RetroArch the password once; hardcore turns off rewind, cheats and starting from a save", () => {
+  const dirs = { saves: "s", states: "t", screenshots: "p", system: "b", private: "x" };
+  const emu = { cores: "c", info: "i", assets: "a", autoconfig: "j" };
+  const first = ra.enforced(emu, dirs, { cheevos: { user: "P", pass: "pw" } });
+  assert.deepEqual([first.cheevos_enable, first.cheevos_username, first.cheevos_password, first.cheevos_token], ["true", "P", "pw", ""]);
+  const later = ra.enforced(emu, dirs, { cheevos: { user: "P" } });
+  assert.equal(later.cheevos_enable, "true");
+  assert.ok(!("cheevos_password" in later) && !("cheevos_token" in later));      // RetroArch's own token stays
+  const off = ra.enforced(emu, dirs, {});
+  assert.deepEqual([off.cheevos_enable, off.cheevos_token, off.cheevos_password], ["false", "", ""]);
+  const hc = ra.enforced(emu, dirs, { cheevos: { user: "P" }, hardcore: true, light: true, resume: true, cheats: true });
+  assert.deepEqual([hc.cheevos_hardcore_mode_enable, hc.rewind_enable, hc.apply_cheats_after_load, hc.savestate_auto_load], ["true", "false", "false", "false"]);
+  assert.equal(ra.enforced(emu, dirs, { hardcore: true }).cheevos_hardcore_mode_enable, "false");   // hardcore means nothing signed out
+});

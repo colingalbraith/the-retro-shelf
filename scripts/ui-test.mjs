@@ -120,6 +120,7 @@ const SCREENS = [
   ["keyboard", "openOsk($('#q'))", "closeOsk(); setQ('')"],
   ["rename", "openRename(G.slice().sort((a, b) => b.title.length - a.title.length)[0].id)", "closeRename()"],
   ["new-shelf", "openShelfSlip({})", "closeShelfSlip()"],
+  ["sign-in", "openRas()", "closeRas()"],
 ];
 
 // --- run ---------------------------------------------------------------------------------------------------------

@@ -276,3 +276,24 @@ test("a game can have settings of its own, over the app's, and they follow it wh
   be.ui.picture = "sharp";
   assert.equal(be.playOpts(byTitle("Tetris")).picture, "sharp");             // a choice of your own wins
 });
+
+test("RetroAchievements: the password stays in memory until RetroArch has a token, then it's wiped", async () => {
+  assert.equal((await be.route("POST", "/api/cheevos/signin", { user: "bad name!", pass: "x" })).code, 400);
+  assert.equal((await be.route("POST", "/api/cheevos/signin", { user: "Player_1", pass: "hunter2" })).code, 200);
+  assert.equal(be.settingsJson().cheevos.pending, "Player_1");
+  be.saveState(); be.saveSettings();
+  assert.ok(!fs.readFileSync(be.files.settings, "utf8").includes("hunter2") && !fs.readFileSync(be.files.state, "utf8").includes("hunter2"));
+  // the game: RetroArch signed in, kept a token, and its settings were saved with the password still in them
+  fs.mkdirSync(path.dirname(be.files.raCfg), { recursive: true });
+  fs.writeFileSync(be.files.raCfg, 'cheevos_username = "Player_1"\ncheevos_password = "hunter2"\ncheevos_token = "TOKEN"\n');
+  be.cheevosAfter();
+  assert.deepEqual(be.settingsJson().cheevos, { user: "Player_1", pending: "", failed: false });
+  assert.ok(!fs.readFileSync(be.files.raCfg, "utf8").includes("hunter2"));
+  // a wrong password: no token, and still wiped
+  await be.route("POST", "/api/cheevos/signout", {});
+  await be.route("POST", "/api/cheevos/signin", { user: "Player_1", pass: "wrong" });
+  fs.writeFileSync(be.files.raCfg, 'cheevos_password = "wrong"\ncheevos_token = ""\n');
+  be.cheevosAfter();
+  assert.deepEqual(be.settingsJson().cheevos, { user: "", pending: "", failed: true });
+  assert.ok(!fs.readFileSync(be.files.raCfg, "utf8").includes("wrong"));
+});

@@ -30,7 +30,7 @@ const GITHUB_API = "https://api.github.com/repos/libretro-thumbnails";
 const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
-                     fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false, rewind: true, lessLag: true,
+                     fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false, rewind: true, lessLag: true, hardcore: false,
                      picture: "auto", sort: "title", buttons: "auto", arrange: "console" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
@@ -68,7 +68,7 @@ function cleanUi(d) {
   if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
   if (Array.isArray(d.hiddenSeries)) out.hiddenSeries = d.hiddenSeries.map(String).slice(0, 1000);
   else if (["art", "color"].includes(d.spine)) out.spine = "cover";
-  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "beta", "tv", "rewind", "lessLag"]) if (typeof d[k] === "boolean") out[k] = d[k];
+  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "beta", "tv", "rewind", "lessLag", "hardcore"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
   if (Array.isArray(d.hidden)) out.hidden = d.hidden.map(String).slice(0, 100);
   return out;
@@ -168,7 +168,7 @@ class Backend extends EventEmitter {
     this.state = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
     // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}]]) if (!this.state[k]) this.state[k] = v;
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -423,7 +423,8 @@ class Backend extends EventEmitter {
       for (const d of ra.neededDirs(dirs)) fs.mkdirSync(d, { recursive: true });
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
       const play = this.playOpts(g);
-      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, load: !(opts.fresh || slot !== null) }));
+      const cheevos = this.raPending || (this.state.cheevos.user ? { user: this.state.cheevos.user } : null);
+      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, load: !(opts.fresh || slot !== null) }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
@@ -479,6 +480,7 @@ class Backend extends EventEmitter {
     try { this.checkPins(); } catch {}
     if (this.running === rec) this.running = null;
     this.saveState();
+    this.cheevosAfter();
     let error = "";
     if (dt < 4 && !rec.stopping) error = (rec.builtIn && ra.explain(this.files.raLog, how)) || "";
     this.lastExit = { id: rec.id, at: now(), dt, error };
@@ -527,6 +529,34 @@ class Backend extends EventEmitter {
     this.saveState();
     return [200, { ok: true, opts: cur }];
   }
+  // ---------------------------------------------------------------- RetroAchievements
+  /**
+   * Signing in: the password stays in memory (never in a file of ours) until the next game, when RetroArch signs in
+   * with it and keeps a token instead. After that game, cheevosAfter() checks for the token.
+   */
+  cheevosSignIn(user, pass) {
+    user = String(user || "").trim(); pass = String(pass || "");
+    if (!/^[A-Za-z0-9_]{2,32}$/.test(user)) return [400, { error: "That isn't a RetroAchievements user name." }];
+    if (!pass || pass.length > 256) return [400, { error: "Type your password." }];
+    this.raPending = { user, pass }; this.raFailed = false;
+    return [200, { ok: true }];
+  }
+  cheevosSignOut() {
+    this.raPending = null; this.raFailed = false;
+    delete this.state.cheevos.user; this.saveState();
+    if (fs.existsSync(this.files.raCfg)) ra.writeConfig(this.files.raCfg, { cheevos_enable: "false", cheevos_username: "", cheevos_password: "", cheevos_token: "" });
+    return [200, { ok: true }];
+  }
+  /** after a game: signed in if RetroArch kept a token; any password left in its settings is wiped either way */
+  cheevosAfter() {
+    if (!this.raPending) return;
+    const user = this.raPending.user, token = ra.readConfigKey(this.files.raCfg, "cheevos_token");
+    this.raPending = null;
+    if (token) { this.state.cheevos.user = user; this.raFailed = false; } else this.raFailed = true;
+    try { ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {}
+    this.saveState();
+  }
+
   // ---------------------------------------------------------------- cheats
   /** libretro's cheat collection: downloaded the first time it's wanted (37 MB), then its index kept in memory */
   async cheatIndex() {
@@ -574,7 +604,7 @@ class Backend extends EventEmitter {
     const target = path.join(path.dirname(this.files.raCfg), "cheats", cn, path.parse(g.path).name + ".cht");
     const keys = this.state.cheats[g.id] || [];
     let chosen = [];
-    if (keys.length && !this.ui.hardcore) {
+    if (keys.length && !(this.ui.hardcore && this.state.cheevos.user)) {
       try {
         const idx = await this.cheatIndex(), byFile = new Map();
         for (const k of keys) { const i = k.lastIndexOf("#"), f = k.slice(0, i); if (idx.entries.has(f)) (byFile.get(f) || byFile.set(f, []).get(f)).push(+k.slice(i + 1)); }
@@ -1103,7 +1133,8 @@ class Backend extends EventEmitter {
       roms_ok: fs.existsSync(root), exe_ok: this.exeOk(), cores_ok: this.coresOk(),
       builtin: this.ra ? { version: this.ra.version, systems } : null, own: this.ownEmu(),
       folders: { games: root, saves: this.folders.saves, bios: this.folders.bios },
-    }, app: { version: this.dirs.version || "" } };
+    }, app: { version: this.dirs.version || "" },
+    cheevos: { user: this.state.cheevos.user || "", pending: this.raPending ? this.raPending.user : "", failed: !!this.raFailed } };
   }
 
   applySettings(data) {
@@ -1296,6 +1327,8 @@ class Backend extends EventEmitter {
       case "/api/games/search": return j(this.gameSearch(d.q));
       case "/api/game/opts": return j(this.setGameOpts(String(d.id || ""), d.opts));
       case "/api/cheats": return j(await this.cheatList(String(d.id || "")));
+      case "/api/cheevos/signin": return j(this.cheevosSignIn(d.user, d.pass));
+      case "/api/cheevos/signout": return j(this.cheevosSignOut());
       case "/api/cheats/set": return j(this.setCheats(String(d.id || ""), d.on));
       case "/api/whatsnew/seen": this.state.seenVersion = this.dirs.version; this.saveState(); return j([200, { ok: true }]);
       case "/api/pins/seen": { const seen = new Set(Array.isArray(d.keys) ? d.keys : []); this.newPins = (this.newPins || []).filter(k => !seen.has(k)); return j([200, { ok: true }]); }

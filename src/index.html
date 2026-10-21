@@ -534,8 +534,9 @@ html:not([data-fx="off"]) #pick.show .panel{animation:rise .22s ease}
 .over.show{opacity:1;visibility:visible}
 .over .slip{outline:0;width:min(560px,90vw)}
 .over .slip p{margin:0 0 12px}
-.over input[type=text]{width:100%;margin:6px 0 16px;padding:9px 12px;border:1.5px solid var(--ink);background:var(--paper-hi);color:var(--ink);font:600 18px var(--disp);outline:none;user-select:text}
+.over :is(input[type=text],input[type=password]){width:100%;margin:6px 0 16px;padding:9px 12px;border:1.5px solid var(--ink);background:var(--paper-hi);color:var(--ink);font:600 18px var(--disp);outline:none;user-select:text}
 .over .btns{justify-content:flex-start}
+.over .btns .lnk{margin-left:auto;align-self:center;border:0;background:none;padding:0;color:var(--ink2);font:500 14px var(--disp);text-decoration:underline;text-underline-offset:3px}
 #welcome ol{margin:10px 0 18px;padding-left:1.3em;color:var(--ink2);line-height:1.45}
 #welcome li{margin:0 0 8px}
 #welcome li b{color:var(--ink)}
@@ -666,6 +667,12 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   </div>
 </div>
 
+<div id="ras" class="over"><div class="slip"><h2>Sign in to RetroAchievements</h2>
+  <p>Your free account from retroachievements.org. The password goes to RetroArch once, to sign in when your next game starts, and isn't kept.</p>
+  <input type="text" id="rasu" spellcheck="false" autocomplete="off" placeholder="User name">
+  <input type="password" id="rasp" autocomplete="off" placeholder="Password">
+  <div class="btns"><button class="btn primary" id="rasok">Sign in</button><button class="btn" id="rasno">Cancel</button><button class="lnk" id="rasnew">Make an account</button></div></div></div>
+
 <div id="cheat" class="over"><div class="slip wide"><h2 id="cheatt">Cheats</h2><p id="cheatm"></p>
   <input type="text" id="cheatq" spellcheck="false" autocomplete="off" placeholder="Search cheats" hidden>
   <div id="cheatl"></div>
@@ -733,7 +740,9 @@ const HTML = document.documentElement;
 
 let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {}, GAMECHOICES = {};
 let UI = {accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines"};
-let PATHS = {}, STATUS = {running: null, covers: {}}, APPINFO = {};
+let PATHS = {}, STATUS = {running: null, covers: {}}, APPINFO = {}, CHEEVOS = {};
+/* hardcore achievements: games start from the beginning, so there's no "continue" */
+const hardcore = () => !!(UI.hardcore && CHEEVOS.user);
 let q = "", sel = null, focusId = null, firstPaint = true;
 let kbMode = false, padOn = false, offset = 0, io = null, stopping = false;
 const LAUNCH = {open: false, id: null};
@@ -1029,7 +1038,7 @@ function spineTitle(c, g) {
 function ingest(d) {
   G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; CONS = d.consoles || {}; GAMECHOICES = d.gameChoices || {}; SHELVES = d.shelves || [];
   if (!uiEdits) UI = d.settings.ui;
-  PATHS = d.settings.paths; APPINFO = d.settings.app || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
+  PATHS = d.settings.paths; APPINFO = d.settings.app || {}; CHEEVOS = d.settings.cheevos || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
   applyUI();
 }
 const vis = () => G.filter(g => UI.hidden.indexOf(g.system) < 0 && (!g.hidden || UI.showHidden));
@@ -1137,7 +1146,7 @@ function fillBack(c, g) {
   const bk = c.querySelector(".bk"); clear(bk);
   bk.appendChild(el("div", "bt"));
   const inn = el("div", "in"); bk.appendChild(inn);
-  const sv = g.saves || {}, resume = sv.resume, played = g.plays ? plural(g.plays, "time", "times") + (g.time ? " · " + fmtDur(g.time) : "") : "";
+  const sv = g.saves || {}, resume = hardcore() ? 0 : sv.resume, played = g.plays ? plural(g.plays, "time", "times") + (g.time ? " · " + fmtDur(g.time) : "") : "";
   inn.appendChild(el("h4", "", g.title));
   inn.appendChild(el("div", "sub", [g.system, g.tag, g.year].filter(Boolean).join(" · ")));
   const who = [g.pub, g.dev && g.dev !== g.pub ? "by " + g.dev : "", g.genre].filter(Boolean).join(" · ");
@@ -1292,7 +1301,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
@@ -1409,7 +1418,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1635,7 +1644,7 @@ async function loadLibrary(force) {
 /* ---------- a controller (or TV remote setup) reaches everything ----------
    In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
    On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
-const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
+const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
 const topPanel = () => PANELS.find(([id]) => isOpen(id));
@@ -1669,7 +1678,7 @@ function panelScroll(root, d) {
 function padPress(root) {
   const e = document.activeElement;
   if (!root.contains(e) || e === root) { const f = focusables(root)[0]; if (f) f.focus(); return; }
-  if (e.tagName === "INPUT" && e.type === "text") openOsk(e);
+  if (e.tagName === "INPUT" && (e.type === "text" || e.type === "password")) openOsk(e);
   else e.click();
 }
 
@@ -1696,7 +1705,7 @@ function openOpts(sub) {
   } else {
     $("#optst").textContent = g ? g.title : "The Retro Shelf";
     if (g) {
-      const resume = g.saves && g.saves.resume;
+      const resume = g.saves && g.saves.resume && !hardcore();
       item(resume ? "Continue" : "Play", () => play(g));
       if (resume) item("Start fresh", () => play(g, {fresh: true}));
       item(sel.classList.contains("flip") ? "Turn back" : "Turn over", () => flip());
@@ -1731,19 +1740,21 @@ function openOsk(input) {
   sh.title = "Capital letter"; sh.onclick = () => { oskShift = !oskShift; paintOsk(); };
   sl.onclick = () => oskType("/"); sp.onclick = () => oskType(" "); bs.onclick = () => oskType(null); dn.onclick = () => closeOsk();
   [sh, sl, sp, bs, dn].forEach(b => last.appendChild(b)); k.appendChild(last); paintOsk();
-  $("#oskv").textContent = input.value || ""; $("#osk").classList.add("show");
+  $("#oskv").textContent = oskShown(input); $("#osk").classList.add("show");
   setTimeout(() => k.querySelector("button").focus(), 30);
 }
 function paintOsk() {
   $$("#oskk button[data-ch]").forEach(b => { b.textContent = oskShift ? b.dataset.ch.toUpperCase() : b.dataset.ch; });
   $$("#oskk button").forEach(b => { if (b.textContent === "⇧") b.classList.toggle("on", oskShift); });
 }
+/* what the keyboard shows of what's typed: a password as dots */
+const oskShown = i => i.type === "password" ? "•".repeat(i.value.length) : i.value || "";
 function oskType(ch) {
   const i = oskFor; if (!i) return;
   i.value = ch === null ? i.value.slice(0, -1) : i.value + (i.value || ch !== " " ? ch : "");
   /* Shift is for one capital */
   if (oskShift && ch && /[a-z]/i.test(ch)) { oskShift = false; paintOsk(); }
-  i.dispatchEvent(new Event("input", {bubbles: true})); $("#oskv").textContent = i.value; beep(600, .02, .015);
+  i.dispatchEvent(new Event("input", {bubbles: true})); $("#oskv").textContent = oskShown(i); beep(600, .02, .015);
 }
 function closeOsk() {
   if (!isOpen("osk")) return;
@@ -1962,6 +1973,19 @@ function leaveScreens(keep) {
   for (const id of ["settings", "getg", "colls", "trophy"]) if (id !== keep && isOpen(id)) { $("#" + id).classList.remove("show"); if (id === "colls" && collIO) collIO.disconnect(); }
 }
 
+/* ---------- signing in to RetroAchievements: the password goes to the app's memory, and from there to RetroArch once ---------- */
+function openRas() { blurActive(); $("#rasu").value = CHEEVOS.user || CHEEVOS.pending || ""; $("#rasp").value = ""; $("#ras").classList.add("show"); light(); setTimeout(() => ($("#rasu").value ? $("#rasp") : $("#rasu")).focus(), 50); }
+function closeRas() { if (!isOpen("ras")) return; $("#ras").classList.remove("show"); $("#rasp").value = ""; light(); }
+async function saveRas() {
+  const r = await api("/api/cheevos/signin", {user: $("#rasu").value, pass: $("#rasp").value});
+  $("#rasp").value = "";
+  if (!r.ok) return toast(r.data.error || t("Couldn't sign in."), true);
+  closeRas(); await refresh(true); if (isOpen("settings")) renderSettings();
+  toast(t("You'll be signed in when your next game starts."));
+}
+$("#rasok").onclick = saveRas; $("#rasno").onclick = closeRas;
+$("#rasnew").onclick = () => APP.openUrl("https://retroachievements.org/createaccount.php");
+
 /* ---------- cheats: libretro's cheat lists for a game, ticked on; RetroArch switches them on as the game starts ---------- */
 let CHEAT = null;
 async function openCheats(id) {
@@ -2162,6 +2186,22 @@ function renderSettings() {
 
   H("Your play");
   playStats(b, R);
+  /* RetroAchievements: signed in, waiting for the next game to sign in, or not */
+  const cv = el("div", "btns");
+  if (CHEEVOS.user) {
+    const so = el("button", "btn", t("Sign out")); so.onclick = async () => { await api("/api/cheevos/signout", {}); await refresh(true); renderSettings(); };
+    cv.appendChild(so);
+    R("RetroAchievements", t("Signed in as {user}. Achievements pop up while you play; your progress is on retroachievements.org.", {user: CHEEVOS.user}), cv);
+    R(t("Hardcore"), t("Achievements count as hardcore: no rewind, no cheats, and every game starts from the beginning."), sw(!!UI.hardcore, v => { UI.hardcore = v; saveUI(); refresh(true); }));
+  } else if (CHEEVOS.pending) {
+    const no = el("button", "btn", t("Cancel")); no.onclick = async () => { await api("/api/cheevos/signout", {}); await refresh(true); renderSettings(); };
+    cv.appendChild(no);
+    R("RetroAchievements", t("Signs in as {user} when your next game starts.", {user: CHEEVOS.pending}), cv);
+  } else {
+    const si = el("button", "btn", t("Sign in…")); si.onclick = openRas;
+    cv.appendChild(si);
+    R("RetroAchievements", (CHEEVOS.failed ? t("Couldn't sign in. Check your user name and password.") + " " : "") + t("Earn achievements in your games with a free retroachievements.org account."), cv);
+  }
 
   H("App");
   R("TV mode", "For a computer hooked up to a TV: opens fullscreen and bigger, and everything works with a controller. Select opens a game's options.", sw(!!UI.tv, v => { UI.tv = v; saveUI(); applyUI(); APP.tvMode(v); }));
@@ -2446,6 +2486,7 @@ document.addEventListener("keydown", e => {
   }
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
   if (isOpen("opts")) { if (k === "Escape") closeOpts(); else if (arrow) { e.preventDefault(); padNav($("#opts"), arrow); } return; }
+  if (isOpen("ras")) { if (k === "Escape") closeRas(); else if (k === "Enter") saveRas(); return; }
   if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }

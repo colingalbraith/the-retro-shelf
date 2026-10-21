@@ -149,6 +149,8 @@ function gameMenu(id) {
   const ext = path.extname(g.path).toLowerCase(), sys = backend.cfg.systems;
   const others = Object.keys(sys).filter(s => s !== g.system && (sys[s].exts || []).includes(ext));
   const saves = backend.savesOf(g, {}), hidden = backend.state.hidden.includes(g.id);
+  // hardcore achievements: every game starts from the beginning
+  if (saves && backend.ui.hardcore && backend.state.cheevos.user) saves.resume = 0;
   const tpl = [
     { label: saves && saves.resume ? "Continue" : "Play", click: () => send({ cmd: "play", id: g.id }) },
     ...(saves && saves.resume ? [{ label: "Start Fresh", click: () => send({ cmd: "play", id: g.id, fresh: true }) }] : []),

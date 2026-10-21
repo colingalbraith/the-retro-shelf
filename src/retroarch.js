@@ -54,6 +54,7 @@ const q = v => '"' + String(v).replace(/"/g, "") + '"';
  * people make in RetroArch's own menu stick.
  */
 function enforced(ra, dirs, opts) {
+  const hardcore = !!(opts.cheevos && opts.hardcore);
   return {
     video_fullscreen: opts.fullscreen ? "true" : "false",
     // Hold Start (or press Esc) to come back to the shelf; hold Select for RetroArch's menu.
@@ -64,7 +65,7 @@ function enforced(ra, dirs, opts) {
     stdin_cmd_enable: "true",
     savestate_auto_save: opts.resume ? "true" : "false",
     // a launch from a chosen save slot, or "start fresh", skips the resume point
-    savestate_auto_load: opts.resume && opts.load !== false ? "true" : "false",
+    savestate_auto_load: opts.resume && opts.load !== false && !hardcore ? "true" : "false",
     // the picture: sharp pixels, smoothed, or the scanlines of an old TV or a handheld's screen (a shader, passed with
     // --set-shader)
     video_smooth: opts.picture === "smooth" ? "true" : "false",
@@ -77,7 +78,7 @@ function enforced(ra, dirs, opts) {
     // frame less lag (run-ahead): on light consoles (opts.light), where they cost little. The triggers only on
     // consoles whose controllers had none (opts.freeTriggers); in RetroArch's own controller profiles for Macs and
     // Xbox-style pads they're axes +4 and +5
-    rewind_enable: opts.light && opts.rewind !== false ? "true" : "false",
+    rewind_enable: opts.light && opts.rewind !== false && !hardcore ? "true" : "false",
     input_rewind: "r",
     input_rewind_axis: opts.light && opts.freeTriggers && opts.rewind !== false ? "+4" : "nul",
     input_hold_fast_forward: "l",
@@ -88,8 +89,16 @@ function enforced(ra, dirs, opts) {
     run_ahead_frames: "1",
     run_ahead_secondary_instance: "false",
     run_ahead_hide_warnings: "true",
-    // the cheats chosen for this game (written to its file in the cheats folder), switched on as it starts
-    apply_cheats_after_load: opts.cheats ? "true" : "false",
+    // the cheats chosen for this game (written to its file in the cheats folder), switched on as it starts; never
+    // with hardcore achievements
+    apply_cheats_after_load: opts.cheats && !hardcore ? "true" : "false",
+    // RetroAchievements (opts.cheevos: {user} once signed in, {user, pass} the first time): RetroArch signs in with the
+    // password, keeps a token in its place and clears the password itself. Hardcore also means no rewind and no
+    // starting from a save
+    cheevos_enable: opts.cheevos ? "true" : "false",
+    cheevos_hardcore_mode_enable: hardcore ? "true" : "false",
+    ...(opts.cheevos && opts.cheevos.pass ? { cheevos_username: opts.cheevos.user, cheevos_password: opts.cheevos.pass, cheevos_token: "" } : {}),
+    ...(!opts.cheevos ? { cheevos_username: "", cheevos_password: "", cheevos_token: "" } : {}),
     // a picture with every save, shown on the back of the box
     savestate_thumbnail_enable: "true",
     autosave_interval: "10",
@@ -122,6 +131,14 @@ function enforced(ra, dirs, opts) {
 }
 
 /** Rewrite only the given keys in a retroarch.cfg, creating it if needed. */
+/** one setting's value in a RetroArch config file, or "" */
+function readConfigKey(file, key) {
+  let text = "";
+  try { text = fs.readFileSync(file, "utf8"); } catch { return ""; }
+  const m = new RegExp(`^\\s*${key}\\s*=\\s*"?([^"\\r\\n]*)"?`, "m").exec(text);
+  return m ? m[1] : "";
+}
+
 function writeConfig(file, keys) {
   let lines = [];
   try { lines = fs.readFileSync(file, "utf8").split(/\r?\n/); } catch {}
@@ -187,4 +204,4 @@ function explain(logFile, exit = {}) {
   return "";
 }
 
-module.exports = { bundled, corePath, enforced, neededDirs, writeConfig, linkSystemData, explain, CORE_EXT };
+module.exports = { bundled, corePath, enforced, neededDirs, writeConfig, readConfigKey, linkSystemData, explain, CORE_EXT };
