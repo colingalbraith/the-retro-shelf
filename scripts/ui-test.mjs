@@ -132,6 +132,9 @@ const SCREENS = [
   ["rename", "openRename(G.slice().sort((a, b) => b.title.length - a.title.length)[0].id)", "closeRename()"],
   ["new-shelf", "openShelfSlip({})", "closeShelfSlip()"],
   ["sign-in", "openRas()", "closeRas()"],
+  ["controller-test", "openCtest()", "closeCtest()"],
+  ["buttons", "openButtons(G.find(g => cons(g.system).buttons && cons(g.system).builtin).system)", "closeList()"],
+  ["choose-folder", "openBrowse()", "closeList()"],
 ];
 
 // --- run ---------------------------------------------------------------------------------------------------------

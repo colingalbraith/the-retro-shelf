@@ -332,6 +332,8 @@ html:not([data-fx="off"]) #launch.show .lslot .box{animation:turn .9s cubic-bezi
 #lhint{margin:0 0 24px;color:var(--dust)}
 #lhint2{margin:-16px 0 24px;color:var(--dust)}
 #lhint2:empty{display:none}
+#lplayers{margin:-12px 0 24px;color:var(--dust);font-size:13px}
+#lplayers:empty{display:none}
 .lbtns{display:flex;gap:10px;justify-content:center}
 .btn{border:1.5px solid currentColor;background:none;padding:7px 15px;border-radius:2px;font:600 15px/1.2 var(--disp);transition:background .12s}
 .btn:hover{background:rgba(127,127,127,.12)}
@@ -446,6 +448,14 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .cmore button{border:0;background:none;padding:0;color:var(--chalk);font:inherit;text-decoration:underline;text-underline-offset:3px}
 .slip.wide{width:560px;max-width:86vw}
 #waddr{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15)}
+/* the controller test: a drawing that lights up */
+#ctpad{display:block;width:100%;max-width:440px;margin:8px auto 4px}
+#ctpad rect,#ctpad circle{fill:var(--paper-hi);stroke:var(--ink);stroke-width:1.5}
+#ctpad .body{fill:rgba(28,25,22,.06);stroke:var(--ink);stroke-width:1.5}
+#ctpad .on{fill:var(--acc)}
+#ctpad .dot{fill:var(--ink);stroke:none}
+#ctpad text{font:600 10px var(--disp);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.cthint{color:var(--ink2);font-size:13px}
 /* a list of games with something to do for each: hidden ones, copies of the same game */
 #lstl{max-height:52vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15);scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
 #lstl h3{margin:14px 0 4px;font:600 12px var(--disp);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
@@ -652,6 +662,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     <p id="lstat"></p>
     <p id="lhint">Quit the emulator to come back here.</p>
     <p id="lhint2"></p>
+    <p id="lplayers"></p>
     <div class="lbtns">
       <button class="btn" id="lhide">Back to the shelf</button>
       <button class="btn danger" id="lstop">Stop game</button>
@@ -733,6 +744,21 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     </div>
   </div>
 </div>
+
+<div id="ctest" class="over"><div class="slip wide"><h2>Controller test</h2><p id="ctname"></p>
+  <svg id="ctpad" viewBox="0 0 400 230" role="img" aria-label="A controller drawing that lights up as you press">
+    <rect x="60" y="2" width="70" height="16" rx="5" data-i="6"/><rect x="270" y="2" width="70" height="16" rx="5" data-i="7"/>
+    <rect x="55" y="22" width="80" height="14" rx="5" data-i="4"/><rect x="265" y="22" width="80" height="14" rx="5" data-i="5"/>
+    <path class="body" d="M70 45 Q200 25 330 45 Q395 60 390 150 Q385 215 335 215 Q300 215 270 170 L130 170 Q100 215 65 215 Q15 215 10 150 Q5 60 70 45 Z"/>
+    <rect x="70" y="80" width="18" height="18" data-i="12"/><rect x="70" y="116" width="18" height="18" data-i="13"/><rect x="52" y="98" width="18" height="18" data-i="14"/><rect x="88" y="98" width="18" height="18" data-i="15"/>
+    <circle cx="315" cy="125" r="13" data-i="0"/><circle cx="342" cy="98" r="13" data-i="1"/><circle cx="288" cy="98" r="13" data-i="2"/><circle cx="315" cy="71" r="13" data-i="3"/>
+    <rect x="150" y="76" width="44" height="16" rx="8" data-i="8"/><rect x="206" y="76" width="44" height="16" rx="8" data-i="9"/>
+    <circle cx="140" cy="140" r="22" class="well" data-i="10"/><circle cx="260" cy="140" r="22" class="well" data-i="11"/>
+    <circle cx="140" cy="140" r="8" class="dot" id="ctl"/><circle cx="260" cy="140" r="8" class="dot" id="ctr"/>
+    <g id="ctlabels"></g>
+  </svg>
+  <p class="cthint" id="cthint"></p>
+  <div class="btns"><button class="btn primary" id="ctdone">Done</button></div></div></div>
 
 <div id="lst" class="over"><div class="slip wide"><h2 id="lstt"></h2><p id="lstp"></p><div id="lstl"></div>
   <div class="btns"><button class="btn primary" id="lstok">Done</button></div></div></div>
@@ -1369,7 +1395,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "ctest", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
@@ -1486,7 +1512,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("lst") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("lst") || isOpen("ctest") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1509,7 +1535,9 @@ async function rescan() {
 
 /* ---------- adding games (desktop app): drop files or pick them, the app sorts them by system ---------- */
 const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
-async function addGames() { const ps = await APP.pickGames(); if (ps && ps.length) importPaths(ps); }
+/* pressed with a controller just now: the system's file windows need a mouse, so the app's own folder browser instead */
+const byPad = () => Date.now() - padAt < 2000;
+async function addGames() { if (byPad()) return openBrowse(); const ps = await APP.pickGames(); if (ps && ps.length) importPaths(ps); }
 let importing = false;
 async function importPaths(paths) {
   if (!paths.length) return;
@@ -1631,6 +1659,9 @@ function showLaunch(g) {
     : !c2.light ? "" : c2.freeTriggers ? (rw ? t("Hold the left trigger (or R) to rewind, the right one (or L) to fast-forward.") : t("Hold the right trigger (or L) to fast-forward."))
     : (rw ? t("Hold R to rewind, L to fast-forward.") : t("Hold L to fast-forward."));
   $("#lhint2").style.visibility = "hidden";
+  /* the controllers in the order they were connected: RetroArch numbers players the same way */
+  const pads = connectedPads();
+  $("#lplayers").textContent = pads.length > 1 ? pads.map((p, i) => t("Player {n}: {pad}", {n: i + 1, pad: padName(p)})).join(" · ") : "";
   L.classList.add("show"); updatePill(); light();
 }
 function hideLaunch() {
@@ -1648,6 +1679,9 @@ function showGame(id) {
   const root = $("#shelves"), r = c.getBoundingClientRect(), R = root.getBoundingClientRect();
   root.scrollBy({top: r.top - R.top - (R.height - r.height) / 2, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, 450);
 }
+/* a panel opened from another one (settings → a list) gives focus back to the button that opened it */
+function opener() { const a = document.activeElement; return a && a !== document.body && !a.closest("#shelves") ? a : null; }
+function backTo(e) { if (e && e.isConnected && e.getClientRects().length) e.focus({preventScroll: true}); else focusById(focusId); }
 function focusById(id) {
   const c = id && (sel && sel.dataset.id === id && document.getElementById("shelves").contains(sel) ? sel : document.querySelector('#shelves .card[data-id="' + id + '"]'))
     || document.querySelector("#shelves .card");
@@ -1761,7 +1795,7 @@ async function loadLibrary(force) {
 /* ---------- a controller (or TV remote setup) reaches everything ----------
    In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
    On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
-const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["lst", () => closeList()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
+const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["ctest", () => closeCtest()], ["lst", () => closeList()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
 const topPanel = () => PANELS.find(([id]) => isOpen(id));
@@ -2152,15 +2186,104 @@ $("#pkhide").onclick = hidePicked;
 $("#pkshelf").onclick = () => openOpts("shelfMany");
 $("#pkprog").onclick = () => openOpts("progressMany");
 
-/* ---------- a list of games, each with something to do: hidden games, copies of one game ---------- */
-let listFill = null;
-function openList(title, about, fill) {
-  listFill = fill; $("#lstt").textContent = title; $("#lstp").textContent = about;
-  fill($("#lstl"));
-  blurActive(); $("#lst").classList.add("show"); light(); beep(520);
-  setTimeout(() => { const b = $("#lstl button") || $("#lstok"); b.focus({preventScroll: true}); }, 40);
+/* ---------- controllers: a test screen, and each console's buttons changed ---------- */
+let ctRaf = 0, ctFrom = null;
+function openCtest() {
+  if (LAUNCH.open) return;
+  ctFrom = opener(); blurActive(); $("#ctest").classList.add("show"); light(); beep(520);
+  const loop = () => {
+    if (!isOpen("ctest")) return;
+    const pads = connectedPads(), gp = pads[0];
+    $("#ctname").textContent = gp ? pads.map((p, i) => (pads.length > 1 ? t("Player {n}: ", {n: i + 1}) : "") + padName(p)).join(" · ") : t("No controller found. Plug one in or turn it on, then press a button.");
+    const nm = PAD_NAMES[padStyle(gp)], lab = $("#ctlabels");
+    if (lab.dataset.style !== padStyle(gp)) {
+      clear(lab); lab.dataset.style = padStyle(gp);
+      $("#cthint").textContent = t("Press anything: it lights up. Hold {b} (or press Esc) to leave.", {b: nm[padStyle(gp) === "nintendo" ? 0 : 1]});
+      for (const e of $$("#ctpad [data-i]")) {
+        const i = +e.dataset.i; if (i >= 10 && i <= 11) continue;
+        const b = e.getBBox(), tx = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        tx.setAttribute("x", b.x + b.width / 2); tx.setAttribute("y", b.y + b.height / 2); tx.textContent = nm[i];
+        if (nm[i].length > 4) tx.style.fontSize = "8px";
+        lab.appendChild(tx);
+      }
+    }
+    for (const e of $$("#ctpad [data-i]")) e.classList.toggle("on", !!(gp && gp.buttons[+e.dataset.i] && gp.buttons[+e.dataset.i].pressed));
+    const ax = gp ? gp.axes : [0, 0, 0, 0];
+    $("#ctl").setAttribute("cx", 140 + 14 * (ax[0] || 0)); $("#ctl").setAttribute("cy", 140 + 14 * (ax[1] || 0));
+    $("#ctr").setAttribute("cx", 260 + 14 * (ax[2] || 0)); $("#ctr").setAttribute("cy", 140 + 14 * (ax[3] || 0));
+    ctRaf = requestAnimationFrame(loop);
+  };
+  loop();
 }
-function closeList() { if (!isOpen("lst")) return; $("#lst").classList.remove("show"); listFill = null; focusById(focusId); light(); beep(330); }
+function closeCtest() { if (!isOpen("ctest")) return; $("#ctest").classList.remove("show"); cancelAnimationFrame(ctRaf); padHeld.bDown = 0; backTo(ctFrom); light(); beep(330); }
+$("#ctdone").onclick = closeCtest;
+
+/* a console's buttons: what each of its buttons is, and which of your controller's does it. Pick one, press the
+   button you want for it: the two swap. Saved as RetroArch's remap file for each game as it starts */
+const RP_NAMES = [[0, "B (bottom)"], [8, "A (right)"], [1, "Y (left)"], [9, "X (top)"], [10, "L"], [11, "R"], [12, "L2"], [13, "R2"], [2, "Select"], [3, "Start"]];
+const STD_TO_RP = [0, 8, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7];
+let LISTEN = null;
+function openButtons(system) {
+  const c = cons(system), names = c.buttons || RP_NAMES;
+  let map = {...(c.remap || {})};
+  const physFor = target => { for (let p = 0; p < 16; p++) if ((map[p] ?? p) === target) return p; return target; };
+  const save = async () => { const r = await api("/api/remap", {system, map}); if (!r.ok) toast(r.data.error || t("Couldn't save that."), true); await refresh(true); };
+  openList(t("Buttons for {console}", {console: system}), t("Which of your controller's buttons does each of the console's. Choose one, then press the button you want for it."), list => {
+    const nm = PAD_NAMES[padStyle()];
+    for (const [target, name] of names) {
+      const p = physFor(target);
+      listRow(list, name, t("Your controller's {b}", {b: nm[STD_TO_RP.indexOf(p)] || "?"}), [[t("Change"), () => {
+        if (!connectedPads().length) return toast(t("Plug in a controller first."), true);
+        $("#lstp").textContent = t("Press the button you want for {name}… (Esc to stop)", {name});
+        LISTEN = async i => {
+          LISTEN = null; $("#lstp").textContent = t("Which of your controller's buttons does each of the console's. Choose one, then press the button you want for it.");
+          if (i === null) return;
+          const phys = STD_TO_RP[i], was = map[phys] ?? phys, other = physFor(target);
+          map[phys] = target; map[other] = was;
+          for (const k of Object.keys(map)) if (+k === map[k]) delete map[k];
+          await save(); redrawList(); beep(880, .05);
+        };
+      }]]);
+    }
+    if (Object.keys(map).length) listRow(list, t("As they were"), t("Every button back to what it did at first."), [[t("Put back"), async () => { map = {}; await save(); redrawList(); }]]);
+  });
+}
+function openButtonConsoles() {
+  openList(t("Change buttons"), t("Choose a console. What you change there is for all its games."), list => {
+    for (const s of SYSTEMS) if (cons(s).builtin && G.some(g => g.system === s)) listRow(list, s, cons(s).remap ? t("Changed") : "", [[t("Buttons…"), () => openButtons(s)]]);
+  });
+}
+
+/* choosing a folder of games with only a controller: the places to start, then folder by folder */
+async function openBrowse(dir) {
+  const r = await api("/api/browse", {dir: dir || ""});
+  if (!r.ok) return toast(r.data.error || t("That folder can't be opened."), true);
+  const d = r.data, name = p => p.split(/[\\/]/).filter(Boolean).pop() || p;
+  openList(d.dir ? name(d.dir) : t("Choose a folder of games"), d.dir || t("Its games show on the shelves where they are, and new ones appear by themselves."), list => {
+    if (d.dir) {
+      listRow(list, t("Watch this folder"), t("{n} right here, and any in the folders inside it.", {n: plural(d.games, "game", "games")}), [[t("Watch"), async () => {
+        const w = await api("/api/watch/add", {dir: d.dir});
+        if (!w.ok) return toast(w.data.error || t("Couldn't watch that folder."), true);
+        closeList(); await refresh(true); if (isOpen("settings")) renderSettings();
+        toast(t("{n} from that folder are on the shelves.", {n: plural(w.data.games, "game", "games")}));
+      }]]);
+      listRow(list, t("Back"), d.parent || t("The places to start"), [[t("Open"), () => openBrowse(d.parent || "")]]);
+      for (const f of d.folders) listRow(list, f.name, f.games ? plural(f.games, "game", "games") : "", [[t("Open"), () => openBrowse(f.path)]]);
+      if (!d.folders.length) list.appendChild(el("p", "", t("No folders inside this one.")));
+    } else for (const p of d.places) listRow(list, t(p.label), p.path, [[t("Open"), () => openBrowse(p.path)]]);
+  }, () => d.dir && d.folders.length ? $$("#lstl .lrow button")[2] : null);
+}
+
+/* ---------- a list of games, each with something to do: hidden games, copies of one game ---------- */
+let listFill = null, listFrom = null;
+function openList(title, about, fill, first) {
+  if (!isOpen("lst")) listFrom = opener();
+  listFill = fill; $("#lstt").textContent = title; $("#lstp").textContent = about;
+  clear($("#lstl")); fill($("#lstl"));
+  blurActive(); $("#lst").classList.add("show"); light(); beep(520);
+  setTimeout(() => { const b = (first && first()) || $("#lstl button") || $("#lstok"); b.focus({preventScroll: true}); }, 40);
+}
+function closeList() { if (!isOpen("lst")) return; $("#lst").classList.remove("show"); listFill = null; LISTEN = null; backTo(listFrom); light(); beep(330); }
 const redrawList = () => { if (listFill) { const l = $("#lstl"), refocus = keepFocus(l); clear(l); listFill(l); refocus(); } };
 $("#lstok").onclick = closeList;
 function listRow(list, label, sub, buttons, pic) {
@@ -2401,6 +2524,7 @@ function renderSettings() {
   }
   const wf = el("button", "btn", t("Watch a folder…"));
   wf.onclick = async () => {
+    if (byPad()) return openBrowse();
     const r = await APP.watchFolder();
     if (!r || (!r.ok && !r.error)) return;
     if (!r.ok) return toast(r.error, true);
@@ -2483,7 +2607,10 @@ function renderSettings() {
     R("Pick up where you left off", "Saves your spot when you leave a game and starts there next time.", sw(UI.resume !== false, v => { UI.resume = v; saveUI(); }));
     R(t("Rewind"), t("Hold the left trigger, or R on a keyboard, to go back a few seconds. The right trigger, or L, fast-forwards. On 8- and 16-bit consoles and Game Boy."), sw(UI.rewind !== false, v => { UI.rewind = v; saveUI(); }));
     R(t("Less lag"), t("Games answer the controller a frame sooner, on the same consoles. Turn it off if a game's sound crackles."), sw(UI.lessLag !== false, v => { UI.lessLag = v; saveUI(); }));
-  R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
+  R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); renderHints(); }));
+    const cb = el("div", "btns"), ct = el("button", "btn", t("Test…")), cr = el("button", "btn", t("Change buttons…"));
+    ct.onclick = openCtest; cr.onclick = openButtonConsoles; cb.appendChild(ct); cb.appendChild(cr);
+    R(t("Your controller"), t("See that every button works, or change what they do in a console's games."), cb);
     R("In a game", "Hold Start (or press Esc) to come back to the shelf. Hold Select (or press F1) for the emulator's menu: save slots, controls, restart.", null);
 
     H("Saves & BIOS");
@@ -2523,7 +2650,7 @@ function renderSettings() {
     }
   } else {
     H("Playing");
-  R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
+  R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); renderHints(); }));
   }
 
   H("Your play");
@@ -2830,6 +2957,8 @@ document.addEventListener("keydown", e => {
   if (isOpen("opts")) { if (k === "Escape") closeOpts(); else if (arrow) { e.preventDefault(); padNav($("#opts"), arrow); } return; }
   if (isOpen("ras")) { if (k === "Escape") closeRas(); else if (k === "Enter") saveRas(); return; }
   if (isOpen("notes")) { if (k === "Escape") closeNote(); else if (k === "Enter") saveNote(); return; }
+  if (isOpen("ctest")) { if (k === "Escape") closeCtest(); return; }
+  if (LISTEN && k === "Escape") { LISTEN(null); return; }
   if (isOpen("lst")) { if (k === "Escape") closeList(); else if (arrow) { e.preventDefault(); padNav($("#lst"), arrow); } return; }
   if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
@@ -2869,9 +2998,27 @@ document.addEventListener("keydown", e => {
 
 /* gamepad: d-pad/stick move, A play, B back, X favorite, Y turn over, LB/RB shelves, Start settings */
 let pad = {}, padHeld = {}, padAt = 0;
+/* each kind of controller's names for its buttons, by position (the standard order: bottom, right, left, top, LB, RB,
+   LT, RT, select, start, L3, R3, up, down, left, right) */
+const PAD_NAMES = {
+  xbox: ["A", "B", "X", "Y", "LB", "RB", "LT", "RT", "View", "Menu", "LS", "RS", "↑", "↓", "←", "→"],
+  playstation: ["✕", "○", "□", "△", "L1", "R1", "L2", "R2", "Create", "Options", "L3", "R3", "↑", "↓", "←", "→"],
+  nintendo: ["B", "A", "Y", "X", "L", "R", "ZL", "ZR", "−", "+", "LS", "RS", "↑", "↓", "←", "→"],
+};
+const connectedPads = () => Array.prototype.filter.call((navigator.getGamepads && navigator.getGamepads()) || [], p => p && p.connected);
+function padStyle(gp) {
+  gp = gp || connectedPads()[0];
+  const id = gp ? gp.id : "";
+  if (UI.buttons === "nintendo" || (UI.buttons !== "xbox" && /nintendo|pro controller|joy-?con|057e/i.test(id))) return "nintendo";
+  if (/054c|dualsense|dualshock|playstation|wireless controller/i.test(id)) return "playstation";
+  return "xbox";
+}
+/* a controller's name without the browser's additions ("Xbox Wireless Controller (STANDARD GAMEPAD Vendor: …)") */
+const padName = gp => gp.id.replace(/\s*\((?:STANDARD GAMEPAD|Vendor)[^)]*\)/gi, "").replace(/^[0-9a-f]{4}-[0-9a-f]{4}-/i, "").trim() || t("Controller");
 function renderHints() {
   const h = $("#hintbar"); clear(h);
-  const items = padOn ? [["D-pad", "browse"], ["Y", "turn over"], ["A", "play"], ["X", "favorite"], ["LB RB", "shelves"], ["Select", "options"], ["Start", "settings"]]
+  const nm = PAD_NAMES[padStyle()], nin = padStyle() === "nintendo";
+  const items = padOn ? [["D-pad", "browse"], [nm[nin ? 2 : 3], "turn over"], [nm[nin ? 1 : 0], "play"], [nm[nin ? 3 : 2], "favorite"], [nm[4] + " " + nm[5], "shelves"], [nm[8], "options"], [nm[9], "settings"]]
     : [["← → ↑ ↓", "browse"], ["Space", "turn over"], ["Enter", "play"], ["F", "favorite"], ["Q E", "shelves"], ["/", "search"], ["O", "options"], ["S", "settings"]];
   items.forEach(it => { const s = el("span"); s.appendChild(el("kbd", "", it[0])); s.appendChild(document.createTextNode(it[1])); h.appendChild(s); });
 }
@@ -2883,13 +3030,15 @@ setInterval(() => {
      on top, an Xbox one A at the bottom and X on the left */
   const nin = UI.buttons === "nintendo" || (UI.buttons !== "xbox" && /nintendo|pro controller|joy-?con|057e/i.test(gp.id));
   const n = {l: bt(14) || gp.axes[0] < -.6, r: bt(15) || gp.axes[0] > .6, u: bt(12) || gp.axes[1] < -.6, d: bt(13) || gp.axes[1] > .6,
-    a: bt(nin ? 1 : 0), b: bt(nin ? 0 : 1), x: bt(nin ? 3 : 2), y: bt(nin ? 2 : 3), lb: bt(4), rb: bt(5), sel: bt(8), st: bt(9)};
+    a: bt(nin ? 1 : 0), b: bt(nin ? 0 : 1), x: bt(nin ? 3 : 2), y: bt(nin ? 2 : 3), lb: bt(4), rb: bt(5), sel: bt(8), st: bt(9), raw: gp.buttons.map(b => b.pressed)};
   if (!document.hasFocus()) { pad = n; for (const k of ["l", "r", "u", "d"]) if (n[k]) padHeld[k] = Infinity; return; }
-  const any = Object.keys(n).some(k => n[k]); if (any) { padAt = Date.now(); setKb(true); if (!padOn) { padOn = true; renderHints(); showHintsBriefly(); } }
+  const any = Object.keys(n).some(k => k !== "raw" && n[k]); if (any) { padAt = Date.now(); setKb(true); if (!padOn) { padOn = true; renderHints(); showHintsBriefly(); } }
   const press = k => n[k] && !pad[k];
   /* the d-pad repeats when held: once, then after a moment every tenth of a second */
   const now = Date.now(), rep = k => { if (!n[k]) return false; if (!pad[k]) { padHeld[k] = now + 380; return true; } if (now >= padHeld[k]) { padHeld[k] = now + 110; return true; } return false; };
   const panel = topPanel();
+  if (panel && panel[0] === "ctest") { if (n.b && pad.b && now - (padHeld.bDown || now) > 1200) closeCtest(); else if (n.b && !pad.b) padHeld.bDown = now; pad = n; return; }
+  if (LISTEN) { const i = n.raw.findIndex((on, k) => k < 16 && on && !(pad.raw || [])[k]); pad = n; if (i >= 0) LISTEN(i); return; }
   if (panel && !LAUNCH.open) {
     const root = $("#" + panel[0]);
     for (const k of ["l", "r", "u", "d"]) if (rep(k)) padNav(root, k);
