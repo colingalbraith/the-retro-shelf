@@ -63,3 +63,13 @@ test("the picture setting picks sharp pixels, smoothing, or the old-TV or handhe
   assert.deepEqual(shape("pixel"), ["22", "true"]);
   assert.deepEqual(shape("stretch"), ["24", "false"]);
 });
+
+test("rewind, fast-forward and less lag: on light consoles, the triggers only where controllers had none", () => {
+  const dirs = { saves: "s", states: "t", screenshots: "p", system: "b", private: "x" };
+  const emu = { cores: "c", info: "i", assets: "a", autoconfig: "j" };
+  const e = o => { const x = ra.enforced(emu, dirs, o); return [x.rewind_enable, x.input_rewind_axis, x.input_hold_fast_forward_axis, x.run_ahead_enabled]; };
+  assert.deepEqual(e({ light: true, freeTriggers: true }), ["true", "+4", "+5", "true"]);             // SNES
+  assert.deepEqual(e({ light: true }), ["true", "nul", "nul", "true"]);                               // Atari 2600: its triggers are switches
+  assert.deepEqual(e({}), ["false", "nul", "nul", "false"]);                                          // PS1: R2 is a button there
+  assert.deepEqual(e({ light: true, freeTriggers: true, rewind: false, lessLag: false }), ["false", "nul", "+5", "false"]);
+});

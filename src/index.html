@@ -310,6 +310,8 @@ html:not([data-fx="off"]) #launch.show .lslot .box{animation:turn .9s cubic-bezi
 #lstat{margin:0 0 4px;font:600 15px/1.3 var(--disp);letter-spacing:.14em;text-transform:uppercase}
 #lstat .clk{font:400 15px var(--mono);letter-spacing:.04em}
 #lhint{margin:0 0 24px;color:var(--dust)}
+#lhint2{margin:-16px 0 24px;color:var(--dust)}
+#lhint2:empty{display:none}
 .lbtns{display:flex;gap:10px;justify-content:center}
 .btn{border:1.5px solid currentColor;background:none;padding:7px 15px;border-radius:2px;font:600 15px/1.2 var(--disp);transition:background .12s}
 .btn:hover{background:rgba(127,127,127,.12)}
@@ -605,6 +607,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     <h2 id="ltitle"></h2>
     <p id="lstat"></p>
     <p id="lhint">Quit the emulator to come back here.</p>
+    <p id="lhint2"></p>
     <div class="lbtns">
       <button class="btn" id="lhide">Back to the shelf</button>
       <button class="btn danger" id="lstop">Stop game</button>
@@ -1496,6 +1499,11 @@ function showLaunch(g) {
   const holder = $(".lart"); clear(holder);
   const c = el("div", "lslot"); paintVars(c, g); c.appendChild(box(c, g)); fillCover(c, g); holder.appendChild(c);
   L.classList.add("starting"); $("#lstat").textContent = MEDIA_VERB[media(g)] + "…"; $("#lhint").style.visibility = "hidden";
+  /* what this console's games can do besides */
+  const c2 = cons(g.system), rw = c2.light && UI.rewind !== false;
+  $("#lhint2").textContent = !c2.light ? "" : c2.freeTriggers ? (rw ? t("Hold the left trigger (or R) to rewind, the right one (or L) to fast-forward.") : t("Hold the right trigger (or L) to fast-forward."))
+    : (rw ? t("Hold R to rewind, L to fast-forward.") : t("Hold L to fast-forward."));
+  $("#lhint2").style.visibility = "hidden";
   L.classList.add("show"); updatePill(); light();
 }
 function hideLaunch() {
@@ -1525,7 +1533,7 @@ function tick() {
   const s = $("#lstat"); clear(s);
   if (starting) s.textContent = (g ? MEDIA_VERB[media(g)] : "Starting") + "…";
   else { s.appendChild(document.createTextNode("Playing  ")); s.appendChild(el("span", "clk", clock(e))); }
-  $("#lhint").style.visibility = starting ? "hidden" : "visible";
+  $("#lhint").style.visibility = $("#lhint2").style.visibility = starting ? "hidden" : "visible";
 }
 function updatePill() {
   const p = $("#nowpill"), r = STATUS.running;
@@ -2061,6 +2069,8 @@ function renderSettings() {
     R(t("Picture"), t("How games look. By console: an old TV's scanlines for home consoles, a handheld's screen for Game Boy and GBA, crisp pixels for the rest."),
       seg([["auto", t("By console")], ["sharp", t("Sharp")], ["smooth", t("Smooth")], ["crt", t("Old TV")], ["lcd", t("Handheld")]], UI.picture || "auto", v => { UI.picture = v; saveUI(); }));
     R("Pick up where you left off", "Saves your spot when you leave a game and starts there next time.", sw(UI.resume !== false, v => { UI.resume = v; saveUI(); }));
+    R(t("Rewind"), t("Hold the left trigger, or R on a keyboard, to go back a few seconds. The right trigger, or L, fast-forwards. On 8- and 16-bit consoles and Game Boy."), sw(UI.rewind !== false, v => { UI.rewind = v; saveUI(); }));
+    R(t("Less lag"), t("Games answer the controller a frame sooner, on the same consoles. Turn it off if a game's sound crackles."), sw(UI.lessLag !== false, v => { UI.lessLag = v; saveUI(); }));
   R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); }));
     R("In a game", "Hold Start (or press Esc) to come back to the shelf. Hold Select (or press F1) for the emulator's menu: save slots, controls, restart.", null);
 

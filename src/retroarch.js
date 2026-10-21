@@ -73,6 +73,21 @@ function enforced(ra, dirs, opts) {
     // screen (24)
     aspect_ratio_index: String({ "4:3": 0, stretch: 24 }[opts.shape] ?? 22),
     video_scale_integer: opts.shape === "pixel" ? "true" : "false",
+    // rewind (hold the left trigger, or R) and fast-forward (hold the right trigger, or L; Space keeps it on), and a
+    // frame less lag (run-ahead): on light consoles (opts.light), where they cost little. The triggers only on
+    // consoles whose controllers had none (opts.freeTriggers); in RetroArch's own controller profiles for Macs and
+    // Xbox-style pads they're axes +4 and +5
+    rewind_enable: opts.light && opts.rewind !== false ? "true" : "false",
+    input_rewind: "r",
+    input_rewind_axis: opts.light && opts.freeTriggers && opts.rewind !== false ? "+4" : "nul",
+    input_hold_fast_forward: "l",
+    input_hold_fast_forward_axis: opts.freeTriggers ? "+5" : "nul",
+    input_toggle_fast_forward: "space",
+    fastforward_ratio: "3.0",
+    run_ahead_enabled: opts.light && opts.lessLag !== false ? "true" : "false",
+    run_ahead_frames: "1",
+    run_ahead_secondary_instance: "false",
+    run_ahead_hide_warnings: "true",
     // a picture with every save, shown on the back of the box
     savestate_thumbnail_enable: "true",
     autosave_interval: "10",

@@ -11,6 +11,8 @@
       "thumbs": "Nintendo - Nintendo Entertainment System",
       "media": "cart",
       "picture": "crt",
+      "light": true,
+      "freeTriggers": true,
       "abbr": "NES",
       "look": [
         "nes",
@@ -33,6 +35,8 @@
       "thumbs": "Nintendo - Super Nintendo Entertainment System",
       "media": "wide",
       "picture": "crt",
+      "light": true,
+      "freeTriggers": true,
       "abbr": "SNES",
       "look": [
         "snes",
@@ -58,6 +62,8 @@
       ],
       "media": "mini",
       "picture": "lcd",
+      "light": true,
+      "freeTriggers": true,
       "abbr": "GB",
       "look": [
         "gb",
@@ -86,6 +92,8 @@
       "thumbs": "Nintendo - Game Boy Advance",
       "media": "mini",
       "picture": "lcd",
+      "light": true,
+      "freeTriggers": true,
       "abbr": "GBA",
       "look": [
         "gba",
@@ -119,6 +127,8 @@
       "thumbs": "Sega - Mega Drive - Genesis",
       "media": "cart",
       "picture": "crt",
+      "light": true,
+      "freeTriggers": true,
       "abbr": "MD",
       "look": [
         "genesis",
@@ -144,6 +154,8 @@
       ],
       "media": "cart",
       "picture": "crt",
+      "light": true,
+      "freeTriggers": true,
       "abbr": "SMS",
       "look": [
         "sms",
@@ -166,6 +178,8 @@
       "thumbs": "NEC - PC Engine - TurboGrafx 16",
       "media": "card",
       "picture": "crt",
+      "light": true,
+      "freeTriggers": true,
       "abbr": "PCE",
       "look": [
         "pce",
@@ -207,6 +221,7 @@
       "thumbs": "Atari - 2600",
       "media": "cart",
       "picture": "crt",
+      "light": true,
       "abbr": "2600",
       "look": [
         "atari",
