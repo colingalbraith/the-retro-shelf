@@ -115,11 +115,14 @@ try {
     exe = path.join(work, a.name);
     await download(a.browser_download_url, exe);
     fs.chmodSync(exe, 0o755);
-    // the version inside it: the AppImage takes out just its app archive
+    // the version inside it: the AppImage takes out just its app archive. One named with its version (before
+    // 0.4.0-beta.13) is replaced by one with the new name; since then they keep one name and are replaced in place
     const peek = path.join(home, "peek");
     installed = () => {
+      const image = fs.existsSync(exe) ? exe : fs.readdirSync(work).filter(f => f.endsWith(".AppImage")).map(f => path.join(work, f))[0];
+      if (!image) return "";
       fs.rmSync(peek, { recursive: true, force: true }); fs.mkdirSync(peek);
-      spawnSync(exe, ["--appimage-extract", "resources/app.asar"], { cwd: peek, stdio: "ignore" });
+      spawnSync(image, ["--appimage-extract", "resources/app.asar"], { cwd: peek, stdio: "ignore" });
       return versionIn(path.join(peek, "squashfs-root", "resources"));
     };
   } else {
