@@ -4,7 +4,7 @@
 const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu, screen, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
-const { Backend, GAME_CHOICES } = require("./backend");
+const { Backend, GAME_CHOICES, within } = require("./backend");
 const { Updater } = require("./updater");
 const { zipFolder, zipFiles, unzipInto, filesIn } = require("./zip");
 
@@ -33,9 +33,15 @@ if (!HOME) {
     try { if (signs.some(f => fs.existsSync(path.join(from, f))) && !fs.existsSync(to)) { fs.renameSync(from, to); return true; } } catch {}
     return false;
   };
-  move(path.join(app.getPath("appData"), "Arcade"), app.getPath("userData"), ["settings.json", "state.json", "covers", "retroarch"]);
+  // only folders that are surely this app's: its settings (with their ui.accent), or the README it puts in its games
+  // folder. Someone else's "Arcade" folder stays where it is
+  const oldData = path.join(app.getPath("appData"), "Arcade"), oldDocs = path.join(app.getPath("documents"), "Arcade");
+  let ours = false, oursDocs = false;
+  try { const st = JSON.parse(fs.readFileSync(path.join(oldData, "settings.json"), "utf8")); ours = !!(st && st.ui && "accent" in st.ui); } catch {}
+  try { oursDocs = fs.readFileSync(path.join(oldDocs, "Games", "README.txt"), "utf8").startsWith("Your games go here, one folder per system"); } catch {}
+  if (ours) move(oldData, app.getPath("userData"), ["settings.json", "state.json", "covers", "retroarch"]);
   // games are known by their path, so their play history is moved over to the new paths once the backend is up
-  if (move(path.join(app.getPath("documents"), "Arcade"), DOCS, ["Games"])) OLD_GAMES = path.join(app.getPath("documents"), "Arcade", "Games");
+  if ((ours || oursDocs) && move(oldDocs, DOCS, ["Games"])) OLD_GAMES = path.join(oldDocs, "Games");
 }
 if (!app.requestSingleInstanceLock()) app.quit();
 const EMU = app.isPackaged ? path.join(process.resourcesPath, "emulators")
@@ -180,7 +186,7 @@ function gameMenu(id) {
     const r = await dialog.showOpenDialog(win, { title: tm("Choose a picture"), buttonLabel: tm("Use Picture"), properties: ["openFile"],
       filters: [{ name: tm("Pictures"), extensions: ["png", "jpg", "jpeg", "webp"] }] });
     if (r.canceled || !r.filePaths[0]) return;
-    const [code, res] = backend.setArt(g.id, kind, r.filePaths[0]);
+    const [code, res] = await backend.setArt(g.id, kind, r.filePaths[0]);
     send(code === 200 ? { cmd: "refresh", focus: g.id } : { cmd: "error", text: res.error });
   };
   const ext = path.extname(g.path).toLowerCase(), sys = backend.cfg.systems;
@@ -263,6 +269,8 @@ function ipc() {
   ipcMain.handle("backup-folder", async () => {
     const r = await dialog.showOpenDialog(win, { title: tm("Where should backups go?"), buttonLabel: tm("Back Up Here"), properties: ["openDirectory", "createDirectory"] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
+    // backups kept among the saves would each hold the ones before, growing every week
+    if (within(r.filePaths[0], backend.folders.saves)) return { ok: false, error: "That's inside the saves folder: choose a folder outside it." };
     backend.paths.backup_dir = r.filePaths[0]; backend.saveSettings();
     return { ok: true, dir: r.filePaths[0] };
   });
@@ -312,16 +320,19 @@ function ipc() {
     try { fs.writeFileSync(file, img.toPNG()); } catch (e) { return { ok: false, error: "Couldn't save the picture: " + e.message }; }
     return { ok: true, file };
   });
-  ipcMain.handle("export-saves", async (_, id) => {
+  ipcMain.handle("export-saves", async (_, id, quick) => {
     const g = backend.games.get(String(id));
     if (!g) return { ok: false, error: "Unknown game." };
     const files = backend.gameSaves(g);
     if (!files.length) return { ok: false, error: "This game has no saves yet." };
-    const r = await dialog.showSaveDialog(win, { title: tm("Export saves"), buttonLabel: tm("Export"),
-      defaultPath: path.join(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
+    const r = quick ? { filePath: freeName(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves`) }
+      : await dialog.showSaveDialog(win, { title: tm("Export saves"), buttonLabel: tm("Export"),
+        defaultPath: path.join(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
-    const list = files.flatMap(s => [s.file, ...(s.pic ? [s.file + ".png"] : [])]).map(f => ({ name: path.basename(f), full: f }));
-    try { return { ok: true, count: await zipFiles(list, r.filePath) }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
+    // laid out like a backup (Saves/<emulator>/…, Saves/States/…), so Restore can put it back
+    const list = files.flatMap(s => [s.file, ...(s.pic ? [s.file + ".png"] : [])])
+      .map(f => ({ name: "Saves/" + path.relative(backend.folders.saves, f).split(path.sep).join("/"), full: f }));
+    try { return { ok: true, count: await zipFiles(list, r.filePath), path: r.filePath }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
   });
   // a folder of games to show where it is, without copying
   ipcMain.handle("watch-folder", async () => {
@@ -330,13 +341,18 @@ function ipc() {
     const [code, res] = backend.addWatch(r.filePaths[0]);
     return code === 200 ? { ok: true, games: res.games } : { ok: false, error: res.error };
   });
-  ipcMain.handle("backup-saves", async () => {
+  /** a file name in dir that isn't taken yet: "name.zip", then "name 2.zip"… */
+  const freeName = (dir, name) => { let f = path.join(dir, name + ".zip"); for (let i = 2; fs.existsSync(f); i++) f = path.join(dir, `${name} ${i}.zip`); return f; };
+  // quick: from a controller, which can't work the save window: straight into the backups folder
+  ipcMain.handle("backup-saves", async (_, quick) => {
     const saves = backend.folders.saves;
     // folders RetroArch makes on the first launch don't count: only actual save files
     let any = false;
     try { any = filesIn(saves).length > 0; } catch {}
     if (!any) return { ok: false, error: "There are no saves to back up yet." };
-    const r = await dialog.showSaveDialog(win, { title: tm("Back up saves"), buttonLabel: tm("Back Up"),
+    let r;
+    if (quick) { fs.mkdirSync(backend.backupDir(), { recursive: true }); r = { filePath: freeName(backend.backupDir(), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}`) }; }
+    else r = await dialog.showSaveDialog(win, { title: tm("Back up saves"), buttonLabel: tm("Back Up"),
       defaultPath: path.join(app.getPath("documents"), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
     try { const count = await zipFolder(saves, r.filePath); backend.event("backup"); return { ok: true, count, path: r.filePath }; }
@@ -357,7 +373,8 @@ function ipc() {
   ipcMain.handle("copy-report", () => { clipboard.writeText(backend.report(app.getVersion())); return true; });
   ipcMain.handle("update", (_, what) => {
     if (what === "check") return updater.check(true);
-    if (what === "restart") return updater.restart();
+    // a game still open is closed properly first (saving), not left running while the new version goes in
+    if (what === "restart") return (backend.running && backend.running.alive ? backend.stop() : Promise.resolve()).finally(() => updater.restart());
     if (what === "page") return shell.openExternal(updater.page());
     return updater.state;
   });
@@ -385,10 +402,11 @@ app.whenReady().then(() => {
     const dir = backend.backupDir();
     try {
       fs.mkdirSync(dir, { recursive: true });
-      await zipFolder(saves, path.join(dir, `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`));
+      await zipFolder(saves, path.join(dir, `Retro Shelf saves ${new Date().toISOString().slice(0, 10)} (weekly).zip`));
     } catch { return; }
     backend.state.lastAutoBackup = Math.floor(Date.now() / 1000); backend.saveState(); backend.event("backup");
-    const mine = fs.readdirSync(dir).filter(f => /^Retro Shelf saves \d{4}-\d{2}-\d{2}\.zip$/.test(f)).map(f => path.join(dir, f))
+    // only the weekly ones are pruned: a backup made by hand into the same folder stays
+    const mine = fs.readdirSync(dir).filter(f => /^Retro Shelf saves \d{4}-\d{2}-\d{2} \(weekly\)\.zip$/.test(f)).map(f => path.join(dir, f))
       .sort((x, y) => fs.statSync(y).mtimeMs - fs.statSync(x).mtimeMs);
     for (const f of mine.slice(5)) await shell.trashItem(f).catch(() => {});
   };
@@ -424,6 +442,13 @@ app.on("will-quit", () => { if (updater) updater.applyOnQuit(); });
 
 // Quitting mid-game: let RetroArch save and close first.
 app.on("before-quit", e => {
+  // the games half moved to another drive: quitting would leave a partial copy there
+  if (!quitting && backend && backend.moving && win && !win.isDestroyed()) {
+    const r = dialog.showMessageBoxSync(win, { type: "warning", buttons: [tm("Keep Moving"), tm("Quit Anyway")], defaultId: 0, cancelId: 0,
+      message: tm("The games are still being moved."), detail: tm("Quitting now leaves a partial copy in the new place. Your games stay where they were.") });
+    if (r === 0) { e.preventDefault(); return; }
+  }
+  if (updater) updater.dropUnwanted();
   if (quitting || !backend || !backend.running || !backend.running.alive) return;
   e.preventDefault();
   quitting = true;

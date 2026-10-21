@@ -25,6 +25,12 @@ function destMap(systems) {
 
 /** where a file with this name goes in the BIOS folder, or null when it isn't a BIOS file */
 function biosDest(name, systems = BASE) { return destMap(systems).get(String(name).toLowerCase()) || null; }
+/** the size a BIOS file with this name has (from its emulator's list), or 0 when there's none given */
+function biosSize(name, systems = BASE) {
+  const n = String(name).toLowerCase();
+  for (const s of Object.values(systems)) for (const [p, size] of (s.bios && s.bios.files) || []) if (path.posix.basename(p).toLowerCase() === n && size) return size;
+  return 0;
+}
 
 /**
  * Which BIOS files are in place. biosDir: the BIOS folder; arcadeDir: the arcade games folder, where FinalBurn Neo
@@ -46,4 +52,4 @@ function biosStatus(biosDir, arcadeDir, systems = BASE) {
   });
 }
 
-module.exports = { biosDest, biosStatus, consoles };
+module.exports = { biosDest, biosSize, biosStatus, consoles };

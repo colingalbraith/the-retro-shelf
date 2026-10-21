@@ -54,12 +54,17 @@ test("moving a disc game takes its tracks along and keeps its play history", () 
   assert.equal(be.state.plays[res.id], 7);
 });
 
-test("choosing the cover that's already next to the game keeps it", () => {
+test("choosing the cover that's already next to the game keeps it, and one it replaces isn't deleted", async () => {
   put("nes/Tetris.nes"); const pic = put("nes/Tetris.png", "PNGDATA");
   be.scan();
-  const [code] = be.setArt(byTitle("Tetris").id, "cover", pic);
+  const [code] = await be.setArt(byTitle("Tetris").id, "cover", pic);
   assert.equal(code, 200);
   assert.equal(fs.readFileSync(pic, "utf8"), "PNGDATA");
+  // someone's own picture, replaced by a new one: to the Trash (here, with none, renamed aside)
+  const mine = put("nes/Tetris.jpg", "MY SCAN"), other = put("elsewhere/new.png", "NEW");
+  await be.setArt(byTitle("Tetris").id, "cover", other);
+  assert.equal(fs.readFileSync(pic, "utf8"), "NEW");
+  assert.equal(fs.readFileSync(mine + ".replaced", "utf8"), "MY SCAN");
 });
 
 test("discs listed in an .m3u show once, even from a subfolder", () => {
@@ -279,6 +284,7 @@ test("a game can have settings of its own, over the app's, and they follow it wh
 
 test("RetroAchievements: the password stays in memory until RetroArch has a token, then it's wiped", async () => {
   assert.equal((await be.route("POST", "/api/cheevos/signin", { user: "bad name!", pass: "x" })).code, 400);
+  assert.equal((await be.route("POST", "/api/cheevos/signin", { user: "Player_1", pass: 'a"b' })).code, 400);
   assert.equal((await be.route("POST", "/api/cheevos/signin", { user: "Player_1", pass: "hunter2" })).code, 200);
   assert.equal(be.settingsJson().cheevos.pending, "Player_1");
   be.saveState(); be.saveSettings();
@@ -286,14 +292,19 @@ test("RetroAchievements: the password stays in memory until RetroArch has a toke
   // the game: RetroArch signed in, kept a token, and its settings were saved with the password still in them
   fs.mkdirSync(path.dirname(be.files.raCfg), { recursive: true });
   fs.writeFileSync(be.files.raCfg, 'cheevos_username = "Player_1"\ncheevos_password = "hunter2"\ncheevos_token = "TOKEN"\n');
-  be.cheevosAfter();
+  // a game that wasn't handed the password (another emulator) leaves the sign-in waiting
+  be.cheevosAfter({ cheevos: null });
+  assert.equal(be.settingsJson().cheevos.pending, "Player_1");
+  assert.ok(!fs.readFileSync(be.files.raCfg, "utf8").includes("hunter2"));            // and the file never keeps it
+  fs.writeFileSync(be.files.raCfg, 'cheevos_username = "Player_1"\ncheevos_password = "hunter2"\ncheevos_token = "TOKEN"\n');
+  be.cheevosAfter({ cheevos: be.raPending });
   assert.deepEqual(be.settingsJson().cheevos, { user: "Player_1", pending: "", failed: false });
   assert.ok(!fs.readFileSync(be.files.raCfg, "utf8").includes("hunter2"));
   // a wrong password: no token, and still wiped
   await be.route("POST", "/api/cheevos/signout", {});
   await be.route("POST", "/api/cheevos/signin", { user: "Player_1", pass: "wrong" });
   fs.writeFileSync(be.files.raCfg, 'cheevos_password = "wrong"\ncheevos_token = ""\n');
-  be.cheevosAfter();
+  be.cheevosAfter({ cheevos: be.raPending });
   assert.deepEqual(be.settingsJson().cheevos, { user: "", pending: "", failed: true });
   assert.ok(!fs.readFileSync(be.files.raCfg, "utf8").includes("wrong"));
 });
@@ -365,7 +376,7 @@ test("progress, rating and a note for a game: set, cleared, kept when it moves",
 
 test("a watched folder's games show where they are, each on its console's shelf, and go when it's unwatched", () => {
   const dir = path.join(home, "My Games");
-  const at = (rel, data = "") => { const p = path.join(dir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, data); return p; };
+  const at = (rel, data = "x") => { const p = path.join(dir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, data); return p; };
   at("Super Mario World (USA).sfc");
   at("Discs/Crash Bandicoot (USA).cue", cue(["Crash Bandicoot (USA).bin"])); at("Discs/Crash Bandicoot (USA).bin");
   const md = Buffer.alloc(0x200); md.write("SEGA MEGA DRIVE", 0x100); at("Sonic 2 (World).bin", md);
@@ -393,8 +404,8 @@ test("a watched folder's games show where they are, each on its console's shelf,
 test("games from RetroArch's playlists come in on their playlist's console, where they are", () => {
   const ra = path.join(home, "RetroArch", "playlists"), lib = path.join(home, "roms");
   fs.mkdirSync(ra, { recursive: true }); fs.mkdirSync(path.join(lib, "md"), { recursive: true }); fs.mkdirSync(path.join(lib, "sfc"), { recursive: true });
-  fs.writeFileSync(path.join(lib, "sfc", "Chrono Trigger (USA).sfc"), "");
-  fs.writeFileSync(path.join(lib, "md", "Streets of Rage 2 (USA).bin"), "");        // .bin: could be several consoles; the playlist says
+  fs.writeFileSync(path.join(lib, "sfc", "Chrono Trigger (USA).sfc"), "x");
+  fs.writeFileSync(path.join(lib, "md", "Streets of Rage 2 (USA).bin"), "x");        // .bin: could be several consoles; the playlist says
   put("snes/Super Metroid (USA).sfc");
   const item = (p, db) => ({ path: p, label: path.basename(p), core_path: "DETECT", core_name: "DETECT", crc32: "DETECT", db_name: db });
   fs.writeFileSync(path.join(ra, "Nintendo - Super Nintendo Entertainment System.lpl"), JSON.stringify({ version: "1.5", items: [
@@ -588,4 +599,101 @@ test("the menu music: every track in the list is there, CC0 and credited, and se
   const r = await be.route("GET", "/music/" + tracks[0].file);
   assert.equal(r.code ?? 200, 200);
   assert.equal((await be.route("GET", "/music/../config.json")).code ?? 404, 404);
+});
+
+test("inside a folder or not: another drive on Windows isn't, nor is a sibling named with two dots", () => {
+  const { within } = createRequire(import.meta.url)("../src/backend.js");
+  assert.equal(within("D:\\Games", "C:\\Users\\me\\Games", path.win32), false);
+  assert.equal(within("C:\\Users\\me\\Games\\nes", "C:\\Users\\me\\Games", path.win32), true);
+  assert.equal(within("C:\\Users\\me", "C:\\Users\\me\\Games", path.win32), false);
+  assert.equal(within("/a/b", "/a"), true); assert.equal(within("/a", "/a"), true);
+  assert.equal(within("/ab", "/a"), false); assert.equal(within("/a/..b", "/a"), true);
+});
+
+test("a state file cut short by a crash isn't replaced with an empty one: it's kept aside and the copy before it is used", () => {
+  const { jload, jsave } = createRequire(import.meta.url)("../src/backend.js");
+  const f = path.join(home, "s.json");
+  jsave(f, { time: { a: 100 } }); jsave(f, { time: { a: 200 } });
+  fs.writeFileSync(f, '{"time": {"a": 2');                                           // cut short
+  assert.deepEqual(jload(f, {}), { time: { a: 100 } });                              // the copy before
+  assert.ok(fs.readdirSync(home).some(n => n.startsWith("s.json.broken-")));
+  fs.writeFileSync(f, "null");
+  assert.deepEqual(typeof jload(f, {}), "object");
+  assert.deepEqual(jload(path.join(home, "none.json"), { x: 1 }), { x: 1 });
+});
+
+test("game files named like JavaScript's own words don't break the shelf", () => {
+  for (const n of ["constructor", "toString", "__proto__", "hasOwnProperty"]) put(`nes/${n}.nes`);
+  put("arcade/constructor.zip");
+  assert.doesNotThrow(() => be.scan());
+  assert.ok(byTitle("constructor"));
+});
+
+test("a game's saves and pictures are its own, not a sequel's whose name starts the same", () => {
+  put("nes/Super Mario Bros.nes"); put("nes/Super Mario Bros. 3.nes");
+  put("nes/Super Mario Bros.png"); put("nes/Super Mario Bros. 3.png"); put("nes/Super Mario Bros.logo.png");
+  be.scan();
+  const smb = byTitle("Super Mario Bros"), files = be.gameFiles(smb).files.map(f => path.basename(f)).sort();
+  assert.deepEqual(files, ["Super Mario Bros.logo.png", "Super Mario Bros.nes", "Super Mario Bros.png"]);
+  be.resumeAt = () => 0; be._coreNames = { fceumm_libretro: "FCEUmm" };
+  fs.mkdirSync(path.join(be.folders.saves, "FCEUmm"), { recursive: true });
+  for (const f of ["Super Mario Bros.srm", "Super Mario Bros. 3.srm"]) fs.writeFileSync(path.join(be.folders.saves, "FCEUmm", f), "s");
+  assert.deepEqual(be.gameSaves(smb).map(s => path.basename(s.file)), ["Super Mario Bros.srm"]);
+});
+
+test("cheats: a cheat file made in RetroArch's menu is left alone, and a download that isn't a zip isn't kept", async () => {
+  const { zipFiles } = createRequire(import.meta.url)("../src/zip.js");
+  put("snes/Super Mario World (USA).sfc"); be.scan();
+  const g = byTitle("Super Mario World");
+  be.resumeAt = () => 0; be._coreNames = { snes9x_libretro: "Snes9x" };
+  const target = path.join(path.dirname(be.files.raCfg), "cheats", "Snes9x", "Super Mario World (USA).cht");
+  // a Wi-Fi sign-in page instead of the zip: refused, so the next try downloads again
+  be.fetchUrl = async () => Buffer.from("<html>Sign in to the Wi-Fi</html>");
+  assert.equal((await be.cheatList(g.id))[0], 502);
+  assert.ok(!fs.existsSync(path.join(be.dirs.data, "cheats.zip")));
+  // the real one
+  const src = path.join(home, "smw.cht"), z = path.join(home, "cheats.zip");
+  fs.writeFileSync(src, 'cheats = 1\n\ncheat0_desc = "Infinite lives"\ncheat0_code = "7E0DBE:63"\ncheat0_enable = false\n');
+  await zipFiles([{ name: "Nintendo - Super Nintendo Entertainment System/Super Mario World (USA).cht", full: src }], z);
+  be.fetchUrl = async () => fs.readFileSync(z);
+  const [code, list] = await be.cheatList(g.id);
+  assert.equal(code, 200); assert.ok(list.cheats.length >= 1);
+  // someone's own file from RetroArch's menu, and no cheats chosen here: untouched
+  fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, "cheats = 0\n# mine\n");
+  assert.equal(await be.writeCheats(g), false);
+  assert.equal(fs.readFileSync(target, "utf8"), "cheats = 0\n# mine\n");
+  // cheats chosen here: the app's own file, marked
+  be.state.cheats[g.id] = [list.cheats[0].key];
+  assert.equal(await be.writeCheats(g), true);
+  assert.match(fs.readFileSync(target, "utf8"), /^# Cheats chosen in The Retro Shelf/);
+});
+
+test("pointing Settings at the games folder in its new place keeps every game's history", async () => {
+  const f = put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const old = byTitle("Chrono Trigger").id;
+  be.state.time[old] = 3600; be.state.plays[old] = 3; be.state.fav.push(old);
+  // moved by hand to another folder
+  const moved = path.join(home, "elsewhere", "Games");
+  fs.mkdirSync(path.join(moved, "snes"), { recursive: true }); fs.renameSync(f, path.join(moved, "snes", "Chrono Trigger (USA).sfc"));
+  await be.route("POST", "/api/settings", { paths: { roms_dir: moved } });
+  const now = byTitle("Chrono Trigger").id;
+  assert.notEqual(now, old);
+  assert.deepEqual([be.state.time[now], be.state.plays[now], be.state.fav.includes(now)], [3600, 3, true]);
+});
+
+test("a dropped BIOS file never replaces a good one, and one of the wrong size isn't added", () => {
+  const drop = path.join(home, "drop"); fs.mkdirSync(drop);
+  fs.writeFileSync(path.join(drop, "scph5501.bin"), Buffer.alloc(524288, 1));
+  let r = be.importCheck([path.join(drop, "scph5501.bin")])[1];
+  assert.deepEqual(r.biosAdded, ["scph5501.bin"]);
+  const there = path.join(be.folders.bios, "scph5501.bin");
+  // another one, the right size but different: the one there stays
+  fs.writeFileSync(path.join(drop, "scph5501.bin"), Buffer.alloc(524288, 2));
+  r = be.importCheck([path.join(drop, "scph5501.bin")])[1];
+  assert.deepEqual([r.biosAdded, r.biosKept], [[], ["scph5501.bin"]]);
+  assert.equal(fs.readFileSync(there)[0], 1);
+  // an empty one: left out
+  fs.writeFileSync(path.join(drop, "scph5501.bin"), "");
+  r = be.importCheck([path.join(drop, "scph5501.bin")])[1];
+  assert.deepEqual(r.biosFailed, ["scph5501.bin"]); assert.equal(fs.readFileSync(there)[0], 1);
 });

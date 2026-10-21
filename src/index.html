@@ -312,12 +312,12 @@ kbd{font:600 11.5px/1 var(--disp);color:var(--chalk);border:1px solid #4a453e;bo
 /* ---------- loading bar + toast ---------- */
 #lbar{position:fixed;top:0;left:0;height:2px;width:100%;z-index:150;background:var(--acc);transform:scaleX(0);transform-origin:left;opacity:0;transition:opacity .3s}
 #lbar.on{opacity:1;animation:lbar 1.2s ease-in-out infinite}
-#toast{position:fixed;left:50%;bottom:52px;transform:translate(-50%,10px) rotate(-.6deg);z-index:160;background:var(--paper-hi);color:var(--ink);padding:10px 18px;border-left:4px solid var(--acc);box-shadow:0 10px 24px rgba(0,0,0,.5);max-width:80vw;font:500 14px/1.4 var(--disp);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+#toast{position:fixed;left:50%;bottom:52px;transform:translate(-50%,10px) rotate(-.6deg);z-index:100160;background:var(--paper-hi);color:var(--ink);padding:10px 18px;border-left:4px solid var(--acc);box-shadow:0 10px 24px rgba(0,0,0,.5);max-width:80vw;font:500 14px/1.4 var(--disp);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
 #toast.show{opacity:1;transform:translate(-50%,0) rotate(-.6deg)}
 #toast.bad{border-left-color:#c23b22}
 
 /* ---------- launch: the box turns to face you on its own shelf ---------- */
-#launch{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:none;align-items:center;justify-content:center;
+#launch{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:none;align-items:safe center;justify-content:center;overflow-y:auto;
   background:radial-gradient(circle 420px at 50% 38%,rgba(255,206,150,.09),transparent 70%),var(--floor)}
 #launch.show{display:flex}
 html:not([data-fx="off"]) #launch.show{animation:fade .2s ease}
@@ -406,6 +406,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .cv .pk{width:15%;aspect-ratio:1;height:auto;top:4%;left:5%;font-size:calc(var(--cw) * .08)}
 #pickbar{position:fixed;left:50%;bottom:52px;z-index:120;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;transform:translate(-50%,20px);opacity:0;visibility:hidden;background:var(--paper);color:var(--ink);box-shadow:0 14px 34px rgba(0,0,0,.6);transition:transform .18s,opacity .18s,visibility .18s;font:600 14px var(--disp)}
 #pickbar.show{transform:translate(-50%,0);opacity:1;visibility:visible}
+.playing #pickbar{visibility:hidden}
 #pickbar .btn{padding:6px 10px;font-size:13px}
 .stk-c{position:relative;flex:none;display:flex;flex-direction:column-reverse;align-items:center;width:96px}
 .tcard{position:relative;max-width:660px;margin:84px auto 0;padding:30px 32px 26px;background:var(--paper);color:var(--ink);transform:rotate(-.7deg);
@@ -455,7 +456,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .slip.wide{width:560px;max-width:86vw}
 #waddr{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15)}
 /* the screensaver: the shelves drift behind, pictures from your games fade through in front */
-#saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,9,8,.6);opacity:0;visibility:hidden;transition:opacity 1.5s,visibility 1.5s;cursor:none}
+#saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,9,8,.6);opacity:0;visibility:hidden;transition:opacity 1.5s,visibility 1.5s;cursor:none}
 #saver.show{opacity:1;visibility:visible}
 .svpic{position:relative;width:70vw;height:62vh}
 .svpic img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity 2.2s;filter:drop-shadow(0 24px 40px rgba(0,0,0,.75))}
@@ -537,7 +538,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 #optl button{padding:11px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.12);background:none;text-align:left;color:var(--ink);font:600 17px var(--disp)}
 #optl button:hover,#optl button:focus{background:rgba(28,25,22,.07);outline:none;padding-left:12px}
 #optl .sep{height:10px}
-#osk{position:fixed;left:0;right:0;bottom:0;z-index:300;display:flex;justify-content:center;padding:18px;background:rgba(12,11,10,.6);transform:translateY(100%);transition:transform .18s ease;visibility:hidden}
+#osk{position:fixed;left:0;right:0;bottom:0;z-index:100300;display:flex;justify-content:center;padding:18px;background:rgba(12,11,10,.6);transform:translateY(100%);transition:transform .18s ease;visibility:hidden}
 #osk.show{transform:none;visibility:visible}
 .oskin{background:var(--paper);padding:16px 18px 10px;box-shadow:0 -10px 30px rgba(0,0,0,.5)}
 #oskv{min-height:30px;margin-bottom:10px;padding:4px 10px;border:1.5px solid var(--ink);background:var(--paper-hi);color:var(--ink);font:600 18px/30px var(--disp);white-space:pre}
@@ -585,7 +586,7 @@ html.tv body.kb,html.tv body.kb *{cursor:none!important}
 .pin.locked .badge{background:rgba(70,42,18,.22);color:rgba(60,35,15,.55);text-shadow:none;box-shadow:inset 0 2px 5px rgba(40,20,5,.5)}
 .pin.locked .badge::after{border-color:rgba(60,35,15,.25)}
 .pin.locked b{color:#4a3119}
-#pinpop{position:fixed;right:24px;bottom:58px;z-index:170;display:flex;align-items:center;gap:14px;padding:12px 18px 12px 12px;background:var(--paper-hi);color:var(--ink);
+#pinpop{position:fixed;right:24px;bottom:58px;z-index:100170;display:flex;align-items:center;gap:14px;padding:12px 18px 12px 12px;background:var(--paper-hi);color:var(--ink);
   box-shadow:0 12px 26px rgba(0,0,0,.5);border-left:4px solid var(--acc);transform:translateY(20px);opacity:0;visibility:hidden;transition:transform .25s ease,opacity .25s,visibility .25s}
 #pinpop.show{transform:none;opacity:1;visibility:visible}
 #pinpop .pin{flex-direction:row}#pinpop .badge{width:48px;height:48px;font-size:20px}
@@ -660,7 +661,7 @@ html:not([data-fx="off"]) #pick.show .panel{animation:rise .22s ease}
 #nlist .v{list-style:none;margin:14px 0 6px -1.1em;font:600 12px var(--disp);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
 
 /* ---------- adding games: drop target and the "which system?" slip ---------- */
-#drop{position:fixed;top:0;left:0;right:0;bottom:0;z-index:140;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s,visibility .15s}
+#drop{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100140;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s,visibility .15s}
 #drop.show{opacity:1;visibility:visible}
 .slip{width:min(520px,86vw);background:var(--paper);color:var(--ink);padding:26px 30px 28px;transform:rotate(-1.2deg);box-shadow:6px 8px 16px rgba(0,0,0,.45);outline:2px dashed var(--ink2);outline-offset:-12px}
 .slip h2{margin:0 0 6px;font:700 30px/1.05 var(--disp)}
@@ -675,7 +676,7 @@ html:not([data-fx="off"]) #pick.show .panel{animation:rise .22s ease}
 .note .fine{margin:-6px 0 14px;font-size:13px;color:var(--ink2)}
 
 /* ---------- splash ---------- */
-#splash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--wall);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .4s ease}
+#splash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100400;background:var(--wall);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .4s ease}
 #splash.out{opacity:0;pointer-events:none}
 #swm{font:700 15px/1 var(--disp);letter-spacing:.42em;padding-left:.42em}
 #smsg{margin:0;color:var(--dust);font-size:14px}
@@ -1257,7 +1258,10 @@ function paintVars(c, g) {
   const s = c.style;
   s.setProperty("--hf", k[0]); s.setProperty("--tf", k[1]); s.setProperty("--af", (g.cv && AFS.get(g.id + ":" + g.cv)) || k[2]);
   /* how far a box comes out: picked, it turns to show its cover; turned over, it comes closer still. Small boxes come further */
-  s.setProperty("--zs", (k[3] * .82).toFixed(2)); s.setProperty("--zf", (k[3] * 1.3).toFixed(2));
+  /* never closer than 700px to the 1100px camera (the perspective): at the biggest box sizes a small box would
+     otherwise fill the window, or pass the camera and vanish */
+  const near = 700 / (UI.card || 170);
+  s.setProperty("--zs", Math.min(k[3] * .82, near * .65).toFixed(2)); s.setProperty("--zf", Math.min(k[3] * 1.3, near).toFixed(2));
   s.setProperty("--lb", lc[0]); s.setProperty("--lf", lc[1]);
   s.setProperty("--bd", bd[0]); s.setProperty("--bf", bd[1]);
   const lv = livery(g);
@@ -1431,10 +1435,13 @@ function slot(g, face, i) {
   return c;
 }
 function manual() {
-  const g = {id: "manual", title: "Manual", system: "Arcade", tag: "", cv: 0};
+  const g = {id: "manual", title: t("Manual"), system: "Arcade", tag: "", cv: 0};
   const c = el("div", "card man"); c.tabIndex = 0; c.dataset.id = "manual"; c._manual = true; paintVars(c, g);
   [["--hf", .9], ["--tf", .085], ["--bd", "#1c1916"], ["--bf", "#ece6d6"]].forEach(v => c.style.setProperty(v[0], v[1]));
   c.appendChild(box(c, g)); c.querySelector(".sys").textContent = "?";
+  /* its front, for when it turns to face you: the app's own manual, not a black box */
+  const cv = c.querySelector(".cv"); cv.classList.add("gen"); c._cv = true;
+  cv.appendChild(el("div", "top", "?")); cv.appendChild(el("b", "", t("Manual"))); cv.appendChild(el("i", "rule")); cv.appendChild(el("div", "ft", t("Settings and help")));
   hookSlot(c); c.onclick = openSettings;
   return c;
 }
@@ -1452,7 +1459,12 @@ function renderShelves(keep) {
   firstPaint = false;
   const secs = sections(); let n = 0, row = null, face = null;
   CARDPX = cardPx();
-  if (!secs.length) { POOL = null; root.appendChild(emptyShelf()); light(); return; }
+  if (!secs.length) {
+    POOL = null; root.appendChild(emptyShelf()); light();
+    /* its buttons can be pressed straight away, with Enter or a controller's A */
+    setTimeout(() => { if (!topPanel() && !LAUNCH.open && !root.contains(document.activeElement)) { const b = root.querySelector(".note button"); if (b) b.focus({preventScroll: true}); } }, 60);
+    return;
+  }
   secs.forEach(S => {
     if (!row || face !== S.face) { const sc = el("section", "sec"); row = el("div", "row" + (S.face ? " face" : "")); sc.appendChild(row); root.appendChild(sc); face = S.face; }
     else row.appendChild(el("div", "bookend"));
@@ -1509,6 +1521,8 @@ function renderShelves(keep) {
   }
   watchFar(root);
   if (same) markUnder();
+  /* a new shelf above it (Recently played, after a first game) can push the box out of view: back into it */
+  if (!LAUNCH.open) { const r = c.getBoundingClientRect(), R = root.getBoundingClientRect(); if (r.bottom < R.top || r.top > R.bottom) reveal(c); }
   POOL = null;
 }
 /* Only boxes within about half a screen of the view are drawn. Every box is several 3D layers, and with a big library
@@ -1549,16 +1563,22 @@ function fitPlates() {
 function emptyShelf() {
   const s = el("section", "sec"), row = el("div", "row"); row.style.height = "calc(var(--rowh) * 2)"; row.style.position = "relative"; s.appendChild(row);
   const n = el("div", "note");
-  if (G.length) {
+  const settingsBtn = () => { const b = el("button", "btn", t("Settings")); b.style.marginLeft = "8px"; b.onclick = openSettings; return b; };
+  if (q) {
     n.appendChild(el("h2", "", t("Nothing matches “{q}”", {q})));
     n.appendChild(el("p", "", t("Try another name. Esc clears the search.")));
+  } else if (G.length) {
+    /* games, but none showing: every console's shelf, or every game, hidden in Settings */
+    n.appendChild(el("h2", "", t("Every game is hidden")));
+    n.appendChild(el("p", "", t("Settings shows the consoles and hidden games again.")));
+    const b = settingsBtn(); b.style.marginLeft = "0"; n.appendChild(b);
   } else {
     n.appendChild(el("h2", "", t("The shelves are empty")));
     n.appendChild(el("p", "", t("Drag game files onto this window and they'll go on the right shelf. Zips, discs and whole folders are fine.")));
     n.appendChild(el("p", "fine", t("The Retro Shelf doesn't come with games. Use copies of games you own.")));
     const a = el("button", "btn primary", t("Add games…")); a.id = "hadd"; a.onclick = addGames;
     const b = el("button", "btn", t("Where to get games")); b.id = "hget"; b.style.marginLeft = "8px"; b.onclick = openGetGames;
-    n.appendChild(a); n.appendChild(b);
+    n.appendChild(a); n.appendChild(b); n.appendChild(settingsBtn());
   }
   row.appendChild(n); return s;
 }
@@ -1632,7 +1652,8 @@ function light() {
 async function toggleFav(id) {
   const r = await api("/api/fav", {id}); if (!r.ok) return;
   FAV = new Set(r.data.fav); beep(660);
-  renderShelves(id);
+  /* the box you're on now, which may not be the one starred if you moved meanwhile */
+  renderShelves(focusId);
 }
 async function rescan() {
   busy(true); await api("/api/rescan", {}); await refresh(true); busy(false); toast(t("Found {n}.", {n: plural(G.length, "game", "games")}));
@@ -1643,6 +1664,9 @@ async function rescan() {
 const plural = (n, one, many) => n.toLocaleString(LOCALE) + " " + t(n === 1 ? one : many);
 /* pressed with a controller just now: the system's file windows need a mouse, so the app's own folder browser instead */
 const byPad = () => Date.now() - padAt < 2000;
+/* something that opens a window of the system's (to choose a file or folder): with only a controller it would leave
+   you stuck there, so it says what it needs instead. Returns true when it did */
+function mouseOnly() { if (!byPad()) return false; toast(t("That opens a window that needs a mouse or keyboard."), true); return true; }
 async function addGames() { if (byPad()) return openBrowse(); const ps = await APP.pickGames(); if (ps && ps.length) importPaths(ps); }
 let importing = false;
 async function importPaths(paths) {
@@ -1653,12 +1677,16 @@ async function importPaths(paths) {
 }
 async function importBatch(paths) {
   busy(true); const r = await api("/api/import/check", {paths}); busy(false);
-  if (!r.ok) return toast(r.data.error || "Couldn't read those files.", true);
+  if (!r.ok) return toast(r.data.error || t("Couldn't read those files."), true);
   const items = r.data.items, fresh = items.filter(i => !i.exists), nb = (r.data.biosAdded || []).length;
-  if (nb) { toast(t("Put {n} in the BIOS folder ({files}).", {n: plural(nb, "BIOS file", "BIOS files"), files: r.data.biosAdded.slice(0, 3).join(", ") + (nb > 3 ? "…" : "")})); checkBios(); }
-  if (!items.length && nb) return;
+  const few = list => list.slice(0, 3).join(", ") + (list.length > 3 ? "…" : ""), kept = r.data.biosKept || [], bad = r.data.biosFailed || [];
+  const said = [nb ? t("Put {n} in the BIOS folder ({files}).", {n: plural(nb, "BIOS file", "BIOS files"), files: few(r.data.biosAdded)}) : "",
+    kept.length ? t("Kept the BIOS files already there ({files}): the ones dropped are different.", {files: few(kept)}) : "",
+    bad.length ? t("{files}: not the right size for that BIOS, so left out.", {files: few(bad)}) : ""].filter(Boolean);
+  if (said.length) { toast(said.join(" "), !nb && !!bad.length); checkBios(); }
+  if (!items.length && (nb || kept.length || bad.length)) return;
   if (!items.length) return toast(r.data.unknownCount ? t("Those don't look like games this can play ({files}).", {files: r.data.unknown.slice(0, 3).join(", ") + (r.data.unknownCount > 3 ? "…" : "")}) : t("No games found there."), true);
-  if (!fresh.length) return toast(items.length === 1 ? "That game is already on your shelves." : "Those games are already on your shelves.");
+  if (!fresh.length) return toast(items.length === 1 ? t("That game is already on your shelves.") : t("Those games are already on your shelves."));
   const unsure = fresh.filter(i => !i.system), picks = unsure.length ? await askSystems(unsure) : {};
   if (!picks) return;
   const go = fresh.map(i => ({id: i.id, system: i.system || picks[i.id]})).filter(i => i.system);
@@ -1682,13 +1710,16 @@ function askSystems(items) {
       l.appendChild(el("b", "", gs.length === 1 ? gs[0].name : t("{n} .{ext} files", {n: gs.length, ext: gs[0].name.split(".").pop()})));
       if (gs.length > 1) l.appendChild(el("span", "", gs.slice(0, 3).map(g => g.name).join(", ") + (gs.length > 3 ? ", …" : "")));
       const sg = el("div", "seg"), opts = gs[0].choices.concat([""]);
-      const draw = () => { clear(sg); opts.forEach((o, i) => { const bt = el("button", pick.get(gs) === o ? "on" : "", o || "Skip"); bt.onclick = () => { const f = document.activeElement === bt; pick.set(gs, o); draw(); if (f) sg.children[i].focus(); beep(520); }; sg.appendChild(bt); }); };
+      const draw = () => { clear(sg); opts.forEach((o, i) => { const bt = el("button", pick.get(gs) === o ? "on" : "", o || t("Skip")); bt.onclick = () => { const f = document.activeElement === bt; pick.set(gs, o); draw(); if (f) sg.children[i].focus(); beep(520); }; sg.appendChild(bt); }); };
       paint.push(draw); draw(); r.appendChild(l); r.appendChild(sg); b.appendChild(r);
     });
-    const close = v => { $("#imp").classList.remove("show"); $("#iok").onclick = $("#icancel").onclick = null; done(v); };
+    const from = opener();
+    const close = v => { $("#imp").classList.remove("show"); $("#iok").onclick = $("#icancel").onclick = null; backTo(from); light(); done(v); };
     $("#iok").onclick = () => { const out = {}; groups.forEach(gs => { const v = pick.get(gs); if (v) gs.forEach(g => { out[g.id] = v; }); }); close(out); };
     $("#icancel").onclick = () => close(null);
-    $("#imp").classList.add("show"); light();
+    blurActive(); $("#imp").classList.add("show"); light();
+    /* the first choice has focus, so arrows, Enter and a controller work straight away */
+    setTimeout(() => { const f = $("#ibody .seg button") || $("#iok"); if (f) f.focus({preventScroll: true}); }, 40);
   });
 }
 let impRun = false;
@@ -1753,12 +1784,14 @@ function setQ(v) { $("#q").value = v; q = v.trim().toLowerCase(); renderShelves(
 /* ---------- launch screen ---------- */
 function showLaunch(g) {
   if (!g) return;
-  LAUNCH.open = true; LAUNCH.id = g.id; blurActive();
+  LAUNCH.open = true; LAUNCH.id = g.id; blurActive(); HTML.classList.add("playing");
+  /* its buttons can be reached (a moment later, so the Enter or A that started the game doesn't press one) */
+  setTimeout(() => { if (LAUNCH.open && !topPanel()) $("#lhide").focus({preventScroll: true}); }, 400);
   const L = $("#launch"); L.classList.remove("closing");
   $("#ltitle").textContent = g.title; $("#ltitle").translate = false;
   const holder = $(".lart"); clear(holder);
   const c = el("div", "lslot"); paintVars(c, g); c.appendChild(box(c, g)); fillCover(c, g); holder.appendChild(c);
-  L.classList.add("starting"); $("#lstat").textContent = MEDIA_VERB[media(g)] + "…"; $("#lhint").style.visibility = "hidden";
+  L.classList.add("starting"); $("#lstat").textContent = t(MEDIA_VERB[media(g)] + "…"); $("#lhint").style.visibility = "hidden";
   /* what this console's games can do besides */
   const c2 = cons(g.system), rw = c2.light && UI.rewind !== false;
   $("#lhint2").textContent = /\.m3u$/i.test(g.file || "") ? t("Asked for another disc? On a keyboard, E opens the tray, D picks the next disc, E closes it. With a controller, hold Select, then Disc Control.")
@@ -1775,7 +1808,9 @@ function hideLaunch() {
   const L = $("#launch");
   if (fxMode() !== "off") { L.classList.add("closing"); setTimeout(() => { if (!LAUNCH.open) L.classList.remove("show", "closing"); }, 200); }
   else L.classList.remove("show");
-  setTimeout(() => { focusById(focusId); light(); }, 220); updatePill();
+  HTML.classList.remove("playing");
+  /* back on the shelf, unless a panel opened meanwhile (it keeps its focus) */
+  setTimeout(() => { if (!LAUNCH.open && !topPanel()) focusById(focusId); light(); }, 220); updatePill();
 }
 /* select a game and scroll its shelf into the middle of the window */
 function showGame(id) {
@@ -1792,6 +1827,8 @@ function backTo(e) {
   const p = topPanel(), f = p && focusables($("#" + p[0]))[0];
   if (f) f.focus({preventScroll: true}); else focusById(focusId);
 }
+/* back to a box after something finished, unless a panel or the playing screen has come up meanwhile */
+function focusFree(id) { if (!topPanel() && !LAUNCH.open) focusById(id); }
 function focusById(id) {
   const c = id && (sel && sel.dataset.id === id && document.getElementById("shelves").contains(sel) ? sel : document.querySelector('#shelves .card[data-id="' + id + '"]'))
     || document.querySelector("#shelves .card");
@@ -1802,7 +1839,7 @@ function tick() {
   const e = Math.max(0, (Date.now() + offset) / 1000 - STATUS.running.since), starting = e < 3, g = byId.get(STATUS.running.id);
   $("#launch").classList.toggle("starting", starting);
   const s = $("#lstat"); clear(s);
-  if (starting) s.textContent = (g ? MEDIA_VERB[media(g)] : "Starting") + "…";
+  if (starting) s.textContent = t((g ? MEDIA_VERB[media(g)] : "Starting") + "…");
   else { s.appendChild(document.createTextNode("Playing  ")); s.appendChild(el("span", "clk", clock(e))); }
   $("#lhint").style.visibility = $("#lhint2").style.visibility = starting ? "hidden" : "visible";
 }
@@ -1812,6 +1849,12 @@ function updatePill() {
   paintUpd();
 }
 
+function paintUpdRow() {
+  const row = $("#updrow"); if (!row) return renderSettings();
+  const d = row.querySelector(".rl span"), b = row.querySelector("button");
+  if (d) d.textContent = updText();
+  if (b) { b.textContent = t({ready: "Restart now", manual: "Download"}[UPD.status] || "Check now"); b.classList.toggle("primary", UPD.status === "ready"); b.disabled = UPD.status === "checking" || UPD.status === "downloading"; }
+}
 /* ---------- updates: the app checks GitHub for a new version and puts it in place when it quits ---------- */
 let UPD = {status: "idle", version: "", progress: 0, error: ""};
 function paintUpd() {
@@ -1821,22 +1864,29 @@ function paintUpd() {
 }
 function updText() {
   const v = UPD.version;
-  return {checking: "Checking…", current: "You have the latest version.",
-    downloading: "Downloading version " + v + "… " + (UPD.progress || 0) + "%",
+  return {checking: t("Checking…"), current: t("You have the latest version."),
+    downloading: t("Downloading version {v}… {p}%", {v, p: UPD.progress || 0}),
     ready: t("Version {v} is ready. It goes in when you quit, or now with Restart.", {v}),
     manual: t("Version {v} is out. Download it from the releases page.", {v}) + (APP.platform === "darwin" ? " " + t("(Kept in your Applications folder, The Retro Shelf updates itself.)") : ""),
     error: UPD.error}[UPD.status] || t("Version {v}", {v: APPINFO.version || ""});
 }
 function updAction() {
+  /* not while games are being added or moved: quitting would cut the copying short */
+  if (UPD.status === "ready" && (STATUS.moving || (STATUS.import && STATUS.import.running))) return toast(t("The new version goes in once the games are copied."));
   if (UPD.status === "ready") APP.update("restart");
   else if (UPD.status === "manual") APP.update("page");
   else APP.update("check");
 }
+/* launched: the game just started, until the shelf has seen it run (or end straight away). launchingNow: a press
+   while one is starting doesn't start another */
+let launched = null, launchingNow = false;
 async function play(g, o) {
-  if (!g) return;
+  if (!g || launchingNow) return;
   if (STATUS.running) { showLaunch(byId.get(STATUS.running.id) || g); return; }
   beep(780, .08); showLaunch(g);
-  const r = await api("/api/launch", {id: g.id, slot: o && o.slot, fresh: !!(o && o.fresh), force: !!(o && o.force), pads: padsForPlayers()});
+  launchingNow = true;
+  let r;
+  try { r = await api("/api/launch", {id: g.id, slot: o && o.slot, fresh: !!(o && o.fresh), force: !!(o && o.force), pads: padsForPlayers()}); } finally { launchingNow = false; }
   if (!r.ok && r.data.elsewhere) {
     /* open on another computer that shares the saves: say so, and let you choose */
     hideLaunch();
@@ -1845,16 +1895,17 @@ async function play(g, o) {
     });
     return;
   }
-  if (!r.ok) { hideLaunch(); toast(r.data.error || "Couldn't start the game.", true); return; }
-  offset = r.data.now * 1000 - Date.now(); STATUS.running = {id: g.id, since: r.data.since};
+  if (!r.ok) { hideLaunch(); toast(r.data.error ? t(r.data.error) : t("Couldn't start the game."), true); return; }
+  offset = r.data.now * 1000 - Date.now(); STATUS.running = {id: g.id, since: r.data.since}; launched = {id: g.id, since: r.data.since};
   g.last = Math.floor(r.data.since); setTimeout(poll, 900);
 }
 function onExit(prev) {
-  const dt = (Date.now() + offset) / 1000 - prev.since, wasStop = stopping; stopping = false;
+  const ex = STATUS.exit, mine = ex && ex.id === prev.id;
+  /* how long it ran, as the app measured it (the shelf may only have looked after it ended) */
+  const dt = mine && ex.dt != null ? ex.dt : (Date.now() + offset) / 1000 - prev.since, wasStop = stopping; stopping = false;
   hideLaunch();
-  const ex = STATUS.exit;
-  if (dt < 4 && !wasStop) toast((ex && ex.id === prev.id && ex.error) || (!PATHS.own ? "The game closed right away. The file may be damaged, or not a game for this system."
-    : "The emulator closed right away. Check the RetroArch program and cores folder in Settings."), true);
+  if (dt < 4 && !wasStop) toast((mine && ex.error && t(ex.error)) || (!PATHS.own ? t("The game closed right away. The file may be damaged, or not a game for this system.")
+    : t("The emulator closed right away. Check the RetroArch program and cores folder in Settings.")), true);
   refresh(true);
 }
 
@@ -1869,7 +1920,10 @@ async function poll() {
   if (s.moving) { busy(true); toast(t("Moving the games… {p}%", {p: Math.floor(100 * s.moving.done / Math.max(1, s.moving.total))})); } else if (STATUS.moving) busy(false);
   STATUS.moving = s.moving;
   if (s.newPins && s.newPins.length && !LAUNCH.open && !s.running && !isOpen("news")) showNewPins(s.newPins);
-  if (prev && !s.running) onExit(prev);
+  if (s.running) launched = null;
+  if (prev && !s.running) { launched = null; onExit(prev); }
+  /* a game that ended before the shelf ever saw it running (it closed within a second): its end, all the same */
+  else if (!s.running && launched && s.exit && s.exit.id === launched.id && s.exit.at >= launched.since - 1) { const l = launched; launched = null; onExit(l); }
   if (!prev && s.running && !LAUNCH.open) showLaunch(byId.get(s.running.id));
   const c = s.covers;
   if (c.found !== lastFound || (lastRun && !c.running)) refresh();
@@ -1895,11 +1949,16 @@ function refresh(force) {
 }
 async function loadLibrary(force) {
   const r = await api("/api/library"); if (!r.ok) return;
-  const sig = () => G.map(g => [g.id, g.cv ? 1 : 0, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden + UI.sort + UI.arrange + JSON.stringify(SHELVES);
+  /* (art isn't in it: new covers, as they download, are drawn into their own boxes below, not the whole wall again) */
+  const sig = () => G.map(g => [g.id, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden + UI.sort + UI.arrange + JSON.stringify(SHELVES);
   const before = sig(), art = new Map(G.map(g => [g.id, g.cv + "/" + g.lv]));
   ingest(r.data);
   if (force || sig() !== before) renderShelves(focusId);
-  else G.forEach(g => { if (art.get(g.id) !== g.cv + "/" + g.lv) redrawArt(g); });
+  else {
+    let drew = false;
+    G.forEach(g => { if (art.get(g.id) !== g.cv + "/" + g.lv) { redrawArt(g); drew = true; } });
+    if (drew) { fitPlates(); light(); }
+  }
 }
 
 /* ---------- a controller (or TV remote setup) reaches everything ----------
@@ -1908,7 +1967,27 @@ async function loadLibrary(force) {
 const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["ctest", () => closeCtest()], ["lst", () => closeList()], ["recap", () => closeRecap()], ["keys", () => closeKeys()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
-const topPanel = () => PANELS.find(([id]) => isOpen(id));
+/* the panel on top: the one opened last (each is raised as it opens), whatever order they're listed in */
+let zTop = 0;
+const topPanel = () => {
+  let best = null, bz = -1;
+  for (const p of PANELS) if (isOpen(p[0])) { const z = +($("#" + p[0]).style.zIndex || 0); if (z > bz) { bz = z; best = p; } }
+  return best;
+};
+for (const [id] of PANELS) {
+  const e = document.getElementById(id); if (!e) continue;
+  let was = e.classList.contains("show");
+  new MutationObserver(() => {
+    const now = e.classList.contains("show");
+    if (now && !was) {
+      /* numbered afresh now and then, in the same order, so they stay below toasts and the keyboard (100000 and up) */
+      if (zTop > 5000) { zTop = 0; PANELS.filter(q => isOpen(q[0])).map(q => $("#" + q[0])).sort((x, y) => +x.style.zIndex - +y.style.zIndex).forEach(x => { x.style.zIndex = String(140 + ++zTop); }); }
+      e.style.zIndex = String(140 + ++zTop);
+    }
+    was = now;
+  })
+    .observe(e, {attributes: true, attributeFilter: ["class"]});
+}
 function focusables(root) {
   return $$("button, input, select, a[href]", root).filter(e => !e.disabled && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden"
     && !(e.type === "checkbox" && !e.closest(".sw")));
@@ -1919,6 +1998,11 @@ function padNav(root, dir) {
   const cur = all.includes(document.activeElement) ? document.activeElement : null;
   if (!cur) { all[0].focus({preventScroll: true}); all[0].scrollIntoView({block: "nearest"}); return; }
   if (cur.type === "range" && (dir === "l" || dir === "r")) { dir === "l" ? cur.stepDown() : cur.stepUp(); cur.dispatchEvent(new Event("input")); cur.dispatchEvent(new Event("change")); return; }
+  /* a list to choose from (the language): left and right go through it, round and round */
+  if (cur.tagName === "SELECT" && (dir === "l" || dir === "r") && cur.options.length) {
+    cur.selectedIndex = (cur.selectedIndex + (dir === "l" ? -1 : 1) + cur.options.length) % cur.options.length;
+    cur.dispatchEvent(new Event("change")); beep(440, .03, .02); return;
+  }
   const at = e => { const b = (e.closest(".sw") || e).getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
   const [cx, cy] = at(cur), [dx, dy] = {l: [-1, 0], r: [1, 0], u: [0, -1], d: [0, 1]}[dir];
   let best = null, bs = Infinity;
@@ -1947,10 +2031,11 @@ function padPress(root) {
 function openOpts(sub) {
   if (LAUNCH.open) return;
   const g = selGame(), list = $("#optl"); clear(list);
-  const item = (label, fn, cls) => { const b = el("button", cls || "", label); b.onclick = () => { closeOpts(true); fn(); }; list.appendChild(b); };
+  /* own: the label is someone's own name (a shelf's), not translated */
+  const item = (label, fn, cls, own) => { const b = el("button", cls || "", label); if (own) b.translate = false; b.onclick = () => { closeOpts(true); fn(); }; list.appendChild(b); };
   if (g && sub === "shelf") {
     $("#optst").textContent = t("Put {title} on a shelf", {title: g.title});
-    SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast((on ? "Took it off " : "Put it on ") + sh.name + "."); }); });
+    SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusFree(g.id); toast(on ? t("Took it off {shelf}.", {shelf: sh.name}) : t("Put it on {shelf}.", {shelf: sh.name})); }, "", true); });
     item("New shelf…", () => openShelfSlip({id: g.id}));
   } else if (sub === "shelfMany" || sub === "progressMany") {
     /* the same thing for every picked game */
@@ -1960,7 +2045,7 @@ function openOpts(sub) {
       SHELVES.forEach(sh => item(sh.name, async () => {
         for (const id of ids) if (!sh.ids.includes(id)) await api("/api/shelves", {op: "add", name: sh.name, id});
         clearPicks(); await refresh(true); toast(t("Put {n} on {shelf}.", {n: plural(ids.length, "game", "games"), shelf: sh.name}));
-      }));
+      }, "", true));
       item(t("New shelf…"), () => openShelfSlip({ids}));
     } else {
       $("#optst").textContent = t("How far are you with these {n}?", {n: ids.length});
@@ -1974,7 +2059,7 @@ function openOpts(sub) {
     const set = v => async () => {
       const r = await api("/api/game/info", {id: g.id, [sub]: v});
       if (!r.ok) return toast(r.data.error || t("Couldn't save that."), true);
-      await refresh(true); focusById(g.id);
+      await refresh(true); focusFree(g.id);
     };
     $("#optst").textContent = sub === "progress" ? t("How far are you with {title}?", {title: g.title}) : t("Rate {title}", {title: g.title});
     if (sub === "progress") Object.entries(PROGRESS).forEach(([k, name]) => item((g.progress === k ? "✓ " : "") + t(name), set(k)));
@@ -1986,7 +2071,7 @@ function openOpts(sub) {
     const own = (g.opts || {})[sub], set = v => async () => {
       const r = await api("/api/game/opts", {id: g.id, opts: {[sub]: v}});
       if (!r.ok) return toast(r.data.error || t("Couldn't save that."), true);
-      await refresh(true); focusById(g.id); toast(v ? t("Saved for {title}.", {title: g.title}) : t("{title} uses Settings again.", {title: g.title}));
+      await refresh(true); focusFree(g.id); toast(v ? t("Saved for {title}.", {title: g.title}) : t("{title} uses Settings again.", {title: g.title}));
     };
     $("#optst").textContent = (sub === "picture" ? t("Picture for {title}", {title: g.title}) : t("Screen shape for {title}", {title: g.title}));
     item((own ? "" : "✓ ") + t("Same as Settings"), set(null));
@@ -2072,6 +2157,12 @@ function applyTv() { HTML.classList.toggle("tv", !!UI.tv); }
 
 /* ---------- collections: series (which of their games you have) and the ones you make, with games you want ---------- */
 let COLL = null, collTab = "series", showHiddenSeries = false, collIO = null;
+/* Collections fetched again in place (a game added or taken off): where you are in the list stays */
+async function reloadColls(tab) {
+  if (tab) collTab = tab;
+  const r = await api("/api/collections");
+  if (r.ok && isOpen("colls")) { COLL = r.data; renderColls(); }
+}
 async function openColls(tab) {
   if (LAUNCH.open) return;
   if (tab) collTab = tab;
@@ -2107,7 +2198,7 @@ function collItem(it, list) {
       e.stopPropagation();
       const r = await api("/api/shelves", {op: "unwant", name: list, system: it.system, look: it.look});
       if (!r.ok) return toast(r.data.error || "Couldn't take it off.", true);
-      if (isOpen("colls")) openColls();
+      if (isOpen("colls")) reloadColls();
     };
     b.appendChild(x);
   }
@@ -2161,12 +2252,12 @@ function openCounts(name) {
 $$("#ctabs button").forEach(b => { b.onclick = () => { collTab = b.dataset.t; renderColls(); beep(520); }; });
 
 /* adding a game to one of your collections: search every game the app knows */
-let waddList = null, waddT = 0;
+let waddList = null, waddT = 0, waddFrom = null;
 function openWantAdd(name) {
-  waddList = name; $("#waddt").textContent = t("Add a game to {name}", {name}); $("#waddq").value = ""; clear($("#waddr"));
+  waddList = name; waddFrom = opener(); $("#waddt").textContent = t("Add a game to {name}", {name}); $("#waddq").value = ""; clear($("#waddr"));
   $("#wadd").classList.add("show"); setTimeout(() => $("#waddq").focus(), 50);
 }
-function closeWantAdd() { if (!isOpen("wadd")) return; $("#wadd").classList.remove("show"); waddList = null; if (isOpen("colls")) openColls(); }
+function closeWantAdd() { if (!isOpen("wadd")) return; $("#wadd").classList.remove("show"); waddList = null; if (isOpen("colls")) reloadColls(); backTo(waddFrom); }
 $("#waddq").addEventListener("input", () => { clearTimeout(waddT); waddT = setTimeout(async () => {
   const q = $("#waddq").value, out = $("#waddr"); if (!q.trim()) return clear(out);
   const r = await api("/api/games/search", {q}); if (!r.ok || $("#waddq").value !== q) return;
@@ -2219,7 +2310,7 @@ async function pickCover(x) {
   const id = pickId; if (!id) return;
   busy(true); const r = await api("/api/covers/pick", {id, thumb: x.thumb, name: x.name}); busy(false);
   if (!r.ok) return toast(r.data.error || "Couldn't use that cover.", true);
-  closePicker(); await refresh(); focusById(id); toast("New cover saved.");
+  closePicker(); await refresh(); focusFree(id); toast(t("New cover saved."));
 }
 $("#pclose").onclick = closePicker;
 $("#pgo").onclick = searchCovers;
@@ -2227,27 +2318,27 @@ $("#pick").addEventListener("mousedown", e => { if (e.target === $("#pick")) clo
 
 /* ---------- your own shelves: make one from a game's right-click menu, rename or delete it in Settings ---------- */
 let nsh = null;   // {id} making a shelf with this game on it, or {from} renaming that shelf
+let nshFrom = null;
 function openShelfSlip(o) {
-  nsh = o; const ren = !!o.from;
+  nsh = o; const ren = !!o.from; nshFrom = opener();
   $("#nsht").textContent = ren ? "Rename shelf" : "New shelf";
   $("#nshp").textContent = ren ? "The name on its plate." : "Name it, like Couch co-op or To finish.";
   $("#nshok").textContent = ren ? "Save" : "Make shelf";
   $("#nshname").value = ren ? o.from : "";
-  if (isOpen("settings")) $("#settings").classList.remove("show");
   $("#nsh").classList.add("show"); light();
   setTimeout(() => { $("#nshname").focus(); $("#nshname").select(); }, 50);
 }
-function closeShelfSlip() { if (!isOpen("nsh")) return; $("#nsh").classList.remove("show"); nsh = null; focusById(focusId); light(); }
+function closeShelfSlip() { if (!isOpen("nsh")) return; $("#nsh").classList.remove("show"); nsh = null; backTo(nshFrom); light(); }
 async function saveShelfSlip() {
   const o = nsh, name = $("#nshname").value.trim(); if (!o) return;
-  if (!name) return toast("Give the shelf a name.", true);
+  if (!name) return toast(t("Give the shelf a name."), true);
   const r = await api("/api/shelves", o.from ? {op: "rename", name: o.from, to: name} : {op: "create", name, id: o.id || (o.ids || [])[0]});
-  if (!r.ok) return toast(r.data.error || "Couldn't save the shelf.", true);
+  if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't save the shelf."), true);
   /* a new shelf for picked games: all of them go on it */
   if (o.ids) { for (const id of o.ids.slice(1)) await api("/api/shelves", {op: "add", name, id}); clearPicks(); }
   closeShelfSlip(); await refresh(true);
-  if (o.id) focusById(o.id);
-  if (isOpen("colls")) openColls("mine");
+  if (o.id && !topPanel()) focusById(o.id);
+  if (isOpen("colls")) reloadColls("mine");
   toast(o.from ? t("Shelf renamed.") : t("Made the shelf “{name}”.", {name}));
 }
 $("#nshok").onclick = saveShelfSlip;
@@ -2266,7 +2357,7 @@ async function saveRename() {
   closeRename();
   const r = await api("/api/game/rename", {id, title: $("#rname").value});
   if (!r.ok) return toast(r.data.error || "Couldn't rename it.", true);
-  await refresh(true); focusById(id);
+  await refresh(true); focusFree(id);
 }
 
 /* ---------- first visit ---------- */
@@ -2345,7 +2436,7 @@ function stopSaver() {
 }
 /* anything pressed wakes it, and does nothing else */
 let wokeByClick = false;
-const woke = e => { lastInput = Date.now(); if (stopSaver() && e.cancelable) { e.preventDefault(); e.stopImmediatePropagation(); if (e.type === "mousedown") wokeByClick = true; } };
+const woke = e => { lastInput = Date.now(); if (stopSaver() && e.cancelable) { e.preventDefault(); e.stopImmediatePropagation(); if (e.type === "mousedown" && e.button === 0) wokeByClick = true; } };
 for (const type of ["keydown", "mousedown"]) window.addEventListener(type, woke, {capture: true});
 /* scrolling doesn't wait for this: the wheel and touches only wake it */
 for (const type of ["wheel", "touchstart"]) window.addEventListener(type, () => { lastInput = Date.now(); stopSaver(); }, {capture: true, passive: true});
@@ -2438,9 +2529,12 @@ async function offerRecap() {
   const r = await api("/api/recap/due", {});
   if (r.ok && r.data.recap && !LAUNCH.open && !topPanel()) openRecap(r.data.recap.year, r.data.recap.month, true);
 }
+let recapSeq = 0;
 async function openRecap(year, month, offered) {
   if (LAUNCH.open) return;
-  const r = await api("/api/recap", {year, month}); if (!r.ok) return;
+  /* an answer that comes after the recap was closed, or after another month was asked for, is let go */
+  const my = ++recapSeq, wasOpen = isOpen("recap");
+  const r = await api("/api/recap", {year, month}); if (!r.ok || my !== recapSeq || (wasOpen && !isOpen("recap"))) return;
   if (offered) api("/api/recap/seen", {year, month});
   await renderRecap(RC = r.data);
   if (!isOpen("recap")) { rcFrom = opener(); blurActive(); $("#recap").classList.add("show"); light(); beep(520); setTimeout(() => $("#rcdone").focus({preventScroll: true}), 40); }
@@ -2541,10 +2635,15 @@ function paintPicks() {
 }
 function togglePick(id) { if (PICKED.has(id)) PICKED.delete(id); else PICKED.add(id); paintPicks(); beep(PICKED.has(id) ? 700 : 500, .03); }
 function clearPicks() { PICKED.clear(); paintPicks(); }
+/* hiding several: once at a time (a second click waits), and saying how many it really hid */
+let hidingPicked = false;
 async function hidePicked() {
+  if (hidingPicked) return;
+  hidingPicked = true; busy(true);
   const ids = [...PICKED];
-  for (const id of ids) await api("/api/game/hide", {id, hidden: true});
-  clearPicks(); await refresh(true); toast(t("Hid {n}. Settings → Library lists hidden games.", {n: plural(ids.length, "game", "games")}));
+  let done = 0;
+  try { for (const id of ids) if ((await api("/api/game/hide", {id, hidden: true})).ok) done++; } finally { hidingPicked = false; busy(false); }
+  clearPicks(); await refresh(true); toast(t("Hid {n}. Settings → Library lists hidden games.", {n: plural(done, "game", "games")}), done < ids.length);
 }
 $("#pkclear").onclick = clearPicks;
 $("#pkhide").onclick = hidePicked;
@@ -2599,7 +2698,7 @@ function openButtons(system) {
       const p = physFor(target);
       listRow(list, name, t("Your controller's {b}", {b: nm[STD_TO_RP.indexOf(p)] || "?"}), [[t("Change"), () => {
         if (!connectedPads().length) return toast(t("Plug in a controller first."), true);
-        $("#lstp").textContent = t("Press the button you want for {name}… (Esc to stop)", {name});
+        $("#lstp").textContent = t("Press the button you want for {name}… (hold B or press Esc to stop)", {name});
         LISTEN = async i => {
           LISTEN = null; $("#lstp").textContent = t("Which of your controller's buttons does each of the console's. Choose one, then press the button you want for it.");
           if (i === null) return;
@@ -2620,8 +2719,13 @@ function openButtonConsoles() {
 }
 
 /* choosing a folder of games with only a controller: the places to start, then folder by folder */
+/* a list opened after a wait (a slow folder, the saves): not if it was closed meanwhile, or something else was asked for */
+let listSeq = 0;
+const listTicket = () => { const my = ++listSeq, wasOpen = isOpen("lst"); return () => my === listSeq && !(wasOpen && !isOpen("lst")) && !LAUNCH.open; };
 async function openBrowse(dir) {
+  const still = listTicket();
   const r = await api("/api/browse", {dir: dir || ""});
+  if (!still()) return;
   if (!r.ok) return toast(r.data.error || t("That folder can't be opened."), true);
   const d = r.data, name = p => p.split(/[\\/]/).filter(Boolean).pop() || p;
   openList(d.dir ? name(d.dir) : t("Choose a folder of games"), d.dir || t("Its games show on the shelves where they are, and new ones appear by themselves."), list => {
@@ -2636,13 +2740,15 @@ async function openBrowse(dir) {
       for (const f of d.folders) listRow(list, f.name, f.games ? plural(f.games, "game", "games") : "", [[t("Open"), () => openBrowse(f.path)]], null, true);
       if (!d.folders.length) list.appendChild(el("p", "", t("No folders inside this one.")));
     } else for (const p of d.places) listRow(list, t(p.label), p.path, [[t("Open"), () => openBrowse(p.path)]]);
-  }, () => d.dir && d.folders.length ? $$("#lstl .lrow button")[2] : null);
+  }, () => d.dir && d.folders.length ? $$("#lstl .lrow button")[2] : null, !!d.dir);
 }
 
 /* ---------- a list of games, each with something to do: hidden games, copies of one game ---------- */
 let listFill = null, listFrom = null;
-function openList(title, about, fill, first) {
+function openList(title, about, fill, first, ownTitle) {
   if (!isOpen("lst")) listFrom = opener();
+  /* ownTitle: the title is a name (a folder's), not translated */
+  $("#lstt").translate = !ownTitle;
   listFill = fill; $("#lstt").textContent = title; $("#lstp").textContent = about;
   clear($("#lstl")); fill($("#lstl"));
   blurActive(); $("#lst").classList.add("show"); light(); beep(520);
@@ -2664,7 +2770,8 @@ function listRow(list, label, sub, buttons, pic, name) {
 }
 /* watched files whose console couldn't be told: you choose */
 async function openUnsure() {
-  const r = await api("/api/watch/unsure", {}); if (!r.ok) return;
+  const still = listTicket();
+  const r = await api("/api/watch/unsure", {}); if (!r.ok || !still()) return;
   let files = r.data.files;
   openList(t("Which console?"), t("These files could be for more than one console, and what's in them doesn't say. Choose for each."), list => {
     if (!files.length) list.appendChild(el("p", "", t("All sorted.")));
@@ -2680,7 +2787,9 @@ async function openSaves(id) {
   const g = byId.get(id); if (!g) return;
   let saves = [];
   const load = async () => { const r = await api("/api/saves/list", {id}); saves = r.ok ? r.data.saves : []; };
+  const still = listTicket();
   await load();
+  if (!still()) return;
   const trash = s => async () => {
     const r = await api("/api/saves/trash", {id, file: s.file});
     if (!r.ok) return toast(r.data.error || t("Couldn't move it to the Trash."), true);
@@ -2689,7 +2798,7 @@ async function openSaves(id) {
   openList(t("Saves for {title}", {title: g.title}), t("Everything the emulator has saved for this game. The Trash keeps what you move there, in case."), list => {
     if (!saves.length) return list.appendChild(el("p", "", t("No saves yet. They appear here once you've played.")));
     listRow(list, t("All of them"), plural(saves.length, "file", "files"), [[t("Export…"), async () => {
-      const r = await APP.exportSaves(id); if (r && r.ok) toast(t("Exported {n}.", {n: plural(r.count, "file", "files")})); else if (r && r.error) toast(r.error, true);
+      const quick = byPad(), r = await APP.exportSaves(id, quick); if (r && r.ok) toast(t("Exported {n}.", {n: plural(r.count, "file", "files")}) + (quick ? " " + t("It's in {place}.", {place: r.path}) : "")); else if (r && r.error) toast(r.error, true);
     }]]);
     for (const s of saves) {
       const when = fmtWhen(s.at) + " · " + fmtSize(s.size), label = s.kind === "battery" ? t("The game's own save") + " (" + s.name.split(".").pop() + ")"
@@ -2752,14 +2861,15 @@ async function saveNote() {
   closeNote();
   const r = await api("/api/game/info", {id, note: $("#notesq").value});
   if (!r.ok) return toast(r.data.error || t("Couldn't save the note."), true);
-  await refresh(true); focusById(id);
+  await refresh(true); focusFree(id);
 }
 $("#notesok").onclick = saveNote; $("#notesno").onclick = closeNote;
-$("#notesq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); saveNote(); } });
+/* Enter in the note box saves it: the keyboard handler below does that (once) */
 
 /* ---------- signing in to RetroAchievements: the password goes to the app's memory, and from there to RetroArch once ---------- */
-function openRas() { blurActive(); $("#rasu").value = CHEEVOS.user || CHEEVOS.pending || ""; $("#rasp").value = ""; $("#ras").classList.add("show"); light(); setTimeout(() => ($("#rasu").value ? $("#rasp") : $("#rasu")).focus(), 50); }
-function closeRas() { if (!isOpen("ras")) return; $("#ras").classList.remove("show"); $("#rasp").value = ""; light(); }
+let rasFrom = null;
+function openRas() { rasFrom = opener(); blurActive(); $("#rasu").value = CHEEVOS.user || CHEEVOS.pending || ""; $("#rasp").value = ""; $("#ras").classList.add("show"); light(); setTimeout(() => ($("#rasu").value ? $("#rasp") : $("#rasu")).focus(), 50); }
+function closeRas() { if (!isOpen("ras")) return; $("#ras").classList.remove("show"); $("#rasp").value = ""; backTo(rasFrom); light(); }
 async function saveRas() {
   const r = await api("/api/cheevos/signin", {user: $("#rasu").value, pass: $("#rasp").value});
   $("#rasp").value = "";
@@ -2808,7 +2918,7 @@ async function closeCheats() {
   if (!c || !c.list.length) return;
   const r = await api("/api/cheats/set", {id: c.id, on: [...c.on]});
   if (!r.ok) return toast(r.data.error || t("Couldn't save the cheats."), true);
-  await refresh(true); focusById(c.id);
+  await refresh(true); focusFree(c.id);
   toast(r.data.count ? t("{n} on, from the next time you play.", {n: plural(r.data.count, "cheat", "cheats")}) : t("Cheats off."));
 }
 $("#cheatok").onclick = () => closeCheats();
@@ -2851,7 +2961,9 @@ function keepFocus(root) {
 function renderSettings() {
   const p = $("#spanel"), st = p.scrollTop, b = $("#sbody"), refocus = keepFocus(b); clear(b);
   const H = t => b.appendChild(el("h3", "", t));
-  const R = (label, desc, ctl) => { const r = el("div", "row2"), l = el("div", "rl"); l.appendChild(el("b", "", label)); if (desc) l.appendChild(el("span", "", desc)); r.appendChild(l); if (ctl) r.appendChild(ctl); b.appendChild(r); return r; };
+  /* a row: its label, a line about it, its control. A label that's someone's own name (a shelf, a folder) comes as
+     {own: "…"}, and isn't translated */
+  const R = (label, desc, ctl) => { const r = el("div", "row2"), l = el("div", "rl"), lb = el("b", "", label && label.own !== undefined ? label.own : label); if (label && label.own !== undefined) lb.translate = false; l.appendChild(lb); if (desc) l.appendChild(el("span", "", desc)); r.appendChild(l); if (ctl) r.appendChild(ctl); b.appendChild(r); return r; };
   const sw = (on, fn) => { const l = el("label", "sw"), i = document.createElement("input"); i.type = "checkbox"; i.checked = on; i.onchange = () => fn(i.checked); l.appendChild(i); l.appendChild(el("span", "sl")); return l; };
   const seg = (opts, val, fn) => { const s = el("div", "seg"); opts.forEach(o => { const bt = el("button", o[0] === val ? "on" : "", o[1]); bt.onclick = () => { fn(o[0]); renderSettings(); }; s.appendChild(bt); }); return s; };
   const field = (val, ok, ph) => { const w = el("div", "fld"), i = document.createElement("input"); i.type = "text"; i.value = val || ""; i.placeholder = ph || ""; i.spellcheck = false; w.appendChild(i); w.appendChild(el("i", "dot " + (ok ? "ok" : "bad"))); w.input = i; return w; };
@@ -2867,7 +2979,7 @@ function renderSettings() {
   R("Arrange shelves by", "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.", seg([["console", "Console"], ["genre", "Genre"], ["decade", "Decade"], ["status", t("Progress")]], UI.arrange || "console", v => { UI.arrange = v; saveUI(); renderShelves(focusId); }));
   R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"], ["rating", t("Rating")]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
-  rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
+  rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); saveUI(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
   R("Shelf size", "", rg);
   R("Spines", "Every console has its own packaging look. Cover art runs a strip of each box's art down its spine; Printed uses plain label colors.",
     seg([["cover", "Cover art"], ["printed", "Printed"]], spineMode(), v => { UI.spine = v; UI.tint = v !== "printed"; saveUI(); PAL.clear(); renderShelves(focusId); }));
@@ -2881,7 +2993,7 @@ function renderSettings() {
 
   H("Library");
   const ab = el("div", "btns"), a1 = el("button", "btn primary", "Add games…"), a2 = el("button", "btn", "Show folder");
-  a1.onclick = () => { closeSettings(); addGames(); }; a2.onclick = () => APP.openFolder("games");
+  a1.onclick = () => { closeSettings(); addGames(); }; a2.onclick = () => mouseOnly() || APP.openFolder("games");
   ab.appendChild(a2); ab.appendChild(a1);
   R("Add games", "Or drag game files onto the window. They're copied into the games folder, sorted by system.", ab);
   /* folders of games shown where they are */
@@ -2890,7 +3002,7 @@ function renderSettings() {
     stop.onclick = async () => { await api("/api/watch/remove", {dir: w.dir}); await refresh(true); renderSettings(); };
     if (w.unsure) { const ch = el("button", "btn", t("Choose consoles…")); ch.onclick = openUnsure; wb.appendChild(ch); }
     wb.appendChild(stop);
-    R(w.dir.split(/[\\/]/).filter(Boolean).pop() || w.dir, w.dir + " · " + plural(w.games, "game", "games") + (w.unsure ? " · " + t("{n} not sure which console", {n: w.unsure}) : ""), wb);
+    R({own: w.dir.split(/[\\/]/).filter(Boolean).pop() || w.dir}, w.dir + " · " + plural(w.games, "game", "games") + (w.unsure ? " · " + t("{n} not sure which console", {n: w.unsure}) : ""), wb);
   }
   const wf = el("button", "btn", t("Watch a folder…"));
   wf.onclick = async () => {
@@ -2928,7 +3040,7 @@ function renderSettings() {
       const r = await api("/api/shelves", {op: "delete", name: sh.name}); if (!r.ok) return toast(r.data.error || "Couldn't delete it.", true); await refresh(true); renderSettings(); toast("Deleted the shelf. Its games are still on their console shelves.");
     };
     bs.appendChild(rn); bs.appendChild(del);
-    R(sh.name, t("Your shelf · {n}", {n: plural(sh.ids.length, "game", "games")}), bs);
+    R({own: sh.name}, t("Your shelf · {n}", {n: plural(sh.ids.length, "game", "games")}), bs);
   });
   const chips = el("div", "chips");
   SYSTEMS.forEach(s => { const n = G.filter(g => g.system === s).length; if (!n) return; const hid = UI.hidden.indexOf(s) >= 0; const c = el("button", hid ? "" : "on", s + " " + n);
@@ -2954,7 +3066,7 @@ function renderSettings() {
   const rf = field(PATHS.roms_dir, PATHS.roms_ok, "roms");
   R("Games folder", PATHS.roms_ok ? t("{n} found.", {n: plural(G.length, "game", "games")}) : t("Folder not found."), rf);
   const mv = el("button", "btn", t("Move to another drive…"));
-  mv.onclick = async () => { const r = await APP.moveLibrary(); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("The games are in {dir} now.", {dir: r.to})); };
+  mv.onclick = async () => { if (mouseOnly()) return; const r = await APP.moveLibrary(); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("The games are in {dir} now.", {dir: r.to})); };
   R(t("Move the games"), t("Copies every game to a folder on another drive, checks each one, then uses them from there. Play history comes along. The old copy goes to the Trash only if you say."), mv);
   const sv = el("button", "btn primary", "Save and scan");
   sv.onclick = async () => {
@@ -2985,18 +3097,19 @@ function renderSettings() {
 
     H("Saves & BIOS");
     const fb = el("div", "btns"), f1 = el("button", "btn", "Saves"), f2 = el("button", "btn", "BIOS");
-    f1.onclick = () => APP.openFolder("saves"); f2.onclick = () => APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
+    f1.onclick = () => mouseOnly() || APP.openFolder("saves"); f2.onclick = () => mouseOnly() || APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
     R("Folders", (PATHS.saves_dir ? t("Game saves are kept in {dir}.", {dir: PATHS.saves_dir}) : t("Game saves are kept in Documents › The Retro Shelf › Saves.")) + " " + t("BIOS files are needed for some consoles; Saves & BIOS below shows which."), fb);
     /* saves shared between computers through a cloud folder */
     const sf = el("div", "btns"), sm = el("button", "btn", PATHS.saves_dir ? t("Move again…") : t("Share them…"));
-    sm.onclick = async () => { const r = await APP.moveSaves(false); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("Saves are in {dir} now. The old copy stays where it was.", {dir: r.to})); };
+    sm.onclick = async () => { if (mouseOnly()) return; const r = await APP.moveSaves(false); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("Saves are in {dir} now. The old copy stays where it was.", {dir: r.to})); };
     sf.appendChild(sm);
     if (PATHS.saves_dir) { const sb = el("button", "btn", t("Back to the usual place")); sb.onclick = async () => { const r = await APP.moveSaves(true); if (r && r.ok) { await refresh(true); renderSettings(); toast(t("Saves are back in Documents › The Retro Shelf.")); } else if (r && r.error) toast(r.error, true); }; sf.appendChild(sb); }
     R(t("Saves on more than one computer"), PATHS.saves_dir ? t("Shared through {dir}. If a game is open on another computer, you're told before playing it here. In iCloud Drive, keep the folder downloaded (right-click it in Finder).", {dir: PATHS.saves_dir})
       : t("Put the saves in a folder in iCloud Drive, Dropbox or OneDrive, and point The Retro Shelf on your other computers at the same folder: your progress follows you."), sf);
     const bb = el("div", "btns"), bk = el("button", "btn", "Back up…"), rs = el("button", "btn", "Restore…");
-    bk.onclick = async () => { const r = await APP.backupSaves(); if (r.ok) toast(t("Backed up {n}.", {n: plural(r.count, "file", "files")})); else if (r.error) toast(r.error, true); };
+    bk.onclick = async () => { const quick = byPad(), r = await APP.backupSaves(quick); if (r.ok) toast(t("Backed up {n}.", {n: plural(r.count, "file", "files")}) + (quick ? " " + t("It's in {place}.", {place: r.path}) : "")); else if (r.error) toast(r.error, true); };
     rs.onclick = async () => {
+      if (mouseOnly()) return;
       const r = await APP.restoreSaves(); if (!r.ok) { if (r.error) toast(r.error, true); return; }
       toast(t("Restored {n}.", {n: plural(r.restored, "save", "saves")}) + (r.kept ? " " + t("Kept {n} newer ones you already had.", {n: r.kept}) : "")
         + (r.failed ? " " + (r.failed === 1 ? t("1 save couldn't be written: is a game or another app using it?") : t("{n} saves couldn't be written: is a game or another app using them?", {n: r.failed})) : ""), !!r.failed); refresh(true);
@@ -3005,7 +3118,7 @@ function renderSettings() {
     R("Back up saves", "Puts all your saves and resume points in one .zip file, or puts them back from one. A save newer than the backup is never replaced.", bb);
     /* a backup every week, by itself */
     const ab2 = el("div", "btns"), abf = el("button", "btn", t("Folder…"));
-    abf.onclick = async () => { const r = await APP.backupFolder(); if (r && r.ok) { await refresh(true); renderSettings(); } };
+    abf.onclick = async () => { if (mouseOnly()) return; const r = await APP.backupFolder(); if (r && r.ok) { await refresh(true); renderSettings(); } else if (r && r.error) toast(t(r.error), true); };
     ab2.appendChild(abf); ab2.appendChild(sw(!!UI.autoBackup, v => { UI.autoBackup = v; saveUI(); renderSettings(); }));
     R(t("Back up by itself"), t("Every week, a backup of all your saves in {dir}. The last five are kept.", {dir: PATHS.backup_dir || ""}) + (PATHS.last_backup ? " " + t("The last one: {when}.", {when: fmtWhen(PATHS.last_backup)}) : ""), ab2);
     R("BIOS files", t("Copied from your own consoles. Drop them on this window and they go in the right place.") + (BIOSST ? "" : " " + t("Checking…")), null);
@@ -3069,7 +3182,7 @@ function renderSettings() {
 
   const ub = el("button", "btn" + (UPD.status === "ready" ? " primary" : ""), {ready: "Restart now", manual: "Download"}[UPD.status] || "Check now");
   ub.disabled = UPD.status === "checking" || UPD.status === "downloading"; ub.onclick = updAction;
-  R("Updates", updText(), ub);
+  R("Updates", updText(), ub).id = "updrow";
   R("Check for updates by itself", "Looks for a new version on GitHub every few hours. Nothing about you or your games is sent.", sw(UI.updates !== false, v => { UI.updates = v; saveUI(); }));
   R("Get test versions", "Try new features before they're finished, as test versions come out. They can have bugs; your games and saves stay as they are.", sw(!!UI.beta, v => { UI.beta = v; saveUI(); if (v) setTimeout(() => APP.update("check").then(s => { if (s) { UPD = s; paintUpd(); } }), 900); }));
   const pb = el("div", "btns"), cp = el("button", "btn", "Copy info"), is = el("button", "btn", "Report a problem");
@@ -3285,6 +3398,7 @@ function reveal(c) {
   if (by) { root.scrollBy({top: by, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, 400); }
 }
 function moveH(d) {
+  const note = $("#shelves .note"); if (note && !sel) { padNav(note, d > 0 ? "r" : "l"); return; }
   const cs = slots(); if (!cs.length) return;
   const i = cs.indexOf(sel); if (i < 0) return goTo(cs[0]);
   goTo(cs[Math.max(0, Math.min(cs.length - 1, i + d))]);
@@ -3303,15 +3417,22 @@ function moveV(d) {
 }
 function jump(d) {
   const fs = $$("#shelves .card.first"); if (!fs.length) return;
-  const i = sel ? fs.findIndex(c => c.dataset.group === sel.dataset.group) : -1, c = fs[(i + d + fs.length) % fs.length];
+  /* from no shelf (the Manual box, say): forward goes to the first, back to the last */
+  const i = sel ? fs.findIndex(c => c.dataset.group === sel.dataset.group) : -1, c = fs[i < 0 ? (d > 0 ? 0 : fs.length - 1) : (i + d + fs.length) % fs.length];
   c.focus({preventScroll: true});
   const root = $("#shelves"), r = c.getBoundingClientRect(), R = root.getBoundingClientRect();
   root.scrollBy({top: r.top - R.top - 40, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, 450); beep(520);
 }
 function selGame() { return sel && !sel._manual ? byId.get(sel.dataset.id) : null; }
-function activate() { if (!sel) return; if (sel._manual) openSettings(); else play(selGame()); }
+function activate() {
+  /* no box to play (an empty shelf): its button with focus is pressed */
+  if (!sel) { const b = document.activeElement; if (b && b.tagName === "BUTTON" && b.closest("#shelves")) b.click(); return; }
+  if (sel._manual) openSettings(); else play(selGame());
+}
 
-$("#q").addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); renderShelves(null); paintQ(); });
+/* the shelves are rebuilt a moment after typing stops: with thousands of games, not for every letter */
+let qT = 0;
+$("#q").addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); paintQ(); clearTimeout(qT); qT = setTimeout(() => renderShelves(null), 120); });
 $("#q").addEventListener("blur", paintQ);
 $("#sclose").onclick = closeSettings;
 $("#gclose").onclick = closeGetGames;
@@ -3337,7 +3458,14 @@ function scrollDone() {
 }
 $("#shelves").addEventListener("wheel", scrollingNow, {passive: true, capture: true});
 $("#shelves").addEventListener("scroll", () => { requestAnimationFrame(light); scrollingNow(); }, {passive: true});
-window.addEventListener("resize", () => { if (CARDPX && cardPx() !== CARDPX) renderShelves(focusId); else { fitPlates(); light(); } });
+/* a moment after resizing stops: the box out on the shelf and the light on it worked out for the window's new size */
+let resizeT = 0;
+window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => {
+  if (CARDPX && cardPx() !== CARDPX) return renderShelves(focusId);
+  fitPlates();
+  if (sel && sel._lsel) { sel._lsel = placeBox(sel, "--zs", 18, "--px", "--py"); if (sel.classList.contains("flip")) placeFlip(sel); }
+  light();
+}, 120); });
 document.addEventListener("mousemove", e => { mouseAt = [e.clientX, e.clientY]; setKb(false); });
 document.addEventListener("keydown", e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -3349,7 +3477,20 @@ document.addEventListener("keydown", e => {
     else if (k === "Enter") padPress($("#osk")); else if (k.length === 1) oskType(k);
     return;
   }
+  /* Enter or Space held down doesn't repeat into the next thing (a panel's Save, then playing the game behind it) */
+  if (e.repeat && (k === "Enter" || k === " ")) { e.preventDefault(); return; }
+  /* Tab goes round the panel or screen on top, not through the shelf behind it */
+  if (k === "Tab") {
+    const tp = topPanel(), root = LAUNCH.open ? $("#launch") : tp ? $("#" + tp[0]) : null;
+    if (root) {
+      const f = focusables(root);
+      if (f.length) { e.preventDefault(); const i = f.indexOf(document.activeElement); f[e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i + 1) % f.length].focus(); }
+      return;
+    }
+  }
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
+  /* Esc closes the panel on top, the same one a controller's B would */
+  if (k === "Escape" && !LISTEN) { const tp = topPanel(); if (tp) { e.preventDefault(); tp[1](); return; } }
   if (isOpen("opts")) { if (k === "Escape") closeOpts(); else if (arrow) { e.preventDefault(); padNav($("#opts"), arrow); } return; }
   if (isOpen("ras")) { if (k === "Escape") closeRas(); else if (k === "Enter") saveRas(); return; }
   if (isOpen("notes")) { if (k === "Escape") closeNote(); else if (k === "Enter") saveNote(); return; }
@@ -3359,7 +3500,7 @@ document.addEventListener("keydown", e => {
   if (isOpen("keys")) { if (k === "Escape" || k === "Enter" || k === "?") closeKeys(); return; }
   if (isOpen("recap")) { if (k === "Escape") closeRecap(); else if (arrow) { e.preventDefault(); padNav($("#recap"), arrow); } return; }
   if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
-  if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
+  if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); else if (arrow) { e.preventDefault(); padNav($("#imp"), arrow); } return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
   if (isOpen("nsh")) { if (k === "Escape") closeShelfSlip(); else if (k === "Enter") saveShelfSlip(); return; }
@@ -3370,7 +3511,7 @@ document.addEventListener("keydown", e => {
   if (isOpen("news")) { if (k === "Escape" || k === "Enter") closeNews(); return; }
   if (isOpen("getg")) { if (k === "Escape") closeGetGames(); return; }
   if (isOpen("settings")) { if (k === "Escape") closeSettings(); return; }
-  if (LAUNCH.open) { setKb(true); if (k === "Escape" || k === "Backspace") hideLaunch(); return; }
+  if (LAUNCH.open) { setKb(true); if (k === "Escape" || k === "Backspace") hideLaunch(); else if (arrow) { e.preventDefault(); padNav($("#launch"), arrow); } return; }
   setKb(true);
   if (e.target === $("#q")) {
     if (k === "Escape") { e.preventDefault(); if (e.target.value) setQ(""); e.target.blur(); focusById(focusId); paintQ(); }
@@ -3437,14 +3578,24 @@ setInterval(() => {
   const n = {l: bt(14) || gp.axes[0] < -.6, r: bt(15) || gp.axes[0] > .6, u: bt(12) || gp.axes[1] < -.6, d: bt(13) || gp.axes[1] > .6,
     a: bt(nin ? 1 : 0), b: bt(nin ? 0 : 1), x: bt(nin ? 3 : 2), y: bt(nin ? 2 : 3), lb: bt(4), rb: bt(5), sel: bt(8), st: bt(9), raw: gp.buttons.map(b => b.pressed)};
   if (!document.hasFocus()) { pad = n; for (const k of ["l", "r", "u", "d"]) if (n[k]) padHeld[k] = Infinity; return; }
-  if (SAVER && n.raw.some((on, i) => on && !(pad.raw || [])[i])) { stopSaver(); pad = n; return; }
+  if (SAVER && (n.raw.some((on, i) => on && !(pad.raw || [])[i]) || ["l", "r", "u", "d"].some(k => n[k] && !pad[k]))) { stopSaver(); pad = n; return; }
   const any = Object.keys(n).some(k => k !== "raw" && n[k]); if (any) { padAt = Date.now(); setKb(true); if (!padOn) { padOn = true; renderHints(); showHintsBriefly(); } }
   const press = k => n[k] && !pad[k];
   /* the d-pad repeats when held: once, then after a moment every tenth of a second */
   const now = Date.now(), rep = k => { if (!n[k]) return false; if (!pad[k]) { padHeld[k] = now + 380; return true; } if (now >= padHeld[k]) { padHeld[k] = now + 110; return true; } return false; };
   const panel = topPanel();
   if (panel && panel[0] === "ctest") { if (n.b && pad.b && now - (padHeld.bDown || now) > 1200) closeCtest(); else if (n.b && !pad.b) padHeld.bDown = now; pad = n; return; }
-  if (LISTEN) { const i = n.raw.findIndex((on, k) => k < 16 && on && !(pad.raw || [])[k]); pad = n; if (i >= 0) LISTEN(i); return; }
+  /* choosing a button: the one pressed and let go is it (the d-pad isn't one to choose); B held down stops choosing */
+  if (LISTEN) {
+    const down = n.raw.findIndex((on, k) => k < 12 && on && !(pad.raw || [])[k]);
+    if (down >= 0 && padHeld.listen == null) { padHeld.listen = down; padHeld.listenAt = now; }
+    if (padHeld.listen != null) {
+      const k = padHeld.listen, held = now - padHeld.listenAt;
+      if (!n.raw[k]) { padHeld.listen = null; if (held < 800) LISTEN(k); }
+      else if (held >= 800 && k === (nin ? 0 : 1)) { padHeld.listen = null; LISTEN(null); }
+    }
+    pad = n; return;
+  }
   if (panel && !LAUNCH.open) {
     const root = $("#" + panel[0]);
     for (const k of ["l", "r", "u", "d"]) if (rep(k)) padNav(root, k);
@@ -3453,7 +3604,12 @@ setInterval(() => {
     if (press("b")) panel[1]();
     if (panel[0] === "colls" && (press("lb") || press("rb"))) { collTab = collTab === "series" ? "mine" : "series"; renderColls(); }
   }
-  else if (LAUNCH.open) { if (press("b")) hideLaunch(); }
+  else if (LAUNCH.open) {
+    /* its buttons with the d-pad and A: Back to the shelf, or Stop game */
+    for (const k of ["l", "r", "u", "d"]) if (rep(k)) padNav($("#launch"), k);
+    if (press("a")) padPress($("#launch"));
+    if (press("b")) hideLaunch();
+  }
   else {
     if (rep("l")) moveH(-1); if (rep("r")) moveH(1); if (rep("u")) moveV(-1); if (rep("d")) moveV(1);
     if (press("lb")) jump(-1); if (press("rb")) jump(1); if (press("st")) openSettings(); if (press("sel")) openOpts();
@@ -3477,7 +3633,8 @@ document.addEventListener("drop", e => {
   importPaths(Array.prototype.map.call(e.dataTransfer.files, f => APP.pathFor(f)).filter(Boolean));
 });
 APP.onMenu(w => {
-  if (w && w.cmd === "update") { UPD = w.state; paintUpd(); if (isOpen("settings")) renderSettings(); return; }
+  /* only the Updates row changes as a download goes: the rest of Settings (a path half typed) stays as it is */
+  if (w && w.cmd === "update") { UPD = w.state; paintUpd(); if (isOpen("settings")) paintUpdRow(); return; }
   if (w && w.cmd === "refresh") { refresh(true).then(() => { if (w.focus) focusById(w.focus); }); return; }
   if (w && w.cmd === "error") { toast(w.text, true); return; }
   if (LAUNCH.open) return;
@@ -3510,7 +3667,7 @@ function t(text, vars) {
    The shelves' own text (game names, console plates) is the games', and stays as it is */
 const LANGS = [["auto", "Automatic"], ["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["pt", "Português"], ["ja", "日本語"]];
 const LOCALES = {es: "es", fr: "fr", de: "de", pt: "pt-BR", ja: "ja"};
-const T_ATTRS = ["aria-label", "title", "placeholder"], T_SKIP = "#shelves,script,style,.card,.ci,.tro,#saver,#nlist,[translate=no]";
+const T_ATTRS = ["aria-label", "title", "placeholder"], T_SKIP = "#shelves,script,style,.card,.ci,.tro,.lslot,#saver,#nlist,#oskv,[translate=no]";
 let langObs = null, HARVEST = null;
 function trText(n) {
   if (n.__en !== undefined && n.nodeValue !== n.__tr) n.__en = undefined;   // the app wrote new text into it since

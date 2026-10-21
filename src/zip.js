@@ -6,7 +6,7 @@ const path = require("path");
 const util = require("util");
 const zlib = require("zlib");
 
-/** every file under dir (not hidden ones), as paths relative to it */
+/** every file under dir (not hidden ones), as paths relative to it; a link to a file counts as that file */
 function filesIn(dir, rel = "") {
   let out = [];
   for (const e of fs.readdirSync(path.join(dir, rel), { withFileTypes: true })) {
@@ -14,6 +14,7 @@ function filesIn(dir, rel = "") {
     const r = rel ? rel + "/" + e.name : e.name;
     if (e.isDirectory()) out = out.concat(filesIn(dir, r));
     else if (e.isFile()) out.push(r);
+    else if (e.isSymbolicLink()) { try { if (fs.statSync(path.join(dir, r)).isFile()) out.push(r); } catch {} }
   }
   return out;
 }
@@ -22,21 +23,46 @@ function filesIn(dir, rel = "") {
 function dosTime(d) {
   return {
     time: (d.getHours() << 11) | (d.getMinutes() << 5) | Math.floor(d.getSeconds() / 2),
-    date: ((Math.max(1980, d.getFullYear()) - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
+    // the form has room for 1980 to 2107: a file dated outside it (a clock gone wrong) is put at the nearest end
+    date: ((Math.min(2107, Math.max(1980, d.getFullYear())) - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
   };
 }
 
 // a plain zip file counts sizes and places in 32 bits: a backup can't pass 4 GB, or hold more than 65,535 files
 const MAX = 0xffffffff, TOO_BIG = "the saves add up to more than 4 GB, too much for one backup file";
 const deflate = util.promisify(zlib.deflateRaw), inflate = util.promisify(zlib.inflateRaw);
+// what a zip may claim, read before trusting it: an index past 64 MB, or one file past 512 MB, isn't saves or cheats
+const MAX_INDEX = 64 * 1048576, MAX_ENTRY = 512 * 1048576;
+/** an entry's contents, unpacked to no more than the size its index gives (a "zip bomb" stops there) */
+const unpack = (method, body, size) => method === 8 ? inflate(body, { maxOutputLength: Math.max(1, size) }) : method === 0 ? Promise.resolve(body) : Promise.resolve(null);
+// what old Windows zips use for names that aren't marked as UTF-8: code page 437's upper half
+const CP437 = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
+function entryName(cd, at, nlen) {
+  const raw = cd.subarray(at + 46, at + 46 + nlen);
+  if (cd.readUInt16LE(at + 8) & 0x800 || !raw.some(b => b >= 0x80)) return raw.toString("utf8");
+  const utf8 = raw.toString("utf8");
+  return utf8.includes("\ufffd") ? [...raw].map(b => b < 0x80 ? String.fromCharCode(b) : CP437[b - 0x80]).join("") : utf8;
+}
+/** a zip's index: where it is and how long, checked against the file's size */
+async function index(fh, read) {
+  const size = (await fh.stat()).size, tail = await read(Math.max(0, size - 65557), Math.min(size, 65557));
+  let e = -1;
+  for (let i = tail.length - 22; i >= 0; i--) if (tail.readUInt32LE(i) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error("that isn't a zip file");
+  const len = tail.readUInt32LE(e + 12), start = tail.readUInt32LE(e + 16);
+  if (len > MAX_INDEX || start + len > size) throw new Error("that zip file is damaged");
+  return { count: tail.readUInt16LE(e + 10), cd: await read(start, len) };
+}
 
 /**
- * Zips the folder dir into the file out, with every entry under the folder's own name ("Saves/…"), so unzipping
- * puts the folder back. Returns how many files went in. Works a file at a time without holding up the app.
+ * Zips the folder dir into the file out, with every entry under one top folder ("Saves/…" whatever the folder is
+ * called, so a backup of saves kept in a cloud folder restores the same way), so unzipping puts the folder back.
+ * Returns how many files went in. Works a file at a time without holding up the app.
  */
-async function zipFolder(dir, out) {
-  const top = path.basename(dir);
-  return zipFiles(filesIn(dir).map(rel => ({ name: top + "/" + rel, full: path.join(dir, ...rel.split("/")) })), out);
+async function zipFolder(dir, out, top = "Saves") {
+  // a zip or a half-written file among the saves isn't a save (and a backup kept there would hold the ones before)
+  const files = filesIn(dir).filter(r => !/\.(zip|part|tmp)$/i.test(r));
+  return zipFiles(files.map(rel => ({ name: top + "/" + rel, full: path.join(dir, ...rel.split("/")) })), out);
 }
 
 /** Zips these files ({name in the zip, full path}) into the file out. Returns how many went in. */
@@ -81,40 +107,44 @@ async function zipFiles(list, out) {
 }
 
 /**
- * Puts a backup's files back into dir. Entries under "Saves/" (as zipFolder writes them) land in dir; a save already
- * there that's newer than the one in the backup is kept. Nothing is written outside dir. A save that can't be
- * written (a game has it open, a name this computer doesn't allow) is counted as failed and the rest still go back.
- * Reads the backup a piece at a time, so its size doesn't matter. Returns counts.
+ * Puts a backup's files back into dir. A backup holds one top folder ("Saves/…" as zipFolder writes them, or the
+ * folder's own name in backups from before); its contents land in dir, and a save already there that's newer than
+ * the one in the backup is kept. A zip that isn't laid out like that isn't a backup, and nothing is restored from it.
+ * Nothing is written outside dir. A save that can't be written (a game has it open, a name this computer doesn't
+ * allow) is counted as failed and the rest still go back. Reads the backup a piece at a time. Returns counts.
  */
 async function unzipInto(file, dir) {
   const fh = await fsp.open(file, "r");
   const read = async (pos, len) => { const b = Buffer.alloc(len); const { bytesRead } = await fh.read(b, 0, len, pos); return b.subarray(0, bytesRead); };
   const res = { restored: 0, kept: 0, skipped: 0, failed: 0 };
   try {
-    const size = (await fh.stat()).size, tail = await read(Math.max(0, size - 65557), Math.min(size, 65557));
-    let e = -1;
-    for (let i = tail.length - 22; i >= 0; i--) if (tail.readUInt32LE(i) === 0x06054b50) { e = i; break; }
-    if (e < 0) throw new Error("that isn't a zip file");
-    const count = tail.readUInt16LE(e + 10), cd = await read(tail.readUInt32LE(e + 16), tail.readUInt32LE(e + 12));
+    const { count, cd } = await index(fh, read), list = [];
     let at = 0;
     for (let k = 0; k < count && at + 46 <= cd.length && cd.readUInt32LE(at) === 0x02014b50; k++) {
-      const method = cd.readUInt16LE(at + 10), time = cd.readUInt16LE(at + 12), date = cd.readUInt16LE(at + 14), crc = cd.readUInt32LE(at + 16);
-      const csize = cd.readUInt32LE(at + 20), nlen = cd.readUInt16LE(at + 28), xlen = cd.readUInt16LE(at + 30), clen = cd.readUInt16LE(at + 32);
-      const local = cd.readUInt32LE(at + 42), name = cd.toString("utf8", at + 46, at + 46 + nlen);
-      at += 46 + nlen + xlen + clen;
-      if (name.endsWith("/")) continue;
-      const parts = name.replace(/^Saves\//, "").split("/");
+      const nlen = cd.readUInt16LE(at + 28);
+      list.push({ method: cd.readUInt16LE(at + 10), time: cd.readUInt16LE(at + 12), date: cd.readUInt16LE(at + 14), crc: cd.readUInt32LE(at + 16),
+        csize: cd.readUInt32LE(at + 20), usize: cd.readUInt32LE(at + 24), local: cd.readUInt32LE(at + 42), name: entryName(cd, at, nlen).replace(/\\/g, "/") });
+      at += 46 + nlen + cd.readUInt16LE(at + 30) + cd.readUInt16LE(at + 32);
+    }
+    // the backup's one top folder (Finder's __MACOSX extras aside)
+    const files = list.filter(x => !x.name.endsWith("/") && !/^__MACOSX(\/|$)/.test(x.name));
+    const tops = new Set(files.map(x => x.name.includes("/") ? x.name.split("/")[0] : ""));
+    if (!files.length || tops.size !== 1 || tops.has("")) throw new Error("that isn't a backup of saves from The Retro Shelf");
+    for (const { method, time, date, crc, csize, usize, local, name } of files) {
+      const parts = name.split("/").slice(1);
       // Finder's extra files, hidden files, and anything that would end up outside the Saves folder are left out
       if (/^__MACOSX/.test(name) || parts.some(p => !p || p === "." || p === ".." || p.startsWith(".") || /[:\\]/.test(p))) { res.skipped++; continue; }
       const to = path.join(dir, ...parts);
       if (path.relative(dir, to).startsWith("..")) { res.skipped++; continue; }
       const when = new Date(((date >> 9) & 127) + 1980, ((date >> 5) & 15) - 1, date & 31, (time >> 11) & 31, (time >> 5) & 63, (time & 31) * 2);
       try { if ((await fsp.stat(to)).mtimeMs > when.getTime() + 2000) { res.kept++; continue; } } catch {}
-      const lh = await read(local, 30);
-      if (lh.length < 30 || lh.readUInt32LE(0) !== 0x04034b50) { res.skipped++; continue; }
-      const body = await read(local + 30 + lh.readUInt16LE(26) + lh.readUInt16LE(28), csize);
+      if (csize > MAX_ENTRY || usize > MAX_ENTRY) { res.skipped++; continue; }
       let data;
-      try { data = method === 8 ? await inflate(body) : method === 0 ? body : null; } catch { data = null; }
+      try {
+        const lh = await read(local, 30);
+        if (lh.length < 30 || lh.readUInt32LE(0) !== 0x04034b50) { res.skipped++; continue; }
+        data = await unpack(method, await read(local + 30 + lh.readUInt16LE(26) + lh.readUInt16LE(28), csize), usize);
+      } catch { data = null; }
       if (!data || zlib.crc32(data) !== crc) { res.skipped++; continue; }
       try {
         await fsp.mkdir(path.dirname(to), { recursive: true });
@@ -138,15 +168,11 @@ async function entries(file) {
   const fh = await fsp.open(file, "r");
   const read = async (pos, len) => { const b = Buffer.alloc(len); const { bytesRead } = await fh.read(b, 0, len, pos); return b.subarray(0, bytesRead); };
   try {
-    const size = (await fh.stat()).size, tail = await read(Math.max(0, size - 65557), Math.min(size, 65557));
-    let e = -1;
-    for (let i = tail.length - 22; i >= 0; i--) if (tail.readUInt32LE(i) === 0x06054b50) { e = i; break; }
-    if (e < 0) throw new Error("that isn't a zip file");
-    const count = tail.readUInt16LE(e + 10), cd = await read(tail.readUInt32LE(e + 16), tail.readUInt32LE(e + 12)), out = [];
+    const { count, cd } = await index(fh, read), out = [];
     let at = 0;
     for (let k = 0; k < count && at + 46 <= cd.length && cd.readUInt32LE(at) === 0x02014b50; k++) {
-      const nlen = cd.readUInt16LE(at + 28), name = cd.toString("utf8", at + 46, at + 46 + nlen);
-      if (!name.endsWith("/")) out.push({ name, method: cd.readUInt16LE(at + 10), crc: cd.readUInt32LE(at + 16), csize: cd.readUInt32LE(at + 20), local: cd.readUInt32LE(at + 42) });
+      const nlen = cd.readUInt16LE(at + 28), name = entryName(cd, at, nlen);
+      if (!name.endsWith("/")) out.push({ name, method: cd.readUInt16LE(at + 10), crc: cd.readUInt32LE(at + 16), csize: cd.readUInt32LE(at + 20), usize: cd.readUInt32LE(at + 24), local: cd.readUInt32LE(at + 42) });
       at += 46 + nlen + cd.readUInt16LE(at + 30) + cd.readUInt16LE(at + 32);
     }
     return out;
@@ -158,9 +184,9 @@ async function readEntry(file, entry) {
   const fh = await fsp.open(file, "r");
   try {
     const lh = Buffer.alloc(30); await fh.read(lh, 0, 30, entry.local);
-    if (lh.readUInt32LE(0) !== 0x04034b50) throw new Error("damaged zip file");
+    if (lh.readUInt32LE(0) !== 0x04034b50 || entry.csize > MAX_ENTRY || (entry.usize || 0) > MAX_ENTRY) throw new Error("damaged zip file");
     const body = Buffer.alloc(entry.csize); await fh.read(body, 0, entry.csize, entry.local + 30 + lh.readUInt16LE(26) + lh.readUInt16LE(28));
-    const data = entry.method === 8 ? await inflate(body) : entry.method === 0 ? body : null;
+    const data = await unpack(entry.method, body, entry.usize ?? MAX_ENTRY);
     if (!data || zlib.crc32(data) !== entry.crc) throw new Error("damaged zip file");
     return data;
   } finally { await fh.close(); }
