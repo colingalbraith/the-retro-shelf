@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0-beta.15
+
+- **Fast-forward speed:** Settings → While you play → Fast-forward speed: 2×, 3× (as before), 4× or Fastest, as fast
+  as your computer can go. It's kept for every game. The sound now speeds up smoothly with the game instead of
+  breaking up, and is off at Fastest.
+
 ## 0.4.0-beta.14
 
 - **Four more languages (beta):** Italiano, Русский, 한국어 and 简体中文, in Settings → App → Language, or by
