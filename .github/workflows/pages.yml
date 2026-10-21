@@ -21,7 +21,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # a release: publish again from main (GitHub Pages only takes main, not a release's tag), so the button offers it
+  refresh:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
   publish:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
