@@ -361,7 +361,8 @@ function ipc() {
   ipcMain.handle("copy-report", () => { clipboard.writeText(backend.report(app.getVersion())); return true; });
   ipcMain.handle("update", (_, what) => {
     if (what === "check") return updater.check(true);
-    if (what === "restart") return updater.restart();
+    // a game still open is closed properly first (saving), not left running while the new version goes in
+    if (what === "restart") return (backend.running && backend.running.alive ? backend.stop() : Promise.resolve()).finally(() => updater.restart());
     if (what === "page") return shell.openExternal(updater.page());
     return updater.state;
   });
@@ -429,6 +430,13 @@ app.on("will-quit", () => { if (updater) updater.applyOnQuit(); });
 
 // Quitting mid-game: let RetroArch save and close first.
 app.on("before-quit", e => {
+  // the games half moved to another drive: quitting would leave a partial copy there
+  if (!quitting && backend && backend.moving && win && !win.isDestroyed()) {
+    const r = dialog.showMessageBoxSync(win, { type: "warning", buttons: [tm("Keep Moving"), tm("Quit Anyway")], defaultId: 0, cancelId: 0,
+      message: tm("The games are still being moved."), detail: tm("Quitting now leaves a partial copy in the new place. Your games stay where they were.") });
+    if (r === 0) { e.preventDefault(); return; }
+  }
+  if (updater) updater.dropUnwanted();
   if (quitting || !backend || !backend.running || !backend.running.alive) return;
   e.preventDefault();
   quitting = true;

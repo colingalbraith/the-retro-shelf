@@ -5,12 +5,13 @@
 // downloads the new app, checks it against the checksum published with the release, and swaps it in on quit.
 // With test versions on, both also take GitHub prereleases (0.4.0-beta.1); otherwise only full releases.
 const { app, net } = require("electron");
-const { spawn, execFileSync } = require("child_process");
+const { spawn, execFile } = require("child_process");
+const run = require("util").promisify(execFile);
 const { EventEmitter } = require("events");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { compare } = require("./version");
+const { compare, isTest } = require("./version");
 
 const REPO = "colingalbraith/the-retro-shelf";
 const PAGE = `https://github.com/${REPO}/releases/latest`;
@@ -51,7 +52,18 @@ class Updater extends EventEmitter {
     this.beta = () => false;
   }
   set(s) { Object.assign(this.state, s); this.emit("change", { ...this.state }); }
-  page() { return PAGE; }
+  /** where to download by hand: the test version's own page when that's what's waiting (the latest release isn't it) */
+  page() { return this.state.status === "manual" && isTest(this.state.version) ? `https://github.com/${REPO}/releases/tag/v${this.state.version}` : PAGE; }
+
+  /** a test version downloaded before test versions were turned off isn't put in place */
+  unwanted() { return ["ready", "manual"].includes(this.state.status) && isTest(this.state.version) && !this.beta(); }
+  dropUnwanted() {
+    if (!this.unwanted()) return false;
+    if (this.ready) { try { fs.rmSync(this.ready.work, { recursive: true, force: true }); } catch {} this.ready = null; }
+    if (this.au) this.au.autoInstallOnAppQuit = false;
+    this.set({ status: "idle", version: "", progress: 0 });
+    return true;
+  }
 
   /** checks shortly after launch and every few hours, while enabled() says so; beta() says whether test versions count */
   start(enabled, beta) {
@@ -63,6 +75,7 @@ class Updater extends EventEmitter {
   }
 
   async check(manual) {
+    this.dropUnwanted();
     if (["checking", "downloading", "ready"].includes(this.state.status)) return this.state;
     if (!app.isPackaged && !process.env.RETRO_SHELF_UPDATE_FEED) { this.set({ status: "error", error: "Updates only work in the installed app." }); return this.state; }
     this.set({ status: "checking", error: "" });
@@ -92,6 +105,12 @@ class Updater extends EventEmitter {
     autoUpdater.on("download-progress", p => this.set({ progress: Math.round(p.percent || 0) }));
     autoUpdater.on("update-downloaded", i => this.set({ status: "ready", version: i.version }));
     autoUpdater.on("error", e => this.set({ status: "error", error: "Update failed: " + (e && e.message || e) }));
+    // Linux: an AppImage named after its version gets the new one's name; where the old one was (a Steam shortcut points
+    // there), a link to the new one. Named without a version since 0.4.0, later ones are replaced in place
+    autoUpdater.on("appimage-filename-updated", dest => {
+      const old = process.env.APPIMAGE;
+      if (old && old !== dest) { try { if (!fs.existsSync(old)) fs.symlinkSync(dest, old); } catch {} }
+    });
     return (this.au = autoUpdater);
   }
   async checkWindows() {
@@ -147,11 +166,12 @@ class Updater extends EventEmitter {
     try {
       const zip = path.join(work, "update.zip");
       await this.download(base + "/" + encodeURIComponent(file.url), zip, file);
-      execFileSync("ditto", ["-x", "-k", zip, work]);
+      // unpacked in the background: hundreds of MB, and the app stays usable meanwhile
+      await run("ditto", ["-x", "-k", zip, work]);
       fs.rmSync(zip, { force: true });
       const next = fs.readdirSync(work).find(f => f.endsWith(".app"));
       if (!next) throw new Error("the download didn't contain the app");
-      const v = execFileSync("plutil", ["-extract", "CFBundleShortVersionString", "raw", path.join(work, next, "Contents", "Info.plist")]).toString().trim();
+      const v = (await run("plutil", ["-extract", "CFBundleShortVersionString", "raw", path.join(work, next, "Contents", "Info.plist")])).stdout.toString().trim();
       if (v !== feed.version) throw new Error(`the download is version ${v}, not ${feed.version}`);
       this.ready = { bundle, next: path.join(work, next), work };
       this.set({ status: "ready", progress: 100 });
@@ -166,17 +186,24 @@ class Updater extends EventEmitter {
     const r = await net.fetch(url, { cache: "no-store" });
     if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
     const total = file.size || +r.headers.get("content-length") || 0, hash = crypto.createHash("sha512"), out = fs.createWriteStream(to);
+    // a write that fails (a full disk) ends the download with that error, rather than leaving it waiting forever
+    let failed = null;
+    const fail = new Promise((_, bad) => out.once("error", e => { failed = e; bad(e); }));
+    fail.catch(() => {});
     let got = 0, last = 0;
     try {
       for await (const chunk of r.body) {
+        if (failed) throw failed;
         hash.update(chunk); got += chunk.length;
-        if (!out.write(chunk)) await new Promise(res => out.once("drain", res));
+        if (!out.write(chunk)) await Promise.race([new Promise(res => out.once("drain", res)), fail]);
         const pct = total ? Math.floor(got * 100 / total) : 0;
         if (pct >= last + 2) { last = pct; this.set({ progress: Math.min(99, pct) }); }
       }
     } finally {
-      await new Promise(res => out.end(res));
+      if (failed) out.destroy();
+      else await Promise.race([new Promise(res => out.end(res)), fail]).catch(() => {});
     }
+    if (failed) throw failed;
     if (file.size && got !== file.size) throw new Error("the download was incomplete");
     if (hash.digest("base64") !== file.sha512) throw new Error("the download didn't match its checksum");
   }
@@ -192,6 +219,7 @@ class Updater extends EventEmitter {
 
   /** on a Mac, as the app quits: once this process has exited, the new app takes the old one's place */
   applyOnQuit() {
+    if (this.dropUnwanted()) return;
     if (process.platform !== "darwin" || !this.ready || this.applied) return;
     this.applied = true;
     const { bundle, next, work } = this.ready;

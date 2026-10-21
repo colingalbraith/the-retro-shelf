@@ -128,7 +128,7 @@
           ]
         }
       ],
-      "artifactName": "The-Retro-Shelf-${version}-linux-x86_64.${ext}",
+      "artifactName": "The-Retro-Shelf-linux-x86_64.${ext}",
       "category": "Game",
       "icon": "build/icon.png",
       "executableName": "the-retro-shelf",
