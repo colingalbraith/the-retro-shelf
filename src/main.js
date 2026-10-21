@@ -292,7 +292,7 @@ app.on("web-contents-created", (_, wc) => {
 
 app.whenReady().then(() => {
   if (!app.isPackaged && process.platform === "darwin") app.dock.setIcon(DEV_ICON);
-  backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion() }, fetchUrl);
+  backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion(), watch: true }, fetchUrl);
   backend.trash = p => shell.trashItem(p);
   backend.init();
   if (OLD_GAMES) backend.remapIds(OLD_GAMES);
