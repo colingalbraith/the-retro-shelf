@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0-beta.14
+
+- **Four more languages (beta):** Italiano, Русский, 한국어 and 简体中文, in Settings → App → Language, or by
+  themselves when your computer uses one of them. Like the others, these are first drafts: "Suggest better words"
+  there says what reads oddly. Counting follows each language's own rules (in Russian, 1 игра, 2 игры, 5 игр).
+- **Linux:** the AppImage opens on Ubuntu 22.04 and later and other systems that don't come with the old libfuse2 it
+  used to need: it now carries that part itself.
+
 ## 0.4.0-beta.13
 
 A careful look for bugs, and their fixes. Among them:
