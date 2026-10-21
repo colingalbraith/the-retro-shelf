@@ -439,6 +439,13 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .cmore button{border:0;background:none;padding:0;color:var(--chalk);font:inherit;text-decoration:underline;text-underline-offset:3px}
 .slip.wide{width:560px;max-width:86vw}
 #waddr{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15)}
+/* a list of games with something to do for each: hidden ones, copies of the same game */
+#lstl{max-height:52vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15);scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
+#lstl h3{margin:14px 0 4px;font:600 12px var(--disp);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+#lstl .lrow{display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid rgba(28,25,22,.1)}
+#lstl .lrow span{flex:1;min-width:0;font:500 15px var(--disp);color:var(--ink);overflow-wrap:anywhere}
+#lstl .lrow small{display:block;color:var(--ink2);font-size:12.5px;font-weight:400}
+#lstl .lrow .btn{padding:6px 10px;font-size:13px}
 /* a game's cheats: a box to tick for each */
 #cheatl{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15);scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
 #cheatl button{display:flex;width:100%;gap:12px;align-items:baseline;padding:9px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.1);background:none;text-align:left;color:var(--ink);font:500 15px var(--disp)}
@@ -717,6 +724,9 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     </div>
   </div>
 </div>
+
+<div id="lst" class="over"><div class="slip wide"><h2 id="lstt"></h2><p id="lstp"></p><div id="lstl"></div>
+  <div class="btns"><button class="btn primary" id="lstok">Done</button></div></div></div>
 
 <div id="notes" class="over"><div class="slip"><h2 id="notest">Note</h2><p>A line or two for yourself, like where you're stuck. It goes on the back of the box.</p>
   <input type="text" id="notesq" spellcheck="true" autocomplete="off" maxlength="280" placeholder="Stuck on the water temple">
@@ -1343,7 +1353,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
@@ -1460,7 +1470,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("lst") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1687,7 +1697,7 @@ async function loadLibrary(force) {
 /* ---------- a controller (or TV remote setup) reaches everything ----------
    In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
    On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
-const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
+const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["lst", () => closeList()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
 const topPanel = () => PANELS.find(([id]) => isOpen(id));
@@ -1777,6 +1787,7 @@ function openOpts(sub) {
       item(g.hidden ? "Show on shelves" : "Hide from shelves", async () => { await api("/api/game/hide", {id: g.id, hidden: !g.hidden}); refresh(true); });
       list.appendChild(el("i", "sep"));
     }
+    item(t("Surprise me"), () => surprise());
     item("Search…", () => { $("#q").focus(); paintQ(); if (Date.now() - padAt < 2000) openOsk($("#q")); });
     item("Collections", () => openColls());
     item("Your play", () => openTrophy());
@@ -2031,6 +2042,64 @@ function leaveScreens(keep) {
   for (const id of ["settings", "getg", "colls", "trophy"]) if (id !== keep && isOpen(id)) { $("#" + id).classList.remove("show"); if (id === "colls" && collIO) collIO.disconnect(); }
 }
 
+/* ---------- a list of games, each with something to do: hidden games, copies of one game ---------- */
+let listFill = null;
+function openList(title, about, fill) {
+  listFill = fill; $("#lstt").textContent = title; $("#lstp").textContent = about;
+  fill($("#lstl"));
+  blurActive(); $("#lst").classList.add("show"); light(); beep(520);
+  setTimeout(() => { const b = $("#lstl button") || $("#lstok"); b.focus({preventScroll: true}); }, 40);
+}
+function closeList() { if (!isOpen("lst")) return; $("#lst").classList.remove("show"); listFill = null; focusById(focusId); light(); beep(330); }
+const redrawList = () => { if (listFill) { const l = $("#lstl"), refocus = keepFocus(l); clear(l); listFill(l); refocus(); } };
+$("#lstok").onclick = closeList;
+function listRow(list, label, sub, buttons) {
+  const r = el("div", "lrow"), s = el("span", "", label);
+  if (sub) s.appendChild(el("small", "", sub));
+  r.appendChild(s);
+  for (const [text, fn] of buttons) { const b = el("button", "btn", text); b.onclick = fn; r.appendChild(b); }
+  list.appendChild(r);
+}
+/* hidden games, to bring back */
+function openHidden() {
+  openList(t("Hidden games"), t("Games you've hidden from the shelves. Show one again to put it back."), list => {
+    const hid = G.filter(g => g.hidden).sort(byTitle);
+    if (!hid.length) list.appendChild(el("p", "", t("No hidden games.")));
+    for (const g of hid) listRow(list, g.title, [g.system, g.tag].filter(Boolean).join(" · "), [[t("Show again"), async () => {
+      await api("/api/game/hide", {id: g.id, hidden: false}); await refresh(true); redrawList();
+    }]]);
+  });
+}
+/* the same game more than once on a console (other regions, revisions, or the same file twice) */
+function duplicates() {
+  const groups = new Map();
+  for (const g of G) { if (g.hidden) continue; const k = g.system + "|" + g.title.toLowerCase(); (groups.get(k) || groups.set(k, []).get(k)).push(g); }
+  return [...groups.values()].filter(x => x.length > 1).sort((a, b) => byTitle(a[0], b[0]));
+}
+function openDuplicates() {
+  openList(t("The same game twice"), t("Games you have more than one copy of on a console. Keep one and the others are hidden, not deleted."), list => {
+    const groups = duplicates();
+    if (!groups.length) list.appendChild(el("p", "", t("No copies left: every game is on its shelf once.")));
+    for (const gs of groups) {
+      list.appendChild(el("h3", "", gs[0].title + " · " + gs[0].system));
+      for (const g of gs) listRow(list, g.file, [g.tag, g.time ? fmtDur(g.time) + " played" : "", g.size ? fmtSize(g.size) : ""].filter(Boolean).join(" · "), [[t("Keep this one"), async () => {
+        for (const o of gs) if (o !== g) await api("/api/game/hide", {id: o.id, hidden: true});
+        await refresh(true); redrawList();
+      }]]);
+    }
+  });
+}
+/* a game to try: one you haven't played (or meant to), picked at random from what's on the shelves */
+function surprise() {
+  if (LAUNCH.open) return;
+  const pool = vis().filter(g => cons(g.system) && !(sel && sel.dataset.id === g.id)), want = pool.filter(g => g.progress === "backlog" || (!g.plays && !g.progress));
+  const from = want.length ? want : pool;
+  if (!from.length) return toast(t("Add some games first."));
+  const g = from[Math.floor(Math.random() * from.length)];
+  if (q) setQ("");
+  setTimeout(() => { showGame(g.id); setTimeout(() => { if (sel && sel.dataset.id === g.id) flip(true); }, 700); toast(t("How about {title}?", {title: g.title})); beep(880, .06); }, 60);
+}
+
 /* ---------- a note on a game, for yourself ---------- */
 let noteId = null;
 function openNote(id) {
@@ -2196,7 +2265,13 @@ function renderSettings() {
     c.onclick = () => { UI.hidden = hid ? UI.hidden.filter(x => x !== s) : UI.hidden.concat([s]); saveUI(); renderShelves(focusId); renderSettings(); }; chips.appendChild(c); });
   R("Systems shown", "Hide systems you don't want on the shelves.", chips);
   const nHidden = G.filter(g => g.hidden).length;
-  if (nHidden || UI.showHidden) R("Hidden games", plural(nHidden, "game is", "games are") + " hidden. Right-click a box to hide or show it.", sw(!!UI.showHidden, v => { UI.showHidden = v; saveUI(); renderShelves(focusId); renderSettings(); }));
+  if (nHidden || UI.showHidden) {
+    const hb = el("div", "btns"), hl = el("button", "btn", t("List")); hl.onclick = openHidden;
+    hb.appendChild(hl); hb.appendChild(sw(!!UI.showHidden, v => { UI.showHidden = v; saveUI(); renderShelves(focusId); renderSettings(); }));
+    R("Hidden games", plural(nHidden, "game is", "games are") + " hidden. The switch shows them on the shelves, faded; the list brings them back.", hb);
+  }
+  const dups = duplicates();
+  if (dups.length) { const db2 = el("button", "btn", t("Look")); db2.onclick = openDuplicates; R(t("The same game twice"), t("{n} on the same console more than once, like two regions or revisions.", {n: plural(dups.length, "game is", "games are")}), db2); }
 
   R("Download missing covers", "Looks up box art by title on thumbnails.libretro.com. Nothing else is sent.", sw(UI.autoCovers, v => { UI.autoCovers = v; saveUI(); }));
   const pr = el("div", ""), bar = el("div", "pbar"); bar.id = "cbar"; bar.appendChild(el("i")); pr.appendChild(bar);
@@ -2564,6 +2639,7 @@ document.addEventListener("keydown", e => {
   if (isOpen("opts")) { if (k === "Escape") closeOpts(); else if (arrow) { e.preventDefault(); padNav($("#opts"), arrow); } return; }
   if (isOpen("ras")) { if (k === "Escape") closeRas(); else if (k === "Enter") saveRas(); return; }
   if (isOpen("notes")) { if (k === "Escape") closeNote(); else if (k === "Enter") saveNote(); return; }
+  if (isOpen("lst")) { if (k === "Escape") closeList(); else if (arrow) { e.preventDefault(); padNav($("#lst"), arrow); } return; }
   if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
@@ -2595,6 +2671,7 @@ document.addEventListener("keydown", e => {
   else if (k === "s" || k === "S") openSettings();
   else if (k === "Enter") activate();
   else if ((k === "f" || k === "F") && selGame()) toggleFav(selGame().id);
+  else if (k === "r" || k === "R") surprise();
   else if (k === "o" || k === "O" || k === "ContextMenu") { e.preventDefault(); openOpts(); }
 });
 
