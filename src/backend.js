@@ -820,7 +820,7 @@ class Backend extends EventEmitter {
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
       const play = this.playOpts(g);
       const cheevos = this.raPending || (this.state.cheevos.user ? { user: this.state.cheevos.user } : null);
-      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null) }));
+      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null), pads: opts.pads }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
@@ -1808,7 +1808,7 @@ class Backend extends EventEmitter {
     const d = body && typeof body === "object" && !Array.isArray(body) ? body : {};
     const j = ([code, b]) => ({ code, body: b });
     switch (pathname) {
-      case "/api/launch": return j(await this.launch(String(d.id || ""), { slot: d.slot, fresh: !!d.fresh, force: !!d.force }));
+      case "/api/launch": return j(await this.launch(String(d.id || ""), { slot: d.slot, fresh: !!d.fresh, force: !!d.force, pads: Array.isArray(d.pads) ? d.pads : [] }));
       case "/api/game/rename": return j(this.rename(String(d.id || ""), d.title));
       case "/api/game/hide": return j(this.hide(String(d.id || ""), d.hidden !== false));
       case "/api/stop": await this.stop(); return j([200, { ok: true }]);

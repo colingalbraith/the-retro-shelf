@@ -7,7 +7,8 @@
 - **Change buttons:** for each console, choose which of your controller's buttons does each of the console's (say,
   Genesis A, B and C, or PlayStation ✕ ○ □ △). It's for all that console's games, and "Put back" undoes it.
 - **Buttons by their real names:** a PlayStation controller's hints say ✕ ○ □ △, a Nintendo one's B A Y X.
-- **Player 1, player 2:** with more than one controller, the playing screen says whose is which.
+- **Player 1, player 2:** with more than one controller, the playing screen says whose is which, and the game
+  numbers the players the same way.
 - **Set up with only a controller:** "Add games" and "Watch a folder" open the app's own folder browser when you use
   a controller, so a couch setup never needs a mouse.
 - Reopening a list no longer shows the last list's rows above it, and closing a list opened from Settings goes back

@@ -88,3 +88,21 @@ test("achievements: signing in hands RetroArch the password once; hardcore turns
   assert.deepEqual([hc.cheevos_hardcore_mode_enable, hc.rewind_enable, hc.apply_cheats_after_load, hc.savestate_auto_load], ["true", "false", "false", "false"]);
   assert.equal(ra.enforced(emu, dirs, { hardcore: true }).cheevos_hardcore_mode_enable, "false");   // hardcore means nothing signed out
 });
+
+test("players as the app shows them: each prefers its controller, by name on a Mac and by vendor:product elsewhere", () => {
+  const ps = { name: "DualSense Wireless Controller", vid: "054c", pid: "0CE6" }, xb = { name: "Xbox Wireless Controller", vid: "045e", pid: "0b13" };
+  const mac = ra.players([ps, xb], "darwin");
+  assert.equal(mac.input_player1_device_reservation_type, "1"); assert.equal(mac.input_player1_reserved_device, "DualSense Wireless Controller");
+  assert.equal(mac.input_player2_reserved_device, "Xbox Wireless Controller"); assert.equal(mac.input_player3_device_reservation_type, "0");
+  const win = ra.players([ps, xb], "win32");
+  assert.equal(win.input_player1_reserved_device, "054c:0ce6"); assert.equal(win.input_player2_reserved_device, "045e:0b13");
+  // one controller, or two of the same: the order they connected in, with nothing left over from before
+  assert.equal(ra.players([ps], "win32").input_player1_device_reservation_type, "0");
+  const same = ra.players([xb, xb, ps], "darwin");
+  assert.deepEqual([1, 2, 3].map(i => same[`input_player${i}_device_reservation_type`]), ["0", "0", "1"]);
+  // an XInput pad the browser gives no numbers for isn't reserved; the other still is
+  const mixed = ra.players([{ name: "Xbox 360 Controller (XInput STANDARD GAMEPAD)", vid: "", pid: "" }, ps], "win32");
+  assert.deepEqual([mixed.input_player1_device_reservation_type, mixed.input_player2_reserved_device], ["0", "054c:0ce6"]);
+  assert.equal(ra.players([{ name: 'a"b\nc' }, xb], "darwin").input_player1_reserved_device, "abc");
+  assert.equal(ra.players("junk").input_player1_device_reservation_type, "0");
+});

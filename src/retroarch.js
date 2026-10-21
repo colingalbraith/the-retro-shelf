@@ -132,7 +132,27 @@ function enforced(ra, dirs, opts) {
     menu_show_online_updater: "false",
     menu_show_core_updater: "false",
     config_save_on_exit: "true",
+    ...players(opts.pads),
   };
+}
+
+/**
+ * Player 1, 2… as the app showed them: each player prefers its controller (RetroArch's "reserved device"). Told apart
+ * by name on a Mac, where RetroArch's controller driver knows no vendor or product numbers, and by vendor:product
+ * elsewhere. Controllers that can't be told apart (two of the same) keep the order they connected in, which both
+ * count the same way.
+ */
+function players(pads, platform = process.platform) {
+  const key = p => platform === "darwin" ? String(p.name || "").trim()
+    : /^[0-9a-f]{4}$/i.test(p.vid) && /^[0-9a-f]{4}$/i.test(p.pid) ? `${p.vid}:${p.pid}`.toLowerCase() : "";
+  const keys = (Array.isArray(pads) ? pads : []).slice(0, 4).map(p => (p && typeof p === "object" ? key(p) : "").slice(0, 120));
+  const once = k => k && keys.length > 1 && keys.filter(x => x === k).length === 1;
+  const out = {};
+  for (let i = 0; i < 4; i++) {
+    out[`input_player${i + 1}_device_reservation_type`] = once(keys[i]) ? "1" : "0";
+    out[`input_player${i + 1}_reserved_device`] = once(keys[i]) ? keys[i].replace(/["\x00-\x1f]/g, "") : "";
+  }
+  return out;
 }
 
 /** Rewrite only the given keys in a retroarch.cfg, creating it if needed. */
@@ -213,4 +233,4 @@ function explain(logFile, exit = {}) {
   return "";
 }
 
-module.exports = { bundled, corePath, enforced, neededDirs, writeConfig, readConfigKey, linkSystemData, explain, CORE_EXT };
+module.exports = { bundled, corePath, enforced, players, neededDirs, writeConfig, readConfigKey, linkSystemData, explain, CORE_EXT };

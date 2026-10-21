@@ -516,3 +516,18 @@ test("a whole home folder or drive isn't watched", () => {
   assert.equal(be.addWatch(os.homedir())[0], 400);
   assert.equal(be.addWatch(path.parse(os.tmpdir()).root)[0], 400);
 });
+
+test("the controllers' order reaches RetroArch's config with the game", () => {
+  put("nes/Contra (USA).nes"); be.scan();
+  // a stand-in for the bundled RetroArch, which tests run without
+  const ra = createRequire(import.meta.url)("../src/retroarch.js"), emu = path.join(home, "emu");
+  be.ra = { exe: path.join(emu, "retroarch"), cores: path.join(emu, "cores"), info: emu, assets: emu, autoconfig: emu, version: "test" };
+  const core = ra.corePath(be.ra.cores, be.cfg.systems.NES.core);
+  fs.mkdirSync(path.dirname(core), { recursive: true }); fs.writeFileSync(core, "");
+  be.buildCmd(byTitle("Contra"), { pads: [{ name: "Pro Controller", vid: "057e", pid: "2009" }, { name: "Xbox Wireless Controller", vid: "045e", pid: "0b13" }] });
+  const cfg = fs.readFileSync(be.files.raCfg, "utf8");
+  assert.match(cfg, /input_player1_device_reservation_type = "1"/);
+  assert.match(cfg, process.platform === "darwin" ? /input_player1_reserved_device = "Pro Controller"/ : /input_player1_reserved_device = "057e:2009"/);
+  be.buildCmd(byTitle("Contra"), {});                                               // one controller later: nothing left over
+  assert.match(fs.readFileSync(be.files.raCfg, "utf8"), /input_player1_device_reservation_type = "0"/);
+});

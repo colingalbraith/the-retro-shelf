@@ -1726,7 +1726,7 @@ async function play(g, o) {
   if (!g) return;
   if (STATUS.running) { showLaunch(byId.get(STATUS.running.id) || g); return; }
   beep(780, .08); showLaunch(g);
-  const r = await api("/api/launch", {id: g.id, slot: o && o.slot, fresh: !!(o && o.fresh), force: !!(o && o.force)});
+  const r = await api("/api/launch", {id: g.id, slot: o && o.slot, fresh: !!(o && o.fresh), force: !!(o && o.force), pads: padsForPlayers()});
   if (!r.ok && r.data.elsewhere) {
     /* open on another computer that shares the saves: say so, and let you choose */
     hideLaunch();
@@ -3013,6 +3013,11 @@ function padStyle(gp) {
   if (/054c|dualsense|dualshock|playstation|wireless controller/i.test(id)) return "playstation";
   return "xbox";
 }
+/* the controllers in the order the app shows them as players, for RetroArch to number the same way */
+const padsForPlayers = () => connectedPads().map(p => {
+  const m = p.id.match(/Vendor: ?([0-9a-f]{4}) Product: ?([0-9a-f]{4})/i) || p.id.match(/^([0-9a-f]{4})-([0-9a-f]{4})-/i);
+  return {name: padName(p), vid: m ? m[1] : "", pid: m ? m[2] : ""};
+});
 /* a controller's name without the browser's additions ("Xbox Wireless Controller (STANDARD GAMEPAD Vendor: …)") */
 const padName = gp => gp.id.replace(/\s*\((?:STANDARD GAMEPAD|Vendor)[^)]*\)/gi, "").replace(/^[0-9a-f]{4}-[0-9a-f]{4}-/i, "").trim() || t("Controller");
 function renderHints() {
