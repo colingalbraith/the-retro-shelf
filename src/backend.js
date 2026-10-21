@@ -49,6 +49,10 @@ function jsave(p, obj) {
   fs.writeFileSync(p + ".tmp", JSON.stringify(obj, null, 2));
   fs.renameSync(p + ".tmp", p);
 }
+// RetroArch's names for the RetroPad's buttons, by number (remap files say input_player1_btn_<name>)
+const RETROPAD = ["b", "y", "select", "start", "up", "down", "left", "right", "a", "x", "l", "r", "l2", "r2", "l3", "r3"];
+const REMAP_MARK = "# Buttons changed in The Retro Shelf (Settings → Playing → Buttons)";
+
 // how far you are with a game (setGameInfo): not started yet, playing it, beaten, or done everything there is (100%)
 const PROGRESS = ["backlog", "playing", "beaten", "complete"];
 
@@ -177,7 +181,7 @@ class Backend extends EventEmitter {
     this.state = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
     // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}]]) if (!this.state[k]) this.state[k] = v;
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -507,6 +511,7 @@ class Backend extends EventEmitter {
     let st;
     try { st = fs.statSync(dir); } catch { return [404, { error: "That folder isn't there." }]; }
     if (!st.isDirectory()) return [400, { error: "Choose a folder." }];
+    if (dir === path.resolve(os.homedir()) || path.dirname(dir) === dir) return [400, { error: "That's too big a folder to watch: choose the one your games are in." }];
     const root = path.resolve(this.romsRoot()), inside = (a, b) => !path.relative(b, a).startsWith("..") && !path.isAbsolute(path.relative(b, a));
     if (inside(dir, root) || inside(root, dir)) return [400, { error: "That's the games folder, or part of it: its games are on the shelves already." }];
     const list = this.paths.watch || [];
@@ -515,6 +520,75 @@ class Backend extends EventEmitter {
     this.scan();
     return [200, { ok: true, games: this.watchedItems(dir).items.length }];
   }
+  /**
+   * Folders to choose from with a controller, where the system's folder dialog needs a mouse: the places to start
+   * (home, its usual folders, other drives), then one folder's own folders with how many games are right in each.
+   */
+  browse(dir) {
+    const exts = new Set(Object.values(this.cfg.systems).flatMap(s => s.exts || []).map(e => e.toLowerCase()));
+    const ls = d => { try { return fs.readdirSync(d, { withFileTypes: true }); } catch { return null; } };
+    const home = os.homedir(), places = [];
+    const add = (label, p) => { try { if (fs.statSync(p).isDirectory() && !places.some(x => x.path === p)) places.push({ label, path: p }); } catch {} };
+    add("Home", home);
+    for (const n of ["Desktop", "Documents", "Downloads"]) add(n, path.join(home, n));
+    if (process.platform === "darwin") for (const v of ls("/Volumes") || []) add(v.name, path.join("/Volumes", v.name));
+    else if (process.platform === "win32") for (const l of "CDEFGHIJKLMNOPQRSTUVWXYZ") add(l + ":", l + ":\\");
+    else {
+      let user = ""; try { user = os.userInfo().username; } catch {}
+      for (const base of [`/media/${user}`, `/run/media/${user}`, "/mnt"]) for (const v of ls(base) || []) if (v.isDirectory()) add(v.name, path.join(base, v.name));
+    }
+    if (!dir) return [200, { places }];
+    dir = path.resolve(String(dir));
+    const here = ls(dir);
+    if (!here) return [404, { error: "That folder can't be opened." }];
+    const games = list => (list || []).filter(e => e.isFile() && !hiddenEntry(e) && exts.has(path.extname(e.name).toLowerCase())).length;
+    const folders = here.filter(e => e.isDirectory() && !hiddenEntry(e) && !/^\$|^System Volume Information$/i.test(e.name))
+      .map(e => ({ name: e.name, path: path.join(dir, e.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })).slice(0, 400);
+    for (const f of folders) f.games = games(ls(f.path));
+    return [200, { dir, parent: path.dirname(dir) !== dir ? path.dirname(dir) : null, games: games(here), folders, places }];
+  }
+  // ---------------------------------------------------------------- buttons
+  /**
+   * A console's buttons, changed: {physical: what the console gets}, both RetroPad numbers (B 0, Y 1, Select 2,
+   * Start 3, the d-pad 4–7, A 8, X 9, L 10, R 11, L2 12, R2 13, L3 14, R3 15). Kept as swaps, so every button still
+   * does something. An empty map puts them back.
+   */
+  setRemap(system, map) {
+    if (!this.cfg.systems[system]) return [404, { error: "Unknown console." }];
+    const m = {}, seen = new Set();
+    for (const [k, v] of Object.entries(map && typeof map === "object" ? map : {})) {
+      const a = Number(k), b = Number(v);
+      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a > 15 || b < 0 || b > 15) return [400, { error: "Not a button." }];
+      if (seen.has(b)) return [400, { error: "Two buttons can't do the same thing." }];
+      seen.add(b);
+      if (a !== b) m[a] = b;
+    }
+    if (Object.keys(m).length) this.state.remaps[system] = m; else delete this.state.remaps[system];
+    this.saveState();
+    return [200, { ok: true, map: m }];
+  }
+  /**
+   * Before a game starts: its console's buttons as RetroArch's remap file for that game
+   * (config/remaps/<emulator>/<game>.rmp), for players 1 to 4. A file of ours that's no longer wanted goes; one
+   * made in RetroArch's own menu is left alone.
+   */
+  writeRemap(g) {
+    const core = this.cfg.systems[g.system].core;
+    this.resumeAt(g);
+    const cn = core && this._coreNames && this._coreNames[core];
+    if (!cn) return false;
+    const file = path.join(path.dirname(this.files.raCfg), "config", "remaps", cn, path.parse(g.path).name + ".rmp");
+    const m = this.state.remaps[g.system], ours = () => { try { return fs.readFileSync(file, "utf8").startsWith(REMAP_MARK); } catch { return false; } };
+    if (!m || !Object.keys(m).length) { if (ours()) fs.rmSync(file, { force: true }); return false; }
+    if (fs.existsSync(file) && !ours()) return false;
+    let out = REMAP_MARK + "\n";
+    for (let p = 1; p <= 4; p++) for (let j = 0; j < 16; j++) out += `input_player${p}_btn_${RETROPAD[j]} = "${m[j] ?? j}"\n`;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, out);
+    return true;
+  }
+
   // ---------------------------------------------------------------- saves in a folder of your own, and backups
   /**
    * Puts the saves in another folder (in iCloud Drive, Dropbox or OneDrive, to share them between computers): into
@@ -770,6 +844,7 @@ class Backend extends EventEmitter {
     let built;
     // chosen cheats, written for the built-in RetroArch to switch on as the game starts
     const cheats = !this.ownEmu() && !this.cfg.systems[g.system].emulator ? await this.writeCheats(g).catch(() => false) : false;
+    if (!this.ownEmu() && !this.cfg.systems[g.system].emulator) try { this.writeRemap(g); } catch {}
     try { built = this.buildCmd(g, { ...opts, cheats }); } catch (e) { return [400, { error: e.message }]; }
     const [exe, ...args] = built.cmd;
     const cwd = path.isAbsolute(exe) && fs.existsSync(path.dirname(exe)) ? path.dirname(exe) : undefined;
@@ -1655,7 +1730,7 @@ class Backend extends EventEmitter {
       fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES,
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
       // how each console's games look on the shelf: the kind of box, its short name, packaging and the color of its pile
-      consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null, light: !!v.light, freeTriggers: !!v.freeTriggers, builtin: !v.emulator }])),
+      consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null, light: !!v.light, freeTriggers: !!v.freeTriggers, builtin: !v.emulator, buttons: v.buttons || null, remap: st.remaps[k] || null }])),
       settings: this.settingsJson(), status: this.statusJson(),
     };
   }
@@ -1742,11 +1817,13 @@ class Backend extends EventEmitter {
       case "/api/games/search": return j(this.gameSearch(d.q));
       case "/api/game/opts": return j(this.setGameOpts(String(d.id || ""), d.opts));
       case "/api/game/info": return j(this.setGameInfo(String(d.id || ""), d));
+      case "/api/remap": return j(this.setRemap(String(d.system || ""), d.map));
       case "/api/saves/list": { const g = this.games.get(String(d.id || "")); return j(g ? [200, { saves: this.gameSaves(g).map(({ file, ...x }) => ({ ...x, name: path.basename(file), file })) }] : [404, { error: "Unknown game." }]); }
       case "/api/saves/trash": return j(await this.trashSave(String(d.id || ""), String(d.file || "")));
       case "/api/retroarch/find": { const games = this.retroArchGames(); return j([200, { games: games.length, consoles: [...new Set(games.map(g => g.system))] }]); }
       case "/api/retroarch/import": return j(this.importRetroArch());
       case "/api/watch/add": return j(this.addWatch(String(d.dir || "")));
+      case "/api/browse": return j(this.browse(d.dir ? String(d.dir) : ""));
       case "/api/watch/remove": return j(this.removeWatch(String(d.dir || "")));
       case "/api/watch/unsure": return j([200, { files: this.watchUnsure() }]);
       case "/api/watch/assign": return j(this.assignWatched(String(d.src || ""), String(d.system || "")));

@@ -473,3 +473,46 @@ test("a backup by itself is due weekly, only when it's on", () => {
   be.state.lastAutoBackup = Math.floor(Date.now() / 1000) - 8 * 86400; assert.equal(be.backupDue(), true);
   assert.equal(be.backupDir(), path.join(be.dirs.docs, "Backups"));                // until you choose a folder
 });
+
+test("a console's buttons, changed: written as RetroArch's remap file for each game, and gone when put back", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const g = byTitle("Chrono Trigger");
+  be.resumeAt = () => 0; be._coreNames = { snes9x_libretro: "Snes9x" };
+  const file = path.join(path.dirname(be.files.raCfg), "config", "remaps", "Snes9x", "Chrono Trigger (USA).rmp");
+  assert.equal((await be.route("POST", "/api/remap", { system: "SNES", map: { 0: 8, 8: 0 } })).code, 200);   // B and A swapped
+  assert.equal((await be.route("POST", "/api/remap", { system: "SNES", map: { 0: 8, 1: 8 } })).code, 400);  // two doing one thing
+  assert.equal(be.writeRemap(g), true);
+  const text = fs.readFileSync(file, "utf8");
+  assert.match(text, /input_player1_btn_b = "8"/); assert.match(text, /input_player1_btn_a = "0"/); assert.match(text, /input_player1_btn_y = "1"/);
+  assert.match(text, /input_player4_btn_b = "8"/);
+  assert.equal(be.libraryJson().consoles.SNES.remap[0], 8);
+  await be.route("POST", "/api/remap", { system: "SNES", map: {} });
+  be.writeRemap(g);
+  assert.ok(!fs.existsSync(file));
+  // one made in RetroArch's own menu stays
+  fs.writeFileSync(file, 'input_player1_btn_b = "9"\n');
+  await be.route("POST", "/api/remap", { system: "SNES", map: { 0: 8, 8: 0 } });
+  be.writeRemap(g);
+  assert.equal(fs.readFileSync(file, "utf8"), 'input_player1_btn_b = "9"\n');
+});
+
+test("folders to choose with a controller: the places to start, then each folder's folders and games", async () => {
+  const top = fs.mkdtempSync(path.join(os.tmpdir(), "browse-"));
+  fs.mkdirSync(path.join(top, "Retro", "SNES"), { recursive: true }); fs.mkdirSync(path.join(top, ".hidden"));
+  fs.writeFileSync(path.join(top, "Retro", "SNES", "Game (USA).sfc"), "x"); fs.writeFileSync(path.join(top, "Retro", "SNES", "notes.txt"), "x");
+  fs.writeFileSync(path.join(top, "Retro", "Other (USA).nes"), "x"); fs.writeFileSync(path.join(top, "Retro", "._Other (USA).nes"), "x");
+  const start = await be.route("POST", "/api/browse", {});
+  assert.equal(start.code, 200); assert.ok(start.body.places.some(p => p.path === os.homedir()));
+  const d = (await be.route("POST", "/api/browse", { dir: path.join(top, "Retro") })).body;
+  assert.equal(d.games, 1);                                                        // the Mac's ._ copy doesn't count
+  assert.deepEqual(d.folders.map(f => [f.name, f.games]), [["SNES", 1]]);
+  assert.equal(d.parent, top);
+  assert.deepEqual((await be.route("POST", "/api/browse", { dir: top })).body.folders.map(f => f.name), ["Retro"]);
+  assert.equal((await be.route("POST", "/api/browse", { dir: path.join(top, "nope") })).code, 404);
+  fs.rmSync(top, { recursive: true, force: true });
+});
+
+test("a whole home folder or drive isn't watched", () => {
+  assert.equal(be.addWatch(os.homedir())[0], 400);
+  assert.equal(be.addWatch(path.parse(os.tmpdir()).root)[0], 400);
+});
