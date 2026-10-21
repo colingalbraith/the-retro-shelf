@@ -325,3 +325,25 @@ test("a game on several discs gets a disc list: one box, its history added up, t
   assert.equal([...be.games.values()].filter(g => g.title === "Final Fantasy VII").length, 1);
   assert.equal(be.state.time[ff[0].id], 4200);
 });
+
+test("Game Gear games move from the Master System shelf to their own, once, keeping their history", async () => {
+  const { createHash } = await import("node:crypto");
+  const id = p => createHash("sha1").update(p).digest("hex").slice(0, 12);
+  const old = put("sms/Sonic Chaos (USA, Europe).gg"); put("sms/Sonic Chaos (USA, Europe).png", "cover");
+  put("sms/Alex Kidd (USA).sms");
+  be.state.time[id(old)] = 900; be.state.fav.push(id(old)); delete be.state.ggShelf; be.saveState();
+  be.init();
+  const sonic = byTitle("Sonic Chaos");
+  assert.equal(sonic.system, "Game Gear");
+  assert.ok(sonic.path.includes(path.join("gg", "Sonic Chaos")));
+  assert.ok(fs.existsSync(path.join(games, "gg", "Sonic Chaos (USA, Europe).png")));
+  assert.equal(be.state.time[sonic.id], 900);
+  assert.ok(be.state.fav.includes(sonic.id));
+  assert.equal(byTitle("Alex Kidd").system, "Master System");
+});
+
+test("a game whose name starts with a dot is on the shelf; macOS's ._ files and hidden folders aren't", () => {
+  put("ps2/.hack - Infection (USA).iso"); put("ps2/._.hack - Infection (USA).iso"); put("ps2/.cache/Other (USA).iso"); put("ps2/.DS_Store");
+  be.scan();
+  assert.deepEqual([...be.games.values()].filter(g => g.system === "PS2").map(g => path.basename(g.path)), [".hack - Infection (USA).iso"]);
+});

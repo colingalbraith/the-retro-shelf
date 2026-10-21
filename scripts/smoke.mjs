@@ -90,7 +90,10 @@ function sms() {
   return b;
 }
 const GAMES = [["nes", "Smoke Test (World).nes", nes], ["gb", "Smoke Test GB (World).gb", gb], ["gba", "Smoke Test GBA (World).gba", gba],
-  ["genesis", "Smoke Test MD (World).md", md], ["sms", "Smoke Test SMS (World).sms", sms]];
+  ["genesis", "Smoke Test MD (World).md", md], ["sms", "Smoke Test SMS (World).sms", sms], ["gg", "Smoke Test GG (World).gg", sms],
+  ["sg1000", "Smoke Test SG (World).sg", sms]];
+// each console's own picture (By console): old TV, handheld screen, or plain sharp pixels
+const PICTURE = Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync(path.join(ROOT, "src", "config.json"), "utf8")).systems).map(([k, v]) => [k, v.picture]));
 
 /** a DevTools session with the app's page */
 async function connect() {
@@ -182,8 +185,8 @@ try {
       continue;
     }
     if (!st.running) throw new Error(`${system}: the game closed by itself` + (st.exit && st.exit.error ? ": " + st.exit.error : ""));
-    const look = /Game Boy|GBA/.test(system) ? "handheld" : "old-TV", shader = look === "handheld" ? "zfast_lcd" : "zfast_crt";
-    if (!new RegExp(`\\[Slang\\] Compiling shader: "[^"]*${shader}`).test(ra)) throw new Error(`${system}: the game runs, but without the ${look} picture (see its retroarch log)`);
+    const look = PICTURE[system] === "lcd" ? "handheld" : PICTURE[system] === "crt" ? "old-TV" : "sharp", shader = { handheld: "zfast_lcd", "old-TV": "zfast_crt" }[look];
+    if (shader && !new RegExp(`\\[Slang\\] Compiling shader: "[^"]*${shader}`).test(ra)) throw new Error(`${system}: the game runs, but without the ${look} picture (see its retroarch log)`);
     await page.evaluate(`api("/api/stop", {})`);
     const ex = await until(`${system}: the game didn't close when asked`, () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
     if (ex.error) throw new Error(`${system}: the game closed with: ${ex.error}`);

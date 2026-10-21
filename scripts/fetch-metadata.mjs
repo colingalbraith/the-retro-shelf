@@ -2,7 +2,7 @@
 // Builds src/data/meta/<system folder>.json: game name -> [year, publisher, developer, genre], from the metadata
 // lists in libretro-database (matched by the same No-Intro / Redump names that game files and cover art use).
 // Shipped with the app, so the back of a box needs no lookups.
-//   node scripts/fetch-metadata.mjs
+//   node scripts/fetch-metadata.mjs [console names]     (all consoles when none are named)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,9 @@ async function dat(field, system) {
 }
 
 let total = 0;
+const only = process.argv.slice(2);
 for (const [name, s] of Object.entries(cfg.systems)) {
+  if (only.length && !only.includes(name)) continue;
   const thumbs = !s.thumbs ? [] : typeof s.thumbs === "string" ? [s.thumbs] : s.thumbs;
   if (s.names || !thumbs.length) continue;            // arcade games get theirs from data/arcade-names.json
   const games = {};

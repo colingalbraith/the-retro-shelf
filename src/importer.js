@@ -86,6 +86,12 @@ class Importer {
   /** Best guess of which system a file is for, from its contents. Returns {system, makeCue?} or null. */
   sniff(p, ext, cands) {
     const pick = folder => { const s = this.sys(folder); return s && cands.includes(s) ? s : null; };
+    // Sega's discs say so in their first sector: at the start of an .iso, 16 bytes in on a raw 2352-byte sector
+    const sega = fd => {
+      const h = readAt(fd, 0, 0x30), at = o => ascii(h, o, 15);
+      for (const o of [0, 16]) { if (at(o).startsWith("SEGADISCSYSTEM")) return "segacd"; if (at(o) === "SEGA SEGASATURN") return "saturn"; }
+      return null;
+    };
     if (ext === ".zip") {
       const es = zipEntries(p);
       if (!es || !es.length) return null;
@@ -108,6 +114,8 @@ class Importer {
         return size <= 8 * 1048576 ? { system: pick("genesis") } : null;
       }
       if (ext === ".iso" || ext === ".gcm") {
+        const sg = sega(fd);
+        if (sg) return { system: pick(sg) };
         if (head.length >= 0x20 && (head.readUInt32BE(0x18) === 0x5D1C9EA3 || head.readUInt32BE(0x1C) === 0xC2339F3D)) return { system: pick("gc") };
         const id = discSystemId(fd, size) || "";
         if (/PSP GAME/.test(id)) return { system: pick("psp") };
@@ -136,6 +144,8 @@ class Importer {
       if (ext === ".cue") {
         const files = sheetFiles(p);
         if (files[0]) {
+          const sg = withFile(files[0], sega);
+          if (sg) return { system: pick(sg) };
           const id = withFile(files[0], discSystemId);
           if (id && /PLAYSTATION/.test(id)) return { system: pick("ps1") };
           if (id) return null;
@@ -160,10 +170,12 @@ class Importer {
       let st;
       try { st = fs.statSync(p); } catch { return; }
       if (st.isDirectory()) {
-        if (depth > 6) return;
+        if (depth > 6 || (depth > 0 && path.basename(p).startsWith("."))) return;
         let names = [];
         try { names = fs.readdirSync(p); } catch {}
-        for (const n of names) if (!n.startsWith(".")) walk(path.join(p, n), depth + 1);
+        // macOS's leftovers (._Game.iso, .DS_Store) aren't games; hidden folders are skipped below. A game whose name
+        // starts with a dot (.hack//Infection) is still one
+        for (const n of names) if (!n.startsWith("._") && n !== ".DS_Store") walk(path.join(p, n), depth + 1);
       } else if (st.isFile()) add(p);
     };
     for (const p of paths) if (typeof p === "string" && p) walk(path.resolve(p), 0);

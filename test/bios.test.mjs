@@ -24,8 +24,10 @@ test("the checker tells found, partly there, missing and wrong-size apart", () =
     put("scph5501.bin", 524288);
     put("bios7.bin", 16384);
     put("dc/dc_boot.bin", 1000);
+    put("bios_CD_U.bin", 131072);
     const st = Object.fromEntries(biosStatus(dir, null).map(c => [c.system, c.state]));
-    assert.deepEqual(st, { PS1: "ok", "PC Engine": "missing", Dreamcast: "bad", DS: "partial", GBA: "missing", Arcade: "missing" });
+    assert.deepEqual(st, { PS1: "ok", "PC Engine": "missing", Dreamcast: "bad", DS: "partial", GBA: "missing", Arcade: "missing",
+      "Sega CD": "ok", Saturn: "missing", Lynx: "missing" });
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

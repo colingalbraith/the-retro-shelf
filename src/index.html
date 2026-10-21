@@ -176,6 +176,15 @@ button{cursor:pointer}
   --band:linear-gradient(#5b50a6,#5b50a6) center/calc(var(--t) * .34) calc(var(--t) * .34) no-repeat,linear-gradient(#141416 calc(100% - 2px),#34323c 0)}
 .card[data-lv=ps2]{--body:#0c0e16;--si:#eef1f8;--band:linear-gradient(#22357a calc(100% - 2px),#6d84d6 0);--foot:var(--gm)}
 .card[data-lv=arcade]{--body:#0e0d10;--si:var(--gl);--band:linear-gradient(var(--gl),var(--gm));--foot:var(--gm)}
+.card[data-lv=gg]{--band:linear-gradient(#141414 calc(100% - 3px),#2b6fd6 0);--foot:#141414}
+.card[data-lv=sg]{--band:linear-gradient(#1a1a1a calc(100% - 3px),#c8102e 0);--foot:#1a1a1a}
+.card[data-lv=scd]{--body:#121212;--si:#f2f0ec;--band:linear-gradient(#1a1a1a calc(100% - 3px),#d0021b 0);--foot:var(--gm);--bh:.95}
+.card[data-lv=s32x]{--foot:#111;--band:linear-gradient(#111 calc(100% - 4px),#f5b800 0)}
+.card[data-lv=saturn]{--body:#141416;--si:#eef0f6;--band:linear-gradient(#202024 calc(100% - 2px),#3a6fd8 0);--foot:var(--gm)}
+.card[data-lv=ngp]{--band:linear-gradient(#f1efe9 calc(100% - 3px),#c8102e 0);--foot:#1b1b1b}
+.card[data-lv=lynx]{--band:linear-gradient(#151515 calc(100% - 3px),#f08c00 0);--foot:#151515}
+.card[data-lv=ws]{--band:linear-gradient(#2b54a3 calc(100% - 3px),#9fb7ea 0);--foot:#2b54a3}
+.card[data-lv=vb]{--band:linear-gradient(#111 calc(100% - 3px),#d40000 0);--foot:#111}
 .man .sp .sys{height:max(18px,calc(var(--t) * .95));display:flex;align-items:center;justify-content:center;background:var(--bd);color:var(--bf);font:700 clamp(7px,calc(var(--t) * .3),11px)/1 var(--disp)}
 .card.man{--body:#ece6d6;--si:#1c1916;--foot:#1c1916}
 .stk{position:absolute;z-index:2;border-radius:50%;background:#e9c341;color:#1c1916;text-align:center;box-shadow:0 1px 1px rgba(0,0,0,.4)}
@@ -977,7 +986,7 @@ function logoInfo(im) {
   return {ar, l};
 }
 /* consoles whose spines are always black or always white; everywhere else the spine takes the cover's color */
-const DARK_BODY = /^(ps1|psp|gc|ps2|arcade)$/, LIGHT_BODY = /^(sms|dc|ds)$/;
+const DARK_BODY = /^(ps1|psp|gc|ps2|arcade|scd|saturn)$/, LIGHT_BODY = /^(sms|dc|ds)$/;
 /* keep a logo readable: a cover-colored spine moves lighter or darker away from the logo; on a fixed black spine
    a dark logo gets a light edge */
 function logoContrast(c) {

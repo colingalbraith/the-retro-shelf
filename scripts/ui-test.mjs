@@ -23,18 +23,22 @@ fs.mkdirSync(OUT, { recursive: true });
 function library(games) {
   const by = {};
   for (const list of Object.values(series)) for (const [system, look] of list) (by[system] = by[system] || new Set()).add(look);
-  let n = 0;
+  const made = [];
   for (const [system, s] of Object.entries(cfg.systems)) {
     if (s.names) {    // arcade games go by short names
-      for (const k of ["sf2", "mslug", "pacman", "dkong", "galaga"]) { fs.mkdirSync(path.join(games, s.folder), { recursive: true }); fs.writeFileSync(path.join(games, s.folder, k + ".zip"), ""); n++; }
+      for (const k of ["sf2", "mslug", "pacman", "dkong", "galaga"]) { fs.mkdirSync(path.join(games, s.folder), { recursive: true }); fs.writeFileSync(path.join(games, s.folder, k + ".zip"), ""); made.push(k + ".zip"); }
       continue;
     }
-    const names = [...(by[system] || [])], pick = [...names].sort((a, b) => b.length - a.length).slice(0, 4).concat(names.slice(0, 4));
+    // consoles with no series data: names from their game info, or made up when there's none (Sega CD, Saturn)
+    let names = [...(by[system] || [])].filter(n => !/\((Disc|Disk|CD) ?\d/i.test(n));
+    if (names.length < 4) { try { names = names.concat(Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, "src", "data", "meta", (s.folder || system) + ".json"), "utf8"))).filter(n => !/\((Disc|Disk|CD) ?\d/i.test(n)).slice(0, 40)); } catch {} }
+    if (!names.length) names = ["Test Disc One (USA)", "A Much Longer Test Disc Title - The Second Chapter (USA)"];
+    const pick = [...names].sort((a, b) => b.length - a.length).slice(0, 4).concat(names.slice(0, 4));
     const ext = s.exts.find(e => ![".zip", ".7z"].includes(e)) || s.exts[0];
     fs.mkdirSync(path.join(games, s.folder || system.toLowerCase()), { recursive: true });
-    for (const name of new Set(pick)) { fs.writeFileSync(path.join(games, s.folder || system.toLowerCase(), name.replace(/[\\/:*?"<>|]/g, "_") + ext), ""); n++; }
+    for (const name of new Set(pick)) { const f = name.replace(/[\\/:*?"<>|]/g, "_") + ext; fs.writeFileSync(path.join(games, s.folder || system.toLowerCase(), f), ""); made.push(f); }
   }
-  return n;
+  return made;
 }
 
 async function connect() {
@@ -74,11 +78,15 @@ const BACKS = `(async () => {
   for (const c of document.querySelectorAll("#shelves .card")) { const g = byId.get(c.dataset.id); if (g) (byType[c.dataset.m] = byType[c.dataset.m] || []).push([c, g]); }
   for (const [m, list] of Object.entries(byType)) {
     list.sort((a, b) => b[1].title.length - a[1].title.length);
-    for (const [c, g] of list.slice(0, 3)) {
-      if (!c.isConnected) continue;   // the shelf was drawn again (a resize) after the list was made
-      select(c); await wait(300); flip(true);
-      // turned over and filled in: a moment on a fast computer, longer where drawing is slow
-      for (let i = 0; i < 30 && !c.querySelector(".bk .in"); i++) await wait(100);
+    for (let [c, g] of list.slice(0, 3)) {
+      // turned over and filled in: a moment on a fast computer, longer where drawing is slow. If the shelf is drawn
+      // again meanwhile (after a resize), the box is a new one: find it and turn that over
+      for (let tries = 0; tries < 3; tries++) {
+        if (!c.isConnected) c = document.querySelector('#shelves .card[data-id="' + g.id + '"]') || c;
+        select(c); await wait(300); flip(true);
+        for (let i = 0; i < 30 && c.isConnected && !c.querySelector(".bk .in"); i++) await wait(100);
+        if (c.isConnected && c.querySelector(".bk .in")) break;
+      }
       await wait(650);
       const inn = c.querySelector(".bk .in");
       if (!inn) { if (!c.closest(".lslot")) out.push(m + " box, " + g.title + ": didn't turn over"); continue; }
@@ -128,7 +136,7 @@ const SCREENS = [
 
 // --- run ---------------------------------------------------------------------------------------------------------
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-ui-"));
-const count = library(path.join(home, "The Retro Shelf", "Games"));
+const made = library(path.join(home, "The Retro Shelf", "Games")), count = made.length;
 fs.mkdirSync(path.join(home, "data"), { recursive: true });
 // no downloads (the same boxes every run), no sounds, and seen as an update from 0.2.0 so What's new shows
 fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: { welcomed: true, autoCovers: false, updates: false, sound: false } }));
@@ -143,7 +151,10 @@ try {
   await p.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   const n = await (async () => { for (let i = 0; i < 120; i++) { const v = await p.ev(`typeof G !== "undefined" && !document.querySelector("#splash") ? G.length : 0`); if (v) return v; await sleep(500); } return 0; })();
   console.log(`· the shelf shows ${n} of ${count} games`);
-  if (n !== count) problems.push(`the shelf has ${n} games, not ${count}`);
+  if (n !== count) {
+    const shown = new Set(await p.ev("G.map(g => g.file)"));
+    problems.push(`the shelf has ${n} games, not ${count}; missing: ${made.filter(f => !shown.has(f)).join(", ")}`);
+  }
 
   // What's new, as someone updating from 0.2.0 sees it
   await sleep(1200);

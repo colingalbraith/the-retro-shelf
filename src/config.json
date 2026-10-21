@@ -140,18 +140,77 @@
         "#d8382f"
       ]
     },
+    "Sega CD": {
+      "folder": "segacd",
+      "exts": [
+        ".cue",
+        ".chd",
+        ".iso",
+        ".m3u"
+      ],
+      "core": "genesis_plus_gx_libretro",
+      "thumbs": "Sega - Mega-CD - Sega CD",
+      "media": "cd",
+      "picture": "crt",
+      "discLists": true,
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "SCD",
+      "look": [
+        "scd",
+        "jewel"
+      ],
+      "pile": [
+        "#141312",
+        "#d0021b"
+      ],
+      "bios": {
+        "label": "Sega CD",
+        "note": "Needed for Sega CD games: the one for your games' region.",
+        "any": true,
+        "files": [
+          [
+            "bios_CD_U.bin"
+          ],
+          [
+            "bios_CD_E.bin"
+          ],
+          [
+            "bios_CD_J.bin"
+          ]
+        ]
+      }
+    },
+    "32X": {
+      "folder": "32x",
+      "exts": [
+        ".32x",
+        ".zip",
+        ".7z"
+      ],
+      "core": "picodrive_libretro",
+      "thumbs": "Sega - 32X",
+      "media": "cart",
+      "picture": "crt",
+      "abbr": "32X",
+      "look": [
+        "s32x",
+        "clam",
+        1
+      ],
+      "pile": [
+        "#141312",
+        "#f5b800"
+      ]
+    },
     "Master System": {
       "folder": "sms",
       "exts": [
         ".sms",
-        ".gg",
         ".zip"
       ],
       "core": "genesis_plus_gx_libretro",
-      "thumbs": [
-        "Sega - Master System - Mark III",
-        "Sega - Game Gear"
-      ],
+      "thumbs": "Sega - Master System - Mark III",
       "media": "cart",
       "picture": "crt",
       "light": true,
@@ -164,6 +223,52 @@
       "pile": [
         "#f0eee8",
         "#1f1f1f"
+      ]
+    },
+    "Game Gear": {
+      "folder": "gg",
+      "exts": [
+        ".gg",
+        ".zip",
+        ".7z"
+      ],
+      "core": "genesis_plus_gx_libretro",
+      "thumbs": "Sega - Game Gear",
+      "media": "mini",
+      "picture": "lcd",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "GG",
+      "look": [
+        "gg",
+        "card"
+      ],
+      "pile": [
+        "#1a1a1a",
+        "#2b6fd6"
+      ]
+    },
+    "SG-1000": {
+      "folder": "sg1000",
+      "exts": [
+        ".sg",
+        ".zip",
+        ".7z"
+      ],
+      "core": "genesis_plus_gx_libretro",
+      "thumbs": "Sega - SG-1000",
+      "media": "cart",
+      "picture": "crt",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "SG",
+      "look": [
+        "sg",
+        "card"
+      ],
+      "pile": [
+        "#1d1d1d",
+        "#c8102e"
       ]
     },
     "PC Engine": {
@@ -233,6 +338,40 @@
         "#1d1b19",
         "#c9a24a"
       ]
+    },
+    "Lynx": {
+      "folder": "lynx",
+      "exts": [
+        ".lnx",
+        ".zip",
+        ".7z"
+      ],
+      "core": "handy_libretro",
+      "thumbs": "Atari - Lynx",
+      "media": "cart",
+      "picture": "lcd",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "LYNX",
+      "look": [
+        "lynx",
+        "card",
+        1
+      ],
+      "pile": [
+        "#171717",
+        "#f08c00"
+      ],
+      "bios": {
+        "label": "Atari Lynx",
+        "note": "Optional.",
+        "files": [
+          [
+            "lynxboot.img",
+            512
+          ]
+        ]
+      }
     },
     "N64": {
       "folder": "n64",
@@ -309,6 +448,38 @@
           ],
           [
             "scph1001.bin",
+            524288
+          ]
+        ]
+      }
+    },
+    "Saturn": {
+      "folder": "saturn",
+      "exts": [
+        ".cue",
+        ".chd",
+        ".ccd",
+        ".iso"
+      ],
+      "core": "yabasanshiro_libretro",
+      "thumbs": "Sega - Saturn",
+      "media": "cd",
+      "picture": "crt",
+      "abbr": "SAT",
+      "look": [
+        "saturn",
+        "jewel"
+      ],
+      "pile": [
+        "#18181b",
+        "#3a6fd8"
+      ],
+      "bios": {
+        "label": "Saturn",
+        "note": "Needed for Saturn games.",
+        "files": [
+          [
+            "saturn_bios.bin",
             524288
           ]
         ]
@@ -413,6 +584,84 @@
       "pile": [
         "#141312",
         "#9aa4ad"
+      ]
+    },
+    "Neo Geo Pocket": {
+      "folder": "ngp",
+      "exts": [
+        ".ngp",
+        ".ngc",
+        ".zip",
+        ".7z"
+      ],
+      "core": "mednafen_ngp_libretro",
+      "thumbs": [
+        "SNK - Neo Geo Pocket",
+        "SNK - Neo Geo Pocket Color"
+      ],
+      "media": "mini",
+      "picture": "lcd",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "NGP",
+      "look": [
+        "ngp",
+        "card"
+      ],
+      "pile": [
+        "#ecebe6",
+        "#c8102e"
+      ]
+    },
+    "WonderSwan": {
+      "folder": "wonderswan",
+      "exts": [
+        ".ws",
+        ".wsc",
+        ".zip",
+        ".7z"
+      ],
+      "core": "mednafen_wswan_libretro",
+      "thumbs": [
+        "Bandai - WonderSwan",
+        "Bandai - WonderSwan Color"
+      ],
+      "media": "mini",
+      "picture": "lcd",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "WS",
+      "look": [
+        "ws",
+        "card"
+      ],
+      "pile": [
+        "#e8e6e1",
+        "#2b54a3"
+      ]
+    },
+    "Virtual Boy": {
+      "folder": "vb",
+      "exts": [
+        ".vb",
+        ".vboy",
+        ".zip",
+        ".7z"
+      ],
+      "core": "mednafen_vb_libretro",
+      "thumbs": "Nintendo - Virtual Boy",
+      "media": "cart",
+      "picture": "sharp",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "VB",
+      "look": [
+        "vb",
+        "card"
+      ],
+      "pile": [
+        "#1a1a1a",
+        "#d40000"
       ]
     },
     "Arcade": {

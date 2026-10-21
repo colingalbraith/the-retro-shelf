@@ -24,14 +24,20 @@ Settings → About → Licenses.
 | SNES | Snes9x | **Non-commercial** | https://github.com/libretro/snes9x |
 | Game Boy / Color | Gambatte | GPLv2 | https://github.com/libretro/gambatte-libretro |
 | Game Boy Advance | mGBA | MPL 2.0 | https://github.com/libretro/mgba |
-| Genesis, Master System, Game Gear | Genesis Plus GX | **Non-commercial** | https://github.com/libretro/Genesis-Plus-GX |
+| Genesis, Sega CD, Master System, Game Gear, SG-1000 | Genesis Plus GX | **Non-commercial** | https://github.com/libretro/Genesis-Plus-GX |
+| 32X | PicoDrive | **Non-commercial** (MAME license) | https://github.com/libretro/picodrive |
 | PC Engine | Beetle PCE Fast | GPLv2 | https://github.com/libretro/beetle-pce-fast-libretro |
 | Atari 2600 | Stella | GPLv2 | https://github.com/stella-emu/stella |
+| Atari Lynx | Handy | zlib | https://github.com/libretro/libretro-handy |
 | N64 | Mupen64Plus-Next | GPLv2 | https://github.com/libretro/mupen64plus-libretro-nx |
 | PlayStation | PCSX ReARMed | GPLv2 | https://github.com/libretro/pcsx_rearmed |
+| Saturn | YabaSanshiro | GPLv2 | https://github.com/libretro/yabause |
 | Dreamcast | Flycast | GPLv2 | https://github.com/flyinghead/flycast |
 | DS | melonDS DS | GPLv3+ | https://github.com/JesseTG/melonds-ds |
 | PSP | PPSSPP | GPLv2+ | https://github.com/hrydgard/ppsspp |
+| Neo Geo Pocket (Color) | Beetle NeoPop | GPLv2 | https://github.com/libretro/beetle-ngp-libretro |
+| WonderSwan (Color) | Beetle WonderSwan | GPLv2 | https://github.com/libretro/beetle-wswan-libretro |
+| Virtual Boy | Beetle VB | GPLv2 | https://github.com/libretro/beetle-vb-libretro |
 | Arcade | FinalBurn Neo | **Non-commercial** | https://github.com/libretro/FBNeo |
 | GameCube / Wii | Dolphin | GPLv2+ | https://github.com/libretro/dolphin |
 

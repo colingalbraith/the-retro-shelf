@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0-beta.3
+
+- **Nine more consoles:** Game Gear (now its own shelf; Game Gear games move there by themselves), SG-1000, Sega CD,
+  32X, Saturn, Neo Geo Pocket, Atari Lynx, WonderSwan and Virtual Boy, with box art, box styles and their own pins.
+  Sega CD and Saturn need a BIOS from your own console.
+- Dropped Sega CD and Saturn discs are recognized by what's on them.
+- Games whose names start with a dot (.hack) no longer go missing from the shelf.
+
 ## 0.4.0-beta.2
 
 - **Handheld screen look:** Settings → Playing → Picture → By console gives home consoles an old TV's scanlines and

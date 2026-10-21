@@ -98,6 +98,9 @@ const unquote = v => String(v).trim().replace(/^(["'])(.*)\1$/, "$2").trim();
 /** a path as the file system compares it: Windows and macOS ignore letter case */
 const pathKey = p => process.platform === "linux" ? path.resolve(p) : path.resolve(p).toLowerCase();
 function gid(p) { return crypto.createHash("sha1").update(p).digest("hex").slice(0, 12); }
+/** what scanning skips: hidden folders, and the files macOS leaves around (._Game.iso, .DS_Store). A game whose name
+    starts with a dot (.hack//Infection) still counts */
+const hiddenEntry = e => e.name.startsWith("._") || e.name === ".DS_Store" || (e.isDirectory() && e.name.startsWith("."));
 // "Legend of Zelda, The - A Link to the Past (USA)" -> "The Legend of Zelda: A Link to the Past"
 function cleanTitle(stem) {
   const t = stem.replace(/\s*[([][^)\]]*[)\]]/g, "").trim() || stem;
@@ -180,6 +183,7 @@ class Backend extends EventEmitter {
     this.setupError = "";
     try { this.firstRun(); } catch (e) { this.setupError = e.message; }
     fs.rmSync(path.join(this.files.covers, ".previews"), { recursive: true, force: true });
+    if (!this.state.ggShelf) { try { this.moveGameGear(); } catch {} this.state.ggShelf = 1; this.saveState(); }
     this.scan();
     this.checkPins();
     // a new install starts with the welcome card, not a list of changes it never had
@@ -370,7 +374,7 @@ class Backend extends EventEmitter {
       let ents;
       try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
       for (const e of ents) {
-        if (e.name.startsWith(".")) continue;
+        if (hiddenEntry(e)) continue;
         if (e.isDirectory()) { if (depth < 8) lists(path.join(d, e.name), depth + 1); }
         else if (e.name.toLowerCase().endsWith(".m3u")) for (const f of sheetFiles(path.join(d, e.name))) listed.add(pathKey(f));
       }
@@ -381,7 +385,7 @@ class Backend extends EventEmitter {
       try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
       const groups = new Map();
       for (const e of ents) {
-        if (e.name.startsWith(".")) continue;
+        if (hiddenEntry(e)) continue;
         if (e.isDirectory()) { if (depth < 8) walk(path.join(d, e.name), depth + 1); continue; }
         const ext = path.extname(e.name).toLowerCase(), m = DISC.exec(e.name);
         if (!e.isFile() || !KINDS.includes(ext) || !m || listed.has(pathKey(path.join(d, e.name)))) continue;
@@ -447,7 +451,7 @@ class Backend extends EventEmitter {
         for (const e of ents) if (e.isFile() && e.name.toLowerCase().endsWith(".m3u"))
           for (const f of sheetFiles(path.join(dir, e.name))) listed.add(pathKey(f));
         for (const e of ents) {
-          if (e.name.startsWith(".")) continue;
+          if (hiddenEntry(e)) continue;
           const p = path.join(dir, e.name);
           if (e.isDirectory()) { if (depth < 8) walk(p, depth + 1); continue; }
           const lower = e.name.toLowerCase();
@@ -805,6 +809,36 @@ class Backend extends EventEmitter {
       this.scan();
       return [500, { error: "Couldn't move it: " + e.message }];
     }
+  }
+
+  /**
+   * Game Gear games used to sit with the Master System's; now they have a shelf of their own. Once, .gg files in the
+   * Master System folder move to the Game Gear one (with pictures beside them), keeping their play history. Their
+   * saves stay where they are: the same emulator saves under the same name.
+   */
+  moveGameGear() {
+    const root = this.romsRoot(), sms = this.cfg.systems["Master System"], gg = this.cfg.systems["Game Gear"];
+    if (!sms || !gg) return;
+    const from = path.join(root, sms.folder || "Master System"), to = path.join(root, gg.folder || "Game Gear");
+    const walk = (dir, depth) => {
+      let ents;
+      try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of ents) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) { if (depth < 8 && !hiddenEntry(e)) walk(p, depth + 1); continue; }
+        if (!e.isFile() || !e.name.toLowerCase().endsWith(".gg")) continue;
+        const rel = path.relative(from, dir), destDir = path.join(to, rel), stem = path.parse(e.name).name, dest = path.join(destDir, e.name);
+        if (fs.existsSync(dest)) continue;
+        try {
+          fs.mkdirSync(destDir, { recursive: true });
+          fs.renameSync(p, dest);
+          for (const f of ents) if (f.isFile() && f.name.startsWith(stem + ".") && IMG.includes(path.extname(f.name).toLowerCase()))
+            try { fs.renameSync(path.join(dir, f.name), path.join(destDir, f.name)); } catch {}
+          this.moveStats(gid(p), gid(dest));
+        } catch {}
+      }
+    };
+    walk(from, 0);
   }
 
   toggleFav(id) {

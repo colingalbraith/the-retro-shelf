@@ -57,7 +57,9 @@ const REPO = {
   mgba_libretro: "libretro/mgba", genesis_plus_gx_libretro: "libretro/Genesis-Plus-GX", mednafen_pce_fast_libretro: "libretro/beetle-pce-fast-libretro",
   stella_libretro: "stella-emu/stella", mupen64plus_next_libretro: "libretro/mupen64plus-libretro-nx", pcsx_rearmed_libretro: "libretro/pcsx_rearmed",
   flycast_libretro: "flyinghead/flycast", melondsds_libretro: "JesseTG/melonds-ds", ppsspp_libretro: "hrydgard/ppsspp",
-  fbneo_libretro: "libretro/FBNeo", dolphin_libretro: "libretro/dolphin"
+  fbneo_libretro: "libretro/FBNeo", dolphin_libretro: "libretro/dolphin", picodrive_libretro: "libretro/picodrive",
+  yabasanshiro_libretro: "libretro/yabause", mednafen_ngp_libretro: "libretro/beetle-ngp-libretro", handy_libretro: "libretro/libretro-handy",
+  mednafen_wswan_libretro: "libretro/beetle-wswan-libretro", mednafen_vb_libretro: "libretro/beetle-vb-libretro"
 };
 fetch("/api/licenses").then(r => r.json()).then(d => {
   if (d.retroarch) document.getElementById("rav").textContent = d.retroarch;
@@ -67,7 +69,7 @@ fetch("/api/licenses").then(r => r.json()).then(d => {
     add(c.system);
     const repo = REPO[c.core];
     if (repo) { const a = document.createElement("a"); a.href = "https://github.com/" + repo; a.textContent = c.name; add(a); } else add(c.name);
-    add(c.license || "see source", /non-commercial/i.test(c.license) ? "nc" : "");
+    add(c.license || "see source", /non-commercial|^mame/i.test(c.license) ? "nc" : "");
     add(c.version, "m");
     tb.append(tr); seen.add(c.core);
   }
