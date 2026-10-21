@@ -680,3 +680,20 @@ test("pointing Settings at the games folder in its new place keeps every game's 
   assert.notEqual(now, old);
   assert.deepEqual([be.state.time[now], be.state.plays[now], be.state.fav.includes(now)], [3600, 3, true]);
 });
+
+test("a dropped BIOS file never replaces a good one, and one of the wrong size isn't added", () => {
+  const drop = path.join(home, "drop"); fs.mkdirSync(drop);
+  fs.writeFileSync(path.join(drop, "scph5501.bin"), Buffer.alloc(524288, 1));
+  let r = be.importCheck([path.join(drop, "scph5501.bin")])[1];
+  assert.deepEqual(r.biosAdded, ["scph5501.bin"]);
+  const there = path.join(be.folders.bios, "scph5501.bin");
+  // another one, the right size but different: the one there stays
+  fs.writeFileSync(path.join(drop, "scph5501.bin"), Buffer.alloc(524288, 2));
+  r = be.importCheck([path.join(drop, "scph5501.bin")])[1];
+  assert.deepEqual([r.biosAdded, r.biosKept], [[], ["scph5501.bin"]]);
+  assert.equal(fs.readFileSync(there)[0], 1);
+  // an empty one: left out
+  fs.writeFileSync(path.join(drop, "scph5501.bin"), "");
+  r = be.importCheck([path.join(drop, "scph5501.bin")])[1];
+  assert.deepEqual(r.biosFailed, ["scph5501.bin"]); assert.equal(fs.readFileSync(there)[0], 1);
+});

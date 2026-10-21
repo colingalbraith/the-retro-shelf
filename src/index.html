@@ -1653,12 +1653,16 @@ async function importPaths(paths) {
 }
 async function importBatch(paths) {
   busy(true); const r = await api("/api/import/check", {paths}); busy(false);
-  if (!r.ok) return toast(r.data.error || "Couldn't read those files.", true);
+  if (!r.ok) return toast(r.data.error || t("Couldn't read those files."), true);
   const items = r.data.items, fresh = items.filter(i => !i.exists), nb = (r.data.biosAdded || []).length;
-  if (nb) { toast(t("Put {n} in the BIOS folder ({files}).", {n: plural(nb, "BIOS file", "BIOS files"), files: r.data.biosAdded.slice(0, 3).join(", ") + (nb > 3 ? "…" : "")})); checkBios(); }
-  if (!items.length && nb) return;
+  const few = list => list.slice(0, 3).join(", ") + (list.length > 3 ? "…" : ""), kept = r.data.biosKept || [], bad = r.data.biosFailed || [];
+  const said = [nb ? t("Put {n} in the BIOS folder ({files}).", {n: plural(nb, "BIOS file", "BIOS files"), files: few(r.data.biosAdded)}) : "",
+    kept.length ? t("Kept the BIOS files already there ({files}): the ones dropped are different.", {files: few(kept)}) : "",
+    bad.length ? t("{files}: not the right size for that BIOS, so left out.", {files: few(bad)}) : ""].filter(Boolean);
+  if (said.length) { toast(said.join(" "), !nb && !!bad.length); checkBios(); }
+  if (!items.length && (nb || kept.length || bad.length)) return;
   if (!items.length) return toast(r.data.unknownCount ? t("Those don't look like games this can play ({files}).", {files: r.data.unknown.slice(0, 3).join(", ") + (r.data.unknownCount > 3 ? "…" : "")}) : t("No games found there."), true);
-  if (!fresh.length) return toast(items.length === 1 ? "That game is already on your shelves." : "Those games are already on your shelves.");
+  if (!fresh.length) return toast(items.length === 1 ? t("That game is already on your shelves.") : t("Those games are already on your shelves."));
   const unsure = fresh.filter(i => !i.system), picks = unsure.length ? await askSystems(unsure) : {};
   if (!picks) return;
   const go = fresh.map(i => ({id: i.id, system: i.system || picks[i.id]})).filter(i => i.system);

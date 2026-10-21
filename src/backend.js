@@ -11,7 +11,7 @@ const { spawn } = require("child_process");
 const { EventEmitter } = require("events");
 const ra = require("./retroarch");
 const { Importer, sheetFiles } = require("./importer");
-const { biosDest, biosStatus } = require("./bios");
+const { biosDest, biosSize, biosStatus } = require("./bios");
 const pins = require("./pins");
 const { compare, isTest } = require("./version");
 const cheatFiles = require("./cheats");
@@ -1675,12 +1675,25 @@ class Backend extends EventEmitter {
   // ---------------------------------------------------------------- importing
   importCheck(paths) {
     const { items, unknown, bios } = this.importer.inspect(Array.isArray(paths) ? paths : []);
-    const biosAdded = [], biosFailed = [];
+    const biosAdded = [], biosFailed = [], biosKept = [];
     for (const b of bios) {
-      const to = path.join(this.folders.bios, ...b.dest.split("/"));
+      const to = path.join(this.folders.bios, ...b.dest.split("/")), want = biosSize(b.name, this.cfg.systems);
+      let size = -1;
+      try { size = fs.statSync(b.src).size; } catch {}
+      // empty, or not the size this BIOS is (a failed download, another file with the same name): not it
+      if (size <= 0 || (want && size !== want)) { biosFailed.push(b.name); continue; }
       try {
+        if (path.resolve(to) === path.resolve(b.src)) { biosAdded.push(b.name); continue; }
         fs.mkdirSync(path.dirname(to), { recursive: true });
-        if (path.resolve(to) !== path.resolve(b.src)) fs.copyFileSync(b.src, to);
+        if (fs.existsSync(to)) {
+          const cur = fs.statSync(to).size;
+          if (cur === size && fs.readFileSync(to).equals(fs.readFileSync(b.src))) { biosAdded.push(b.name); continue; }
+          // a different one there already that's the right size (another region's, say) stays; one that isn't the
+          // right size is set aside as .old for the new one
+          if (!want || cur === want) { biosKept.push(b.name); continue; }
+          fs.renameSync(to, to + ".old");
+        }
+        fs.copyFileSync(b.src, to);
         biosAdded.push(b.name);
       } catch { biosFailed.push(b.name); }
     }
@@ -1692,7 +1705,7 @@ class Backend extends EventEmitter {
         if (it.system) { try { const d = this.importer.plan(it, root).main; exists = fs.existsSync(d); } catch {} }
         return { id: it.id, name: it.name, size: it.size, system: it.system, choices: it.choices, exists };
       }),
-      unknown: unknown.slice(0, 50), unknownCount: unknown.length, biosAdded, biosFailed,
+      unknown: unknown.slice(0, 50), unknownCount: unknown.length, biosAdded, biosFailed, biosKept,
     }];
   }
 
