@@ -233,6 +233,35 @@ function ipc() {
   ipcMain.handle("reveal-game", (_, id) => { const g = backend.games.get(String(id)); if (g) shell.showItemInFolder(g.path); });
   ipcMain.handle("game-menu", (_, id) => gameMenu(String(id)));
   ipcMain.handle("open-url", (_, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
+  // where automatic backups go
+  ipcMain.handle("backup-folder", async () => {
+    const r = await dialog.showOpenDialog(win, { title: "Where should backups go?", buttonLabel: "Back Up Here", properties: ["openDirectory", "createDirectory"] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    backend.paths.backup_dir = r.filePaths[0]; backend.saveSettings();
+    return { ok: true, dir: r.filePaths[0] };
+  });
+  // the saves into a folder of your own (to share them through iCloud Drive, Dropbox or OneDrive), or back
+  ipcMain.handle("move-saves", async (_, home) => {
+    let dir = "";
+    if (!home) {
+      const r = await dialog.showOpenDialog(win, { title: "Share saves through a cloud folder", message: "Choose a folder in iCloud Drive, Dropbox or OneDrive.", buttonLabel: "Keep Saves Here", properties: ["openDirectory", "createDirectory"] });
+      if (r.canceled || !r.filePaths[0]) return { ok: false };
+      dir = r.filePaths[0];
+    }
+    const [code, res] = await backend.moveSaves(dir);
+    return code === 200 ? { ok: true, ...res } : { ok: false, error: res.error };
+  });
+  // the games to another drive; then the old copy to the Trash, if you say so
+  ipcMain.handle("move-library", async () => {
+    const r = await dialog.showOpenDialog(win, { title: "Move the games to…", buttonLabel: "Move Them Here", properties: ["openDirectory", "createDirectory"] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    const [code, res] = await backend.moveLibrary(r.filePaths[0]);
+    if (code !== 200) return { ok: false, error: res.error };
+    const a = await dialog.showMessageBox(win, { type: "question", buttons: ["Move to Trash", "Keep It"], defaultId: 0, cancelId: 1,
+      message: `Moved ${res.files} files to ${res.to}.`, detail: `The old copy is still in ${res.from}. Move it to the Trash? Nothing is deleted for good: it stays in the Trash until you empty it.` });
+    if (a.response === 0) await shell.trashItem(res.from).catch(() => {});
+    return { ok: true, ...res, trashed: a.response === 0 };
+  });
   // one game's saves, in one .zip
   ipcMain.handle("export-saves", async (_, id) => {
     const g = backend.games.get(String(id));
@@ -294,6 +323,25 @@ app.whenReady().then(() => {
   if (!app.isPackaged && process.platform === "darwin") app.dock.setIcon(DEV_ICON);
   backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion(), watch: true }, fetchUrl);
   backend.trash = p => shell.trashItem(p);
+  // backups by themselves: weekly, when that's on, never while a game is open; the last five kept, older ones to the Trash
+  const autoBackup = async () => {
+    if (!backend.backupDue() || (backend.running && backend.running.alive)) return;
+    const saves = backend.folders.saves;
+    let any = false;
+    try { any = filesIn(saves).length > 0; } catch {}
+    if (!any) return;
+    const dir = backend.backupDir();
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      await zipFolder(saves, path.join(dir, `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`));
+    } catch { return; }
+    backend.state.lastAutoBackup = Math.floor(Date.now() / 1000); backend.saveState(); backend.event("backup");
+    const mine = fs.readdirSync(dir).filter(f => /^Retro Shelf saves \d{4}-\d{2}-\d{2}\.zip$/.test(f)).map(f => path.join(dir, f))
+      .sort((x, y) => fs.statSync(y).mtimeMs - fs.statSync(x).mtimeMs);
+    for (const f of mine.slice(5)) await shell.trashItem(f).catch(() => {});
+  };
+  setTimeout(autoBackup, 90000);
+  setInterval(autoBackup, 3600000);
   backend.init();
   if (OLD_GAMES) backend.remapIds(OLD_GAMES);
   backend.on("exit", () => setTimeout(focusApp, 150));

@@ -428,3 +428,48 @@ test("a game's saves: its battery save, resume point and numbered saves, each to
   assert.deepEqual(trashed, ["Chrono Trigger (USA).state3"]);
   assert.equal(be.gameSaves(g).length, 3);
 });
+
+test("saves moved to a folder of your own: copied (the newer copy wins), used from there, and a game open elsewhere is told", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const g = byTitle("Chrono Trigger"), cloud = path.join(home, "Dropbox");
+  fs.mkdirSync(path.join(be.folders.saves, "Snes9x"), { recursive: true });
+  fs.writeFileSync(path.join(be.folders.saves, "Snes9x", "Chrono Trigger (USA).srm"), "here");
+  fs.mkdirSync(path.join(cloud, "The Retro Shelf Saves", "Snes9x"), { recursive: true });
+  const other = path.join(cloud, "The Retro Shelf Saves", "Snes9x", "Other (USA).srm"); fs.writeFileSync(other, "other computer's");
+  const [code, res] = await be.moveSaves(cloud);
+  assert.equal(code, 200); assert.equal(res.copied, 1);
+  assert.equal(be.folders.saves, path.join(cloud, "The Retro Shelf Saves"));
+  assert.equal(fs.readFileSync(path.join(be.folders.saves, "Snes9x", "Chrono Trigger (USA).srm"), "utf8"), "here");
+  assert.equal(fs.readFileSync(other, "utf8"), "other computer's");                // nothing there was overwritten
+  assert.ok(fs.existsSync(path.join(be.dirs.docs, "Saves", "Snes9x", "Chrono Trigger (USA).srm")));   // the old copy stays
+  // the other computer has it open
+  fs.mkdirSync(path.join(be.folders.saves, ".in-play"), { recursive: true });
+  fs.writeFileSync(path.join(be.folders.saves, ".in-play", "Den-PC.json"), JSON.stringify({ host: "Den-PC", system: "SNES", game: "Chrono Trigger (USA)", since: Math.floor(Date.now() / 1000) - 60 }));
+  const [c2, r2] = await be.launch(g.id);
+  assert.equal(c2, 409); assert.equal(r2.elsewhere, "Den-PC");
+  // back to the usual place
+  assert.equal((await be.moveSaves(""))[0], 200);
+  assert.equal(be.folders.saves, path.join(be.dirs.docs, "Saves"));
+});
+
+test("the games folder moved to another drive: every file copied, history kept, the old copy left for you", async () => {
+  put("snes/Chrono Trigger (USA).sfc", "rom"); put("ps1/Crash (USA)/Crash (USA).cue", cue(["Crash (USA).bin"])); put("ps1/Crash (USA)/Crash (USA).bin", "disc");
+  be.scan();
+  be.state.time[byTitle("Chrono Trigger").id] = 7200;
+  const drive = path.join(home, "Drive"); fs.mkdirSync(drive);
+  const [code, res] = await be.moveLibrary(drive);
+  assert.equal(code, 200); assert.ok(res.files >= 3);                              // the games, and what else the folder holds
+  assert.equal(be.romsRoot(), path.join(drive, "Games"));
+  assert.ok(byTitle("Chrono Trigger").path.startsWith(path.join(drive, "Games")));
+  assert.equal(be.state.time[byTitle("Chrono Trigger").id], 7200);
+  assert.ok(fs.existsSync(path.join(games, "snes", "Chrono Trigger (USA).sfc")));    // the old copy, until you say
+  assert.equal((await be.moveLibrary(drive))[0], 400);                              // into itself
+});
+
+test("a backup by itself is due weekly, only when it's on", () => {
+  be.ui.autoBackup = false; assert.equal(be.backupDue(), false);
+  be.ui.autoBackup = true; delete be.state.lastAutoBackup; assert.equal(be.backupDue(), true);
+  be.state.lastAutoBackup = Math.floor(Date.now() / 1000) - 3 * 86400; assert.equal(be.backupDue(), false);
+  be.state.lastAutoBackup = Math.floor(Date.now() / 1000) - 8 * 86400; assert.equal(be.backupDue(), true);
+  assert.equal(be.backupDir(), path.join(be.dirs.docs, "Backups"));                // until you choose a folder
+});

@@ -1692,7 +1692,15 @@ async function play(g, o) {
   if (!g) return;
   if (STATUS.running) { showLaunch(byId.get(STATUS.running.id) || g); return; }
   beep(780, .08); showLaunch(g);
-  const r = await api("/api/launch", {id: g.id, slot: o && o.slot, fresh: !!(o && o.fresh)});
+  const r = await api("/api/launch", {id: g.id, slot: o && o.slot, fresh: !!(o && o.fresh), force: !!(o && o.force)});
+  if (!r.ok && r.data.elsewhere) {
+    /* open on another computer that shares the saves: say so, and let you choose */
+    hideLaunch();
+    openList(t("Open on {host}", {host: r.data.elsewhere}), r.data.error, list => {
+      listRow(list, t("Play it here anyway"), t("Whichever computer closes the game last keeps its progress."), [[t("Play anyway"), () => { closeList(); play(g, {...(o || {}), force: true}); }]]);
+    });
+    return;
+  }
   if (!r.ok) { hideLaunch(); toast(r.data.error || "Couldn't start the game.", true); return; }
   offset = r.data.now * 1000 - Date.now(); STATUS.running = {id: g.id, since: r.data.since};
   g.last = Math.floor(r.data.since); setTimeout(poll, 900);
@@ -1713,6 +1721,9 @@ async function poll() {
   const s = r.data; offset = s.now * 1000 - Date.now();
   const prev = lastRunning; lastRunning = s.running; STATUS.running = s.running; STATUS.covers = s.covers; STATUS.exit = s.exit; STATUS.import = s.import;
   importProgress(s.import);
+  /* games being moved to another drive */
+  if (s.moving) { busy(true); toast(t("Moving the games… {p}%", {p: Math.floor(100 * s.moving.done / Math.max(1, s.moving.total))})); } else if (STATUS.moving) busy(false);
+  STATUS.moving = s.moving;
   if (s.newPins && s.newPins.length && !LAUNCH.open && !s.running && !isOpen("news")) showNewPins(s.newPins);
   if (prev && !s.running) onExit(prev);
   if (!prev && s.running && !LAUNCH.open) showLaunch(byId.get(s.running.id));
@@ -2448,6 +2459,9 @@ function renderSettings() {
 
   const rf = field(PATHS.roms_dir, PATHS.roms_ok, "roms");
   R("Games folder", PATHS.roms_ok ? G.length + " games found." : "Folder not found.", rf);
+  const mv = el("button", "btn", t("Move to another drive…"));
+  mv.onclick = async () => { const r = await APP.moveLibrary(); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("The games are in {dir} now.", {dir: r.to})); };
+  R(t("Move the games"), t("Copies every game to a folder on another drive, checks each one, then uses them from there. Play history comes along. The old copy goes to the Trash only if you say."), mv);
   const sv = el("button", "btn primary", "Save and scan");
   sv.onclick = async () => {
     busy(true);
@@ -2475,7 +2489,14 @@ function renderSettings() {
     H("Saves & BIOS");
     const fb = el("div", "btns"), f1 = el("button", "btn", "Saves"), f2 = el("button", "btn", "BIOS");
     f1.onclick = () => APP.openFolder("saves"); f2.onclick = () => APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
-    R("Folders", "Game saves are kept in Documents › The Retro Shelf › Saves. BIOS files are needed for PS2 and PC Engine CD games, and can improve PS1, Dreamcast and DS.", fb);
+    R("Folders", (PATHS.saves_dir ? t("Game saves are kept in {dir}.", {dir: PATHS.saves_dir}) : "Game saves are kept in Documents › The Retro Shelf › Saves.") + " BIOS files are needed for some consoles; Saves & BIOS below shows which.", fb);
+    /* saves shared between computers through a cloud folder */
+    const sf = el("div", "btns"), sm = el("button", "btn", PATHS.saves_dir ? t("Move again…") : t("Share them…"));
+    sm.onclick = async () => { const r = await APP.moveSaves(false); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("Saves are in {dir} now. The old copy stays where it was.", {dir: r.to})); };
+    sf.appendChild(sm);
+    if (PATHS.saves_dir) { const sb = el("button", "btn", t("Back to the usual place")); sb.onclick = async () => { const r = await APP.moveSaves(true); if (r && r.ok) { await refresh(true); renderSettings(); toast(t("Saves are back in Documents › The Retro Shelf.")); } else if (r && r.error) toast(r.error, true); }; sf.appendChild(sb); }
+    R(t("Saves on more than one computer"), PATHS.saves_dir ? t("Shared through {dir}. If a game is open on another computer, you're told before playing it here. In iCloud Drive, keep the folder downloaded (right-click it in Finder).", {dir: PATHS.saves_dir})
+      : t("Put the saves in a folder in iCloud Drive, Dropbox or OneDrive, and point The Retro Shelf on your other computers at the same folder: your progress follows you."), sf);
     const bb = el("div", "btns"), bk = el("button", "btn", "Back up…"), rs = el("button", "btn", "Restore…");
     bk.onclick = async () => { const r = await APP.backupSaves(); if (r.ok) toast("Backed up " + plural(r.count, "file", "files") + "."); else if (r.error) toast(r.error, true); };
     rs.onclick = async () => {
@@ -2485,6 +2506,11 @@ function renderSettings() {
     };
     bb.appendChild(bk); bb.appendChild(rs);
     R("Back up saves", "Puts all your saves and resume points in one .zip file, or puts them back from one. A save newer than the backup is never replaced.", bb);
+    /* a backup every week, by itself */
+    const ab2 = el("div", "btns"), abf = el("button", "btn", t("Folder…"));
+    abf.onclick = async () => { const r = await APP.backupFolder(); if (r && r.ok) { await refresh(true); renderSettings(); } };
+    ab2.appendChild(abf); ab2.appendChild(sw(!!UI.autoBackup, v => { UI.autoBackup = v; saveUI(); renderSettings(); }));
+    R(t("Back up by itself"), t("Every week, a backup of all your saves in {dir}. The last five are kept.", {dir: PATHS.backup_dir || ""}) + (PATHS.last_backup ? " " + t("The last one: {when}.", {when: fmtWhen(PATHS.last_backup)}) : ""), ab2);
     R("BIOS files", "Copied from your own consoles. Drop them on this window and they go in the right place." + (BIOSST ? "" : " Checking…"), null);
     if (BIOSST) {
       const bl = el("div", "biosl");
