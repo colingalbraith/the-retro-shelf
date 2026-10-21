@@ -448,6 +448,38 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .cmore button{border:0;background:none;padding:0;color:var(--chalk);font:inherit;text-decoration:underline;text-underline-offset:3px}
 .slip.wide{width:560px;max-width:86vw}
 #waddr{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15)}
+/* a month's or a year's play on one card, on its own bit of wall for saving as a picture */
+#recap .rcw{display:flex;flex-direction:column;align-items:center;gap:12px;max-height:100vh;overflow-y:auto;padding:16px}
+.rcnav{display:flex;gap:10px;align-items:center}
+.rcnav .btn{min-width:44px;font-size:18px;padding:4px 12px}
+.rcnav .btn:disabled{opacity:.3;cursor:default}
+@media (max-height:600px){#recap .rcw{gap:8px;padding:8px 16px}.rcshot{padding:14px 20px 16px}.rcbig{font-size:32px}.rcard{padding:22px 26px 18px}.rcard .tcs{margin:8px 0 10px}}
+.rcshot{padding:24px 28px 26px;background:radial-gradient(500px 220px at 50% 0,var(--wall-hi),var(--wall))}
+.rcard{margin:0;width:min(600px,calc(100vw - 96px))}
+.rcbig{margin:14px 0 0;font:700 40px/1 var(--disp)}
+.rcbig small{margin-left:8px;font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+.rcard .tcs{margin:12px 0 14px}
+.rctop{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.rctop div{display:flex;gap:9px;align-items:center;min-width:0}
+.rctop .art{flex:none;width:40px;height:54px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#d8cfba;font:700 7px/1.1 var(--disp);text-align:center;box-shadow:0 2px 4px rgba(0,0,0,.25)}
+.rctop img{width:100%;height:100%;object-fit:cover}
+.rctop b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font:700 13px/1.15 var(--disp)}
+.rctop span{font:600 10px var(--mono);color:var(--ink2)}
+.rcl{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-top:10px;border-top:1px solid rgba(28,25,22,.2);font-size:13px}
+.rcl span{display:block;font:600 10px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+.rcpins{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;font:600 11px var(--mono);color:var(--ink2)}
+.rcpins .pin .badge{width:34px;height:34px;font-size:15px}
+.rcpins .pin .badge::after{inset:4px;border-width:1.5px}
+.rcnone{margin:18px 0 6px;color:var(--ink2)}
+.tsave{text-align:center;margin:12px 0 0}
+/* while a picture is taken: no links or hints in it */
+.shooting .tsave,.shooting #hintbar{visibility:hidden}
+.tsave .lnk{border:0;background:none;padding:0;color:var(--dust);font:500 13px var(--disp);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.tsave .lnk:hover{color:var(--chalk)}
+#trophy .thead .btns{display:flex;gap:12px;align-items:center}
+/* a series' game that doesn't count toward having them all */
+.ci.skip .art{opacity:.28;filter:grayscale(1)}
+.ci.skip::after{content:attr(data-skip);position:absolute;left:0;right:0;bottom:8px;font:700 9px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--chalk);text-align:center}
 /* the controller test: a drawing that lights up */
 #ctpad{display:block;width:100%;max-width:440px;margin:8px auto 4px}
 #ctpad rect,#ctpad circle{fill:var(--paper-hi);stroke:var(--ink);stroke-width:1.5}
@@ -697,11 +729,13 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
 
 <div id="trophy" role="dialog" aria-label="Your play">
   <div class="tin">
-    <div class="thead"><span class="tape">Your play</span><button id="tclose" class="btn">Done<kbd>Esc</kbd></button></div>
+    <div class="thead"><span class="tape">Your play</span><div class="btns"><button id="trecap" class="btn">Recap</button><button id="tclose" class="btn">Done<kbd>Esc</kbd></button></div></div>
     <p class="tsum" id="tsum"></p>
     <div class="tshelf" id="ttop"></div>
     <div class="tshelf stacks" id="tcon"></div>
+    <p class="tsave" id="tssave"><button class="lnk">Save the trophy shelf as a picture</button></p>
     <div class="tcard" id="tcard"></div>
+    <p class="tsave" id="tcsave"><button class="lnk">Save the time card as a picture</button></p>
     <div class="cork" id="cork"></div>
   </div>
 </div>
@@ -759,6 +793,12 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   </svg>
   <p class="cthint" id="cthint"></p>
   <div class="btns"><button class="btn primary" id="ctdone">Done</button></div></div></div>
+
+<div id="recap" class="over"><div class="rcw">
+  <div class="rcnav"><button class="btn" id="rcprev" aria-label="Earlier">‹</button><div class="seg ctabs" id="rcseg"><button data-k="month">Month</button><button data-k="year">Year</button></div><button class="btn" id="rcnext" aria-label="Later">›</button></div>
+  <div class="rcshot" id="rcshot"><div class="tcard rcard" id="rcard"></div></div>
+  <div class="btns"><button class="btn" id="rcsave">Save as picture</button><button class="btn primary" id="rcdone">Done</button></div>
+</div></div>
 
 <div id="lst" class="over"><div class="slip wide"><h2 id="lstt"></h2><p id="lstp"></p><div id="lstl"></div>
   <div class="btns"><button class="btn primary" id="lstok">Done</button></div></div></div>
@@ -1395,7 +1435,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "ctest", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "ctest", "recap", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
@@ -1512,7 +1552,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("lst") || isOpen("ctest") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("lst") || isOpen("ctest") || isOpen("recap") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1681,7 +1721,11 @@ function showGame(id) {
 }
 /* a panel opened from another one (settings → a list) gives focus back to the button that opened it */
 function opener() { const a = document.activeElement; return a && a !== document.body && !a.closest("#shelves") ? a : null; }
-function backTo(e) { if (e && e.isConnected && e.getClientRects().length) e.focus({preventScroll: true}); else focusById(focusId); }
+function backTo(e) {
+  if (e && e.isConnected && e.getClientRects().length) return e.focus({preventScroll: true});
+  const p = topPanel(), f = p && focusables($("#" + p[0]))[0];
+  if (f) f.focus({preventScroll: true}); else focusById(focusId);
+}
 function focusById(id) {
   const c = id && (sel && sel.dataset.id === id && document.getElementById("shelves").contains(sel) ? sel : document.querySelector('#shelves .card[data-id="' + id + '"]'))
     || document.querySelector("#shelves .card");
@@ -1795,7 +1839,7 @@ async function loadLibrary(force) {
 /* ---------- a controller (or TV remote setup) reaches everything ----------
    In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
    On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
-const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["ctest", () => closeCtest()], ["lst", () => closeList()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
+const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["ctest", () => closeCtest()], ["lst", () => closeList()], ["recap", () => closeRecap()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
 const topPanel = () => PANELS.find(([id]) => isOpen(id));
@@ -1974,7 +2018,8 @@ async function openColls(tab) {
 }
 function closeColls() { if (!isOpen("colls")) return; $("#colls").classList.remove("show"); if (collIO) collIO.disconnect(); focusById(focusId); light(); beep(330); }
 function collItem(it, list) {
-  const b = el("button", "ci" + (it.id ? "" : " ghost")), art = el("span", "art"), g = it.id && byId.get(it.id);
+  const b = el("button", "ci" + (it.id ? "" : " ghost") + (it.counts === false ? " skip" : "")), art = el("span", "art"), g = it.id && byId.get(it.id);
+  if (it.counts === false) b.dataset.skip = t("Doesn't count");
   b.title = it.title + " · " + it.system + (it.id ? "" : " · not in your library");
   if (g && g.cv) { const im = new Image(); im.alt = ""; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); }
   else if (!it.id) {
@@ -2008,18 +2053,19 @@ function renderColls() {
   if (collIO) collIO.disconnect();
   collIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting && e.target._im) { e.target._im.src = e.target._im.dataset.src; collIO.unobserve(e.target); } }), {root: $("#colls"), rootMargin: "300px"});
   const block = (name, have, items, opts) => {
-    const sec = el("section", "col"), h = el("div", "colh"), pl = el("span", "tplate", name); pl.appendChild(el("small", "", have + " of " + items.length));
+    const sec = el("section", "col"), h = el("div", "colh"), pl = el("span", "tplate", name); pl.appendChild(el("small", "", have + " of " + (opts.total ?? items.length)));
     h.appendChild(pl);
+    if (opts.counts) { const cb = el("button", "lnk", t("What counts")); cb.onclick = opts.counts; h.appendChild(cb); }
     if (opts.hide) { const hb = el("button", "lnk", opts.hidden ? "Show" : "Hide"); hb.onclick = opts.hide; h.appendChild(hb); }
     const strip = el("div", "strip"); items.forEach(it => strip.appendChild(collItem(it, opts.list)));
     if (opts.list) { const add = el("button", "ci add"), art = el("span", "art", "+ Add a game"); add.appendChild(art); add.onclick = () => openWantAdd(opts.list); strip.appendChild(add); }
     sec.appendChild(h); sec.appendChild(strip); list.appendChild(sec);
   };
   if (collTab === "series") {
-    const shown = COLL.series.filter(s => showHiddenSeries || !hidden.has(s.name)), done = COLL.series.filter(s => s.have === s.items.length).length;
+    const shown = COLL.series.filter(s => showHiddenSeries || !hidden.has(s.name)), done = COLL.series.filter(s => s.have === s.total).length;
     sum.textContent = COLL.series.length ? "Your games are part of " + plural(COLL.series.length, "series", "series") + (done ? ", and you have all of " + done + "." : ".") + " Faded boxes are the ones you don't have."
       : "None of your games belong to a series we know of yet.";
-    shown.forEach(s => block(s.name, s.have, s.items, {hidden: hidden.has(s.name), hide: () => {
+    shown.forEach(s => block(s.name, s.have, s.items, {total: s.total, counts: () => openCounts(s.name), hidden: hidden.has(s.name), hide: () => {
       UI.hiddenSeries = hidden.has(s.name) ? [...hidden].filter(n => n !== s.name) : [...hidden, s.name]; saveUI(); renderColls();
     }}));
     const nh = COLL.series.filter(s => hidden.has(s.name)).length;
@@ -2032,6 +2078,18 @@ function renderColls() {
   refocus();
 }
 $("#cclose").onclick = closeColls;
+/* a series' games, each counting toward having them all or not: an odd regional release needn't stand in the way */
+function openCounts(name) {
+  const items = () => ((COLL && COLL.series.find(s => s.name === name)) || {items: []}).items;
+  openList(t("What counts in {series}", {series: name}), t("Games marked as not counting stay in the series, but having them all doesn't need them."), list => {
+    for (const it of items()) listRow(list, it.title, it.system + (it.id ? " · " + t("yours") : "") + (it.counts === false ? " · " + t("doesn't count") : ""), [[it.counts === false ? t("Count it") : t("Don't count it"), async () => {
+      const r = await api("/api/collections/count", {series: name, system: it.system, look: it.look, counts: it.counts === false});
+      if (!r.ok) return toast(r.data.error || t("Couldn't change that."), true);
+      const c = await api("/api/collections"); if (c.ok) COLL = c.data;
+      redrawList(); renderColls();
+    }]]);
+  });
+}
 $$("#ctabs button").forEach(b => { b.onclick = () => { collTab = b.dataset.t; renderColls(); beep(520); }; });
 
 /* adding a game to one of your collections: search every game the app knows */
@@ -2160,7 +2218,103 @@ async function showNews() {
   }
   blurActive(); $("#news").classList.add("show"); light();
 }
-function closeNews() { if (!isOpen("news")) return; $("#news").classList.remove("show"); api("/api/whatsnew/seen", {}); light(); focusById(focusId); }
+function closeNews() { if (!isOpen("news")) return; $("#news").classList.remove("show"); api("/api/whatsnew/seen", {}); light(); focusById(focusId); offerRecap(); }
+
+/* ---------- a month's or a year's play on one card: offered once when a month starts, and from Your play ---------- */
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+let RC = null, rcFrom = null;
+async function offerRecap() {
+  const r = await api("/api/recap/due", {});
+  if (r.ok && r.data.recap && !LAUNCH.open && !topPanel()) openRecap(r.data.recap.year, r.data.recap.month, true);
+}
+async function openRecap(year, month, offered) {
+  if (LAUNCH.open) return;
+  const r = await api("/api/recap", {year, month}); if (!r.ok) return;
+  if (offered) api("/api/recap/seen", {year, month});
+  await renderRecap(RC = r.data);
+  if (!isOpen("recap")) { rcFrom = opener(); blurActive(); $("#recap").classList.add("show"); light(); beep(520); setTimeout(() => $("#rcdone").focus({preventScroll: true}), 40); }
+}
+function closeRecap() { if (!isOpen("recap")) return; $("#recap").classList.remove("show"); backTo(rcFrom); light(); beep(330); }
+const recapName = d => d.month === null ? String(d.year) : MONTH_NAMES[d.month] + " " + d.year;
+async function renderRecap(d) {
+  const card = $("#rcard"), name = recapName(d), refocus = keepFocus($("#recap")); clear(card);
+  const head = el("div", "tch"); head.appendChild(el("span", "", t("Your {when}", {when: name}))); head.appendChild(el("span", "", "The Retro Shelf"));
+  card.appendChild(head);
+  if (!d.sittings) card.appendChild(el("p", "rcnone", t("No play in {when}.", {when: name})));
+  else {
+    const big = el("div", "rcbig", fmtDur(d.total)); big.appendChild(el("small", "", t("played"))); card.appendChild(big);
+    const stat = (v, label) => { const x = el("div"); x.appendChild(el("b", "", String(v))); x.appendChild(el("span", "", label)); return x; }, st = el("div", "tcs");
+    st.appendChild(stat(d.sittings, d.sittings === 1 ? t("Sitting") : t("Sittings")));
+    st.appendChild(stat(d.days, d.days === 1 ? t("Day played") : t("Days played")));
+    st.appendChild(stat(d.games, (d.games === 1 ? t("Game") : t("Games")) + (d.newGames ? " · " + t("{n} new", {n: d.newGames}) : "")));
+    st.appendChild(stat(d.pins.length, d.pins.length === 1 ? t("Pin earned") : t("Pins earned")));
+    card.appendChild(st);
+    if (d.top.length) {
+      const top = el("div", "rctop");
+      for (const x of d.top) {
+        const g = byId.get(x.id); if (!g) continue;
+        const row = el("div"), art = el("span", "art"), tx = el("span");
+        if (g.cv) { const im = new Image(); im.alt = ""; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); } else art.textContent = g.title;
+        tx.appendChild(el("b", "", g.title)); tx.appendChild(el("span", "", g.system + " · " + fmtDur(x.time)));
+        row.appendChild(art); row.appendChild(tx); top.appendChild(row);
+      }
+      card.appendChild(top);
+    }
+    const day = s => new Date(s * 1000).toLocaleDateString(undefined, {weekday: "short", month: "short", day: "numeric"});
+    const lines = el("div", "rcl"), line = (label, text) => { const x = el("div"); x.appendChild(el("span", "", label)); x.appendChild(document.createTextNode(text)); lines.appendChild(x); };
+    const lg = d.longest && byId.get(d.longest.id);
+    if (lg) line(t("Longest sitting"), lg.title + " · " + fmtDur(d.longest.time) + " · " + day(d.longest.at));
+    if (d.busiest) line(t("Busiest day"), day(d.busiest.day) + " · " + fmtDur(d.busiest.time));
+    card.appendChild(lines);
+    if (d.pins.length) {
+      if (!PINCAT) { const r = await api("/api/pins"); if (r.ok) PINCAT = new Map(r.data.pins.map(p => [p.key, p])); }
+      const row = el("div", "rcpins"), ps = d.pins.map(k => PINCAT && PINCAT.get(k)).filter(Boolean);
+      for (const p of ps.slice(0, 10)) { const e = el("div", "pin " + p.tier); e.title = p.title; e.appendChild(el("div", "badge", p.icon)); row.appendChild(e); }
+      if (ps.length > 10) row.appendChild(el("span", "", "+" + (ps.length - 10)));
+      card.appendChild(row);
+    }
+  }
+  /* no earlier than the first sitting, no later than now */
+  const now = new Date(), cur = d.month === null ? d.year >= now.getFullYear() : d.year * 12 + d.month >= now.getFullYear() * 12 + now.getMonth();
+  $("#rcprev").disabled = !d.first || d.from <= d.first; $("#rcnext").disabled = cur;
+  $$("#rcseg button").forEach(b => b.classList.toggle("on", (b.dataset.k === "year") === (d.month === null)));
+  refocus();
+}
+function rcStep(dir) {
+  if (!RC) return;
+  let {year, month} = RC;
+  if (month === null) year += dir; else { month += dir; if (month < 0) { month = 11; year--; } else if (month > 11) { month = 0; year++; } }
+  openRecap(year, month);
+}
+$("#rcprev").onclick = () => rcStep(-1); $("#rcnext").onclick = () => rcStep(1);
+$$("#rcseg button").forEach(b => { b.onclick = () => {
+  if (!RC) return; const now = new Date();
+  openRecap(RC.year, b.dataset.k === "year" ? null : RC.month !== null ? RC.month : RC.year === now.getFullYear() ? now.getMonth() : 11);
+}; });
+$("#rcdone").onclick = closeRecap;
+$("#rcsave").onclick = () => RC && savePicture(() => padRect($("#rcshot").getBoundingClientRect(), -1), "The Retro Shelf - " + recapName(RC));
+$("#trecap").onclick = () => { const n = new Date(); openRecap(n.getFullYear(), n.getMonth()); };
+
+/* part of the window as a picture: what's on screen, saved on this computer. With a controller it goes straight into
+   Pictures, since the save window needs a mouse */
+async function savePicture(rectOf, name) {
+  const quick = byPad(), back = document.activeElement;
+  blurActive(); document.body.classList.add("shooting");
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const b = rectOf(), res = await APP.savePicture({x: b.left, y: b.top, width: b.width, height: b.height}, name, quick);
+  document.body.classList.remove("shooting");
+  if (back && back.focus) back.focus({preventScroll: true});
+  if (res && res.ok) toast(quick ? t("Saved in Pictures, in The Retro Shelf folder.") : t("Saved the picture."));
+  else if (res && res.error) toast(res.error, true);
+}
+const padRect = (r, p) => ({left: Math.max(0, r.left - p), top: Math.max(0, r.top - p), width: Math.min(innerWidth, r.right + p) - Math.max(0, r.left - p), height: Math.min(innerHeight, r.bottom + p) - Math.max(0, r.top - p)});
+/* scrolls Your play so a part of it sits a little below the top, room for what stands above it (the tack, the star) */
+const showInTrophy = e => { $("#trophy").scrollTop += e.getBoundingClientRect().top - 70; };
+$("#tcsave button").onclick = () => { showInTrophy($("#tcard")); savePicture(() => padRect($("#tcard").getBoundingClientRect(), 26), "The Retro Shelf - Time card"); };
+$("#tssave button").onclick = () => {
+  showInTrophy($("#ttop"));
+  savePicture(() => { const a = $("#ttop").getBoundingClientRect(), c = $("#tcon").getBoundingClientRect(), r = {left: Math.min(a.left, c.left), top: a.top - 24, right: Math.max(a.right, c.right), bottom: c.bottom}; return padRect(r, 18); }, "The Retro Shelf - Trophy shelf");
+};
 
 /* the full-window screens replace each other: opening one from another (a menu shortcut, a link) puts that one away */
 function leaveScreens(keep) {
@@ -2757,7 +2911,7 @@ function openTrophy() {
       c.appendChild(pl); con.appendChild(c);
     });
   }
-  con.hidden = !played.length;
+  con.hidden = $("#tssave").hidden = !played.length;
   blurActive(); $("#trophy").scrollTop = 0; $("#trophy").classList.add("show"); light(); beep(520);
   fitTrophy();
   api("/api/sessions").then(r => { if (r.ok && isOpen("trophy")) timeCard(r.data.sessions || [], r.data.now); });
@@ -2854,6 +3008,7 @@ function timeCard(sessions, nowS) {
   });
   card.appendChild(g);
   card.appendChild(el("p", "tcf", sessions.length ? "Each stamp is a day you played. Darker means longer." : "Your time card starts with the next game you play."));
+  $("#tcsave").hidden = !sessions.length;
 }
 /* everything stays on its plank: the trophies shrink together until they fit, and consoles that don't fit are left
    off (the least played go first); each pile is as wide as its plate */
@@ -2960,6 +3115,7 @@ document.addEventListener("keydown", e => {
   if (isOpen("ctest")) { if (k === "Escape") closeCtest(); return; }
   if (LISTEN && k === "Escape") { LISTEN(null); return; }
   if (isOpen("lst")) { if (k === "Escape") closeList(); else if (arrow) { e.preventDefault(); padNav($("#lst"), arrow); } return; }
+  if (isOpen("recap")) { if (k === "Escape") closeRecap(); else if (arrow) { e.preventDefault(); padNav($("#recap"), arrow); } return; }
   if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
@@ -3122,7 +3278,7 @@ function hideSplash() { const s = $("#splash"); s.classList.add("out"); setTimeo
   lastFound = STATUS.covers.found || 0; lastRun = !!STATUS.covers.running;
   if (STATUS.running) showLaunch(byId.get(STATUS.running.id));
   if (!UI.welcomed) setTimeout(() => { $("#welcome").classList.add("show"); light(); }, fxMode() === "off" ? 0 : 500);
-  else setTimeout(showNews, fxMode() === "off" ? 0 : 500);
+  else setTimeout(async () => { await showNews(); if (!isOpen("news")) offerRecap(); }, fxMode() === "off" ? 0 : 500);
   setInterval(poll, 1500); setInterval(tick, 500);
   window.addEventListener("focus", poll);
 })();

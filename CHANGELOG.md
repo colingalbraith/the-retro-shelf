@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0-beta.8
+
+- **Recaps:** a card for any month or year of play: time played, sittings, days, games (and how many were new), your
+  most played, the longest sitting, the busiest day and the pins you earned. Last month's is offered once when a new
+  month starts (in January, the whole last year). Your play → Recap.
+- **Save as a picture:** the recap, the time card and the trophy shelf, saved as a PNG to share anywhere. Made on your
+  computer; nothing is uploaded. With a controller, pictures go straight into Pictures → The Retro Shelf.
+- **New pins** for finishing games (beaten, 100%), your backlog, ratings and notes.
+- **What counts in a series:** in Collections, mark a game in a series as not counting (an odd regional release, a
+  spin-off) so having them all is fair.
+
 ## 0.4.0-beta.7
 
 - **Controller test:** Settings → Playing → Your controller → Test. A drawing of the controller lights up as you

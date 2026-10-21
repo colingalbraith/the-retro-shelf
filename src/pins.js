@@ -15,7 +15,7 @@ const local = t => new Date(t * 1000);
 const dayKey = t => { const d = local(t); return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); };
 
 /* groups on the corkboard, in order */
-const CATS = [["start", "Getting started"], ["time", "Time played"], ["habits", "Habits"], ["dates", "Days and nights"], ["variety", "Variety"],
+const CATS = [["start", "Getting started"], ["time", "Time played"], ["finish", "Finishing"], ["habits", "Habits"], ["dates", "Days and nights"], ["variety", "Variety"],
   ["collecting", "Collecting"], ["consoles", "Consoles"], ["series", "Series"], ["app", "Making it yours"]];
 
 /* the famous series, by the name libretro-database gives them: [name, pin title, icon] */
@@ -69,6 +69,17 @@ const STATIC = [
   { key: "marathon", title: "Marathon", desc: "Play for 3 hours in one sitting.", tier: "silver", icon: "⌛", cat: "time", test: c => c.sittings.some(d => d >= 3 * H && d <= 12 * H) },
   { key: "ultra", title: "Ultramarathon", desc: "Play for 6 hours in one sitting.", tier: "gold", icon: "⧗", cat: "time", test: c => c.sittings.some(d => d >= 6 * H && d <= 12 * H) },
   { key: "quick", title: "Quick Break", desc: "Play 10 short sittings of under 15 minutes.", tier: "bronze", icon: "⏱", cat: "time", test: c => [c.sittings.filter(d => d < 15 * 60).length, 10] },
+  // finishing, rating and notes (Progress, Rating and Note in a game's options)
+  { key: "beaten1", title: "Roll Credits", desc: "Mark a game beaten.", tier: "bronze", icon: "⚐", cat: "finish", test: c => [c.beaten, 1] },
+  { key: "beaten10", title: "Finisher", desc: "Beat 10 games.", tier: "silver", icon: "⚑", cat: "finish", test: c => [c.beaten, 10] },
+  { key: "beaten25", title: "Closer", desc: "Beat 25 games.", tier: "gold", icon: "⛿", cat: "finish", test: c => [c.beaten, 25] },
+  { key: "full1", title: "Every Last Secret", desc: "Mark a game 100%.", tier: "silver", icon: "✓", cat: "finish", test: c => [c.complete, 1] },
+  { key: "full5", title: "Perfectionist", desc: "Mark five games 100%.", tier: "gold", icon: "✪", cat: "finish", test: c => [c.complete, 5] },
+  { key: "backlog10", title: "Big Plans", desc: "Put 10 games on your backlog.", tier: "bronze", icon: "☰", cat: "finish", test: c => [c.backlog, 10] },
+  { key: "rated10", title: "Critic", desc: "Rate 10 games.", tier: "bronze", icon: "☆", cat: "finish", test: c => [c.rated, 10] },
+  { key: "rated50", title: "Reviewer", desc: "Rate 50 games.", tier: "silver", icon: "★", cat: "finish", test: c => [c.rated, 50] },
+  { key: "note1", title: "Note to Self", desc: "Write a note on a game.", tier: "bronze", icon: "✎", cat: "finish", test: c => [c.noted, 1] },
+  { key: "note10", title: "Field Notes", desc: "Write notes on 10 games.", tier: "silver", icon: "✍", cat: "finish", test: c => [c.noted, 10] },
   // habits (from the play log, which starts with version 0.3.0)
   { key: "streak3", title: "Three in a Row", desc: "Play 3 days in a row.", tier: "bronze", icon: "▤", cat: "habits", test: c => [c.bestStreak, 3] },
   { key: "streak7", title: "Regular", desc: "Play 7 days in a row.", tier: "silver", icon: "▦", cat: "habits", test: c => [c.bestStreak, 7] },
@@ -185,6 +196,8 @@ function context(games, st, series, genreOf, extra = {}) {
     if (played.has(g.id)) p.played++;
     p.time += st.time[g.id] || 0;
   }
+  // what you marked, for games still on the shelves
+  const marked = (obj, fn) => Object.entries(obj || {}).filter(([id, v]) => byId.has(id) && fn(v)).length;
   const genreCount = new Map(); for (const g of pg) { const k = genreOf(g.genre || ""); if (k) genreCount.set(k, (genreCount.get(k) || 0) + 1); }
   return {
     games, played, favs: (st.fav || []).filter(id => byId.has(id)).length, shelves: st.shelves || [],
@@ -202,9 +215,12 @@ function context(games, st, series, genreOf, extra = {}) {
     systems: new Set(games.map(g => g.system)), playedSystems: new Set(pg.map(g => g.system)), perSystem,
     playedYears: years, playedDecades: new Set(years.map(y => Math.floor(y / 10))), thisYear: local(extra.now || Date.now() / 1000).getFullYear(),
     playedGenres: new Set(genreCount.keys()), mostInGenre: Math.max(0, ...genreCount.values()),
-    completeSeries: series.filter(s => s.items.length >= 3 && s.have === s.items.length).length,
+    beaten: marked(st.progress, v => v === "beaten" || v === "complete"), complete: marked(st.progress, v => v === "complete"),
+    backlog: marked(st.progress, v => v === "backlog"), rated: marked(st.rating, v => v > 0), noted: marked(st.notes, v => !!String(v || "").trim()),
+    // a series counts its games marked as counting (all of them, unless some were marked otherwise)
+    completeSeries: series.filter(s => (s.total ?? s.items.length) >= 3 && s.have === (s.total ?? s.items.length)).length,
     seriesPlayed: series.filter(s => s.items.some(i => i.id && played.has(i.id))).length,
-    seriesByName: new Map(series.map(s => [s.name, { have: s.have, total: s.items.length }])),
+    seriesByName: new Map(series.map(s => [s.name, { have: s.have, total: s.total ?? s.items.length }])),
     events: st.events || {}, bios: !!extra.bios,
   };
 }

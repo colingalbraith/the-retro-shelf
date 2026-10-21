@@ -86,3 +86,17 @@ test("firsts the app records: CRT, TV mode, a backup, a BIOS, a cover, a name", 
   const got = new Set(full([], { events: { crt: 1, tv: 1, backup: 1, cover: 1, rename: 1, hide: 1, arrange: 1 } }, [], { bios: true }).filter(x => x.earned).map(x => x.key));
   for (const k of ["crt", "tv", "backup", "bios", "cover", "rename", "tidy", "rearrange"]) assert.ok(got.has(k), k);
 });
+
+test("finishing pins: beaten, 100%, the backlog, ratings and notes, for games still on the shelves", () => {
+  const g = Array.from({ length: 12 }, (_, i) => ({ id: "g" + i, system: "SNES" }));
+  const progress = Object.fromEntries(g.slice(0, 10).map((x, i) => [x.id, i < 1 ? "complete" : "beaten"]));
+  const got = earned(g, { progress: { ...progress, gone: "complete" }, rating: { g0: 5, g1: 0 }, notes: { g2: "stuck on the water temple", g3: "  " } });
+  for (const k of ["beaten1", "beaten10", "full1", "note1"]) assert.ok(got.includes(k), k);
+  for (const k of ["beaten25", "full5", "rated10", "note10", "backlog10"]) assert.ok(!got.includes(k), k);
+});
+
+test("a series is complete without the games marked as not counting", () => {
+  const items = [{ id: "a" }, { id: "b" }, { id: null, counts: false }, { id: "c" }];
+  assert.ok(earned([], {}, [{ name: "X", have: 3, total: 3, items }]).includes("complete"));
+  assert.ok(!earned([], {}, [{ name: "X", have: 3, items }]).includes("complete"));      // before: all four counted
+});

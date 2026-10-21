@@ -531,3 +531,40 @@ test("the controllers' order reaches RetroArch's config with the game", () => {
   be.buildCmd(byTitle("Contra"), {});                                               // one controller later: nothing left over
   assert.match(fs.readFileSync(be.files.raCfg, "utf8"), /input_player1_device_reservation_type = "0"/);
 });
+
+test("a game in a series marked as not counting leaves the series' total, and counts again when unmarked", async () => {
+  be.franchises = { "Test Series": [["NES", "Game One (USA)"], ["NES", "Game Two (USA)"], ["NES", "Odd One (Japan)"]] };
+  put("nes/Game One (USA).nes"); put("nes/Game Two (USA).nes"); be.scan();
+  let s = be.collections()[1].series.find(x => x.name === "Test Series");
+  assert.deepEqual([s.have, s.total], [2, 3]);
+  assert.equal((await be.route("POST", "/api/collections/count", { series: "Test Series", system: "NES", look: "Odd One (Japan)", counts: false })).code, 200);
+  s = be.collections()[1].series.find(x => x.name === "Test Series");
+  assert.deepEqual([s.have, s.total], [2, 2]); assert.equal(s.items.find(i => i.look === "Odd One (Japan)").counts, false);
+  assert.equal((await be.route("POST", "/api/collections/count", { series: "Test Series", system: "NES", look: "Not In It", counts: false })).code, 404);
+  await be.route("POST", "/api/collections/count", { series: "Test Series", system: "NES", look: "Odd One (Japan)", counts: true });
+  assert.deepEqual(be.state.notCounted, {});
+});
+
+test("a month's and a year's recap, and last month's offered once when a new month starts", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); put("nes/Contra (USA).nes"); be.scan();
+  const ct = byTitle("Chrono Trigger").id, co = byTitle("Contra").id, at = (m, d, h = 20) => new Date(2026, m, d, h).getTime() / 1000;
+  be.state.sessions = [[co, at(8, 28), 600], [ct, at(9, 3), 3600], [ct, at(9, 3, 22), 1800], [co, at(9, 10), 7200], [ct, at(9, 20), 900], ["gone", at(9, 21), 300]];
+  be.state.pins = { first: at(8, 28), sampler: at(9, 10), old: 0 };
+  const r = (await be.route("POST", "/api/recap", { year: 2026, month: 9 })).body;                // October
+  assert.deepEqual([r.total, r.sittings, r.days, r.games, r.newGames], [3600 + 1800 + 7200 + 900 + 300, 5, 4, 3, 2]);
+  assert.deepEqual(r.top.map(t => [t.id, t.time]), [[co, 7200], [ct, 6300]]);                  // a game no longer here isn't listed
+  assert.deepEqual([r.longest.id, r.longest.time], [co, 7200]);
+  assert.equal(r.busiest.time, 7200); assert.deepEqual(r.pins, ["sampler"]);
+  const y = (await be.route("POST", "/api/recap", { year: 2026, month: null })).body;
+  assert.deepEqual([y.sittings, y.pins], [6, ["first", "sampler"]]);
+  assert.equal((await be.route("POST", "/api/recap", { year: 2026, month: 12 })).code, 400);
+  // offered in November for October, once
+  const realNow = Date.now; Date.now = () => new Date(2026, 10, 2).getTime();
+  try {
+    assert.equal(be.recapDue().month, 9);
+    await be.route("POST", "/api/recap/seen", { year: 2026, month: 9 });
+    assert.equal(be.recapDue(), null);
+    Date.now = () => new Date(2027, 0, 3).getTime();                                          // January: the whole year
+    assert.deepEqual([be.recapDue().year, be.recapDue().month], [2026, null]);
+  } finally { Date.now = realNow; }
+});
