@@ -478,6 +478,8 @@ class Backend extends EventEmitter {
   }
   /** after files change in a folder (a watched one, or the games folder): look again, a moment after the last change */
   watchDir(dir) {
+    // only the app itself watches (dirs.watch); tests and tools look once
+    if (!this.dirs.watch) return;
     this._watchers = this._watchers || new Map();
     if (this._watchers.has(dir)) return;
     try {
