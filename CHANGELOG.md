@@ -1,10 +1,45 @@
 # Changelog
 
+## 0.4.0
+
+- **Linux and Steam Deck:** an AppImage for 64-bit Linux with every emulator built in, that updates itself. On a
+  Steam Deck it works in Game Mode with the Deck's own controls (see docs/steam-deck.md).
+- **17 more consoles, 33 in all:** Game Gear on its own shelf, SG-1000, Sega CD, 32X, Saturn, Atari 7800 and Lynx,
+  ColecoVision, Intellivision, Vectrex, MSX, 3DO, Neo Geo CD and Pocket, WonderSwan, Virtual Boy and Pokémon Mini.
+  MSX runs on C-BIOS, a free BIOS that comes with the app.
+- **Rewind and fast-forward:** hold the left trigger to go back a few seconds, the right one to speed up (2× to as
+  fast as it goes), on 8- and 16-bit consoles and Game Boy. Those games also answer the controller a frame sooner.
+- **The look of each console:** an old TV's scanlines for home consoles and a handheld's screen for Game Boy, or
+  choose a picture and screen shape for one game.
+- **Your controller:** a test that lights up every button you press, your own button layout for each console, hints
+  with your controller's own button names (✕ ○ □ △ or B A Y X), and player 1 and 2 shown when two are plugged in.
+- **Games on several discs** are one box with a disc list, and discs can be changed while playing.
+- **Progress, ratings and notes:** mark a game backlog, playing, beaten or 100%, give it stars, and write on the back
+  of its box. Shelves by progress, a Top rated shelf, and new pins for finishing games: 208 pins in all.
+- **Watched folders:** games in a folder of yours show on the shelves where they are, and new ones appear by
+  themselves. Games in RetroArch's playlists can come in too.
+- **Search that forgives spelling** and knows consoles, years, genres and progress ("snes rpg", "90s"). Pick several
+  games to shelve, mark or hide at once, and Surprise me picks one you haven't played.
+- **Saves:** each game's own saves with their pictures, a backup every week by itself, saves in iCloud Drive, Dropbox
+  or OneDrive shared between computers, and moving all your games to another drive.
+- **Cheats and RetroAchievements,** with a hardcore switch.
+- **Recaps:** a card for any month or year of play, and the recap, time card and trophy shelf saved as pictures to
+  share. Made on your computer; nothing is uploaded.
+- **Look and sound:** shelf themes (walnut, oak or painted white wood; a dark or light wall), a screensaver in TV
+  mode, menu music (five public-domain chiptunes), bigger text, and a sheet of every key and button (press ?).
+- **Ten languages (beta):** Español, Français, Deutsch, Italiano, Português, Русский, 日本語, 한국어 and 简体中文,
+  following your computer's language. "Suggest better words" in Settings says what reads oddly.
+- **A portable Windows copy** that keeps everything in a folder beside it, for a USB stick.
+- **Sturdier:** play history survives a crash, nothing of yours is ever deleted (replaced pictures go to the Trash),
+  and a controller can't get stuck in a window that needs a mouse.
+
 ## 0.4.0-beta.15
 
 - **Fast-forward speed:** Settings → While you play → Fast-forward speed: 2×, 3× (as before), 4× or Fastest, as fast
   as your computer can go. It's kept for every game. The sound now speeds up smoothly with the game instead of
   breaking up, and is off at Fastest.
+- An Xbox Wireless Controller (Xbox Series and One, over Bluetooth) shows A B X Y in hints again, not PlayStation's
+  ✕ ○ □ △.
 
 ## 0.4.0-beta.14
 
