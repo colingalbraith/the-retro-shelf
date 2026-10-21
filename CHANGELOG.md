@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0-beta.13
+
+A careful look for bugs, and their fixes. Among them:
+- **Your play history is safer:** a settings file cut short by a crash is set aside and the copy before it used,
+  instead of starting over empty. Changing the games folder in Settings keeps every game's history.
+- **Backups:** saves kept in a cloud folder now restore properly, single-game exports can be restored, and a backup
+  folder inside the saves folder isn't allowed. Hand-made backups aren't pruned with the weekly ones.
+- **Nothing of yours is deleted:** a new cover sends the old picture to the Trash, a dropped BIOS file never replaces
+  a good one, cheat files made in RetroArch stay, and folders you put in the BIOS folder are left alone.
+- **On Windows,** moving the games to another drive works (it was refused).
+- **Games:** a game that closes within a second no longer leaves "Inserting cartridge…" on screen; a second press
+  can't start two games; play time can't jump when the clock changes; a game left open overnight counts 12 hours at
+  most; the RetroAchievements password leaves RetroArch's settings seconds after the game starts.
+- **Importing:** track files are matched whatever their letter case; arcade sets, zipped games, PS1 and PS2 discs and
+  PSP and PS2 compressed images are told apart; empty files and discs with missing tracks aren't added.
+- **Controllers and keyboard:** Stop game can be reached, Esc and B close the panel on top, Tab stays in it, Enter in
+  a note no longer starts the game, and windows that need a mouse say so instead of leaving a controller stuck.
+- **Updates:** a full disk doesn't freeze the updater, Restart closes the game first, and the Linux AppImage keeps one
+  name so Steam shortcuts keep working.
+
 ## 0.4.0-beta.12
 
 - **Menu music, for real:** five chiptunes by Juhani Junkala, Aureolus_Omicron and johndekale, which their makers
