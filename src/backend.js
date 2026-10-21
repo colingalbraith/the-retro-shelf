@@ -41,13 +41,45 @@ const KNOWN_APPS = {
 };
 
 // ---------------------------------------------------------------- storage
-function jload(p, def) {
-  try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return def; }
+/** whether p is the folder dir or inside it. On Windows a path on another drive isn't (path.relative gives it whole,
+    without ".."), and neither is a sibling whose name starts with two dots */
+function within(p, dir, pp = path) {
+  const r = pp.relative(pp.resolve(dir), pp.resolve(p));
+  return r === "" || (!pp.isAbsolute(r) && r !== ".." && !r.startsWith(".." + pp.sep));
 }
+
+/**
+ * A JSON file, or def when there's none. One that can't be read (cut short by a crash or a full disk, or not an object
+ * when an object is wanted) is set aside as name.broken-<time>, never overwritten, and the copy before it (name.bak,
+ * kept by jsave) is used instead: play history isn't lost to one bad save.
+ */
+function jload(p, def) {
+  const parse = f => {
+    const v = JSON.parse(fs.readFileSync(f, "utf8"));
+    if (def && typeof def === "object" && !Array.isArray(def) && (!v || typeof v !== "object" || Array.isArray(v))) throw new Error("not an object");
+    return v;
+  };
+  try { return parse(p); } catch (e) {
+    if (e.code !== "ENOENT") { try { fs.renameSync(p, `${p}.broken-${Date.now()}`); } catch {} }
+    try { return parse(p + ".bak"); } catch { return def; }
+  }
+}
+/** written whole before it takes the old one's place, which is kept as name.bak; a file another program has open for a
+    moment (Windows) gets a few tries */
 function jsave(p, obj) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p + ".tmp", JSON.stringify(obj, null, 2));
-  fs.renameSync(p + ".tmp", p);
+  const fd = fs.openSync(p + ".tmp", "w");
+  try { fs.writeSync(fd, JSON.stringify(obj, null, 2)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  for (let i = 0; ; i++) {
+    try {
+      if (fs.existsSync(p)) fs.copyFileSync(p, p + ".bak");
+      fs.renameSync(p + ".tmp", p);
+      return;
+    } catch (e) {
+      if (i >= 4 || !["EPERM", "EBUSY", "EACCES"].includes(e.code)) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * (i + 1));
+    }
+  }
 }
 // RetroArch's names for the RetroPad's buttons, by number (remap files say input_player1_btn_<name>)
 const RETROPAD = ["b", "y", "select", "start", "up", "down", "left", "right", "a", "x", "l", "r", "l2", "r2", "l3", "r3"];
@@ -203,6 +235,8 @@ class Backend extends EventEmitter {
     try { this.firstRun(); } catch (e) { this.setupError = e.message; }
     fs.rmSync(path.join(this.files.covers, ".previews"), { recursive: true, force: true });
     if (!this.state.ggShelf) { try { this.moveGameGear(); } catch {} this.state.ggShelf = 1; this.saveState(); }
+    // a password left behind by a game that never finished (the app was force-quit) goes
+    try { if (ra.readConfigKey(this.files.raCfg, "cheevos_password")) ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {}
     this.scan();
     this.checkPins();
     // a new install starts with the welcome card, not a list of changes it never had
@@ -284,14 +318,14 @@ class Backend extends EventEmitter {
     const dir = path.dirname(g.path), stem = path.parse(g.path).name, own = new Set();
     const add = f => {
       const r = path.resolve(f);
-      if (own.has(r) || !fs.existsSync(r) || path.relative(dir, r).startsWith("..")) return;
+      if (own.has(r) || !fs.existsSync(r) || !within(r, dir)) return;
       own.add(r);
       if (SHEETS.includes(path.extname(r).toLowerCase())) for (const x of sheetFiles(r)) add(x);
     };
     add(g.path);
     for (const f of fs.readdirSync(dir)) if (f.startsWith(stem + ".") && IMG.includes(path.extname(f).toLowerCase())) own.add(path.resolve(dir, f));
     const sysDir = path.join(this.romsRoot(), this.cfg.systems[g.system].folder || g.system);
-    if (path.resolve(dir) !== path.resolve(sysDir) && !path.relative(sysDir, dir).startsWith("..")) {
+    if (path.resolve(dir) !== path.resolve(sysDir) && within(dir, sysDir)) {
       const rest = [], walk = (d, depth) => {
         for (const e of fs.readdirSync(d, { withFileTypes: true })) {
           if (e.name.startsWith(".") || /^(desktop\.ini|thumbs\.db)$/i.test(e.name)) continue;
@@ -519,7 +553,7 @@ class Backend extends EventEmitter {
     try { st = fs.statSync(dir); } catch { return [404, { error: "That folder isn't there." }]; }
     if (!st.isDirectory()) return [400, { error: "Choose a folder." }];
     if (dir === path.resolve(os.homedir()) || path.dirname(dir) === dir) return [400, { error: "That's too big a folder to watch: choose the one your games are in." }];
-    const root = path.resolve(this.romsRoot()), inside = (a, b) => !path.relative(b, a).startsWith("..") && !path.isAbsolute(path.relative(b, a));
+    const root = path.resolve(this.romsRoot()), inside = within;
     if (inside(dir, root) || inside(root, dir)) return [400, { error: "That's the games folder, or part of it: its games are on the shelves already." }];
     const list = this.paths.watch || [];
     if (list.some(d => inside(dir, d) || inside(d, dir))) return [409, { error: "That folder, or one around it, is watched already." }];
@@ -603,10 +637,10 @@ class Backend extends EventEmitter {
    * old copy stays where it was. dir "" goes back to the usual place.
    */
   async moveSaves(dir) {
-    if (this.running && this.running.alive) return [409, { error: "Close the game first." }];
+    if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
     const to = dir ? path.join(path.resolve(String(dir)), "The Retro Shelf Saves") : path.join(this.dirs.docs, "Saves"), from = this.folders.saves;
     if (path.resolve(to) === path.resolve(from)) return [200, { ok: true, copied: 0 }];
-    if (!path.relative(from, to).startsWith("..")) return [400, { error: "That's inside the saves folder already." }];
+    if (within(to, from)) return [400, { error: "That's inside the saves folder already." }];
     let copied = 0;
     try {
       await fsp.mkdir(to, { recursive: true });
@@ -628,11 +662,16 @@ class Backend extends EventEmitter {
   }
   /** saves shared between computers: which one has a game open. A note in the saves folder, gone when the game closes */
   inPlayDir() { return this.paths.saves_dir ? path.join(this.folders.saves, ".in-play") : null; }
+  /** this computer, for in-play notes: an id kept in its state (a Mac's network name can change from place to place) */
+  machine() {
+    if (!this.state.machine) { this.state.machine = crypto.randomBytes(8).toString("hex"); try { this.saveState(); } catch {} }
+    return this.state.machine;
+  }
   markInPlay(g, on) {
     const dir = this.inPlayDir(); if (!dir) return;
-    const f = path.join(dir, os.hostname().replace(/[^\w.-]+/g, "_") + ".json");
+    const f = path.join(dir, this.machine() + ".json");
     try {
-      if (on) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(f, JSON.stringify({ host: os.hostname(), system: g.system, game: path.parse(g.path).name, since: Math.floor(now()) })); }
+      if (on) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(f, JSON.stringify({ host: os.hostname(), id: this.machine(), system: g.system, game: path.parse(g.path).name, since: Math.floor(now()) })); }
       else fs.rmSync(f, { force: true });
     } catch {}
   }
@@ -643,7 +682,7 @@ class Backend extends EventEmitter {
     for (const f of files) {
       let m; try { m = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); } catch { continue; }
       // a computer that went off with the game open: its note counts for half a day
-      if (m.host !== os.hostname() && m.system === g.system && m.game === path.parse(g.path).name && now() - m.since < 12 * 3600) return m;
+      if ((m.id ? m.id !== this.machine() : m.host !== os.hostname()) && m.system === g.system && m.game === path.parse(g.path).name && now() - m.since < 12 * 3600) return m;
     }
     return null;
   }
@@ -658,10 +697,10 @@ class Backend extends EventEmitter {
    * Trash). Progress is in status (moving: {done, total}).
    */
   async moveLibrary(dest) {
-    if (this.running && this.running.alive) return [409, { error: "Close the game first." }];
+    if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
     if (this.moving) return [409, { error: "The games are being moved already." }];
     const from = path.resolve(this.romsRoot()), to = path.join(path.resolve(String(dest || "")), "Games");
-    if (!path.relative(from, to).startsWith("..")) return [400, { error: "That's inside the games folder." }];
+    if (within(to, from)) return [400, { error: "That's inside the games folder." }];
     if (fs.existsSync(to) && fs.readdirSync(to).length) return [409, { error: "There's a Games folder there already, with things in it." }];
     const files = [];
     const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.isFile()) files.push([p, fs.statSync(p).size]); } };
@@ -715,7 +754,7 @@ class Backend extends EventEmitter {
         for (const it of (list && list.items) || []) {
           const p = String(it.path || "").split("#")[0], system = bySys.get(String(it.db_name || f).replace(/\.lpl$/i, "").toLowerCase());
           if (!p || !system || out.has(p) || !path.isAbsolute(p) || !fs.existsSync(p)) continue;
-          if (!path.relative(root, p).startsWith("..")) continue;
+          if (within(p, root)) continue;
           out.set(p, system);
         }
       }
@@ -730,7 +769,7 @@ class Backend extends EventEmitter {
     for (const g of games) hints[g.path] = g.system;
     // the fewest folders that hold them all
     const dirs = [...new Set(games.map(g => path.dirname(g.path)))].sort((a, b) => a.length - b.length), keep = [];
-    for (const d of dirs) if (!keep.some(k => !path.relative(k, d).startsWith(".."))) keep.push(d);
+    for (const d of dirs) if (!keep.some(k => within(d, k))) keep.push(d);
     let added = 0;
     for (const d of keep) if (this.addWatch(d)[0] === 200) added++;
     this.saveState(); this.scan();
@@ -757,7 +796,7 @@ class Backend extends EventEmitter {
     if (this._watched) this._watched.delete(dir);
     // the consoles remembered for its files go; play history stays, for if the folder comes back
     const hints = this.state.watchSys || {};
-    for (const f of Object.keys(hints)) if (!path.relative(dir, f).startsWith("..")) delete hints[f];
+    for (const f of Object.keys(hints)) if (within(f, dir)) delete hints[f];
     this.saveState(); this.scan();
     return [200, { ok: true }];
   }
@@ -844,10 +883,15 @@ class Backend extends EventEmitter {
   async launch(id, opts = {}) {
     const g = this.games.get(id);
     if (!g) return [404, { error: "Unknown game. Rescan the library." }];
-    if (this.running && this.running.alive) return [409, { error: "A game is already running." }];
+    // a second press while the first is still starting (cheats can take a while) doesn't start a second emulator
+    if ((this.running && this.running.alive) || this.launching) return [409, { error: "A game is already running." }];
     // saves shared with another computer: playing a game that's open there too would overwrite its progress
     const there = this.inPlayElsewhere(g);
     if (there && !opts.force) return [409, { error: `This game is open on ${there.host} (since ${new Date(there.since * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}). Playing it here too can overwrite its progress.`, elsewhere: there.host }];
+    this.launching = true;
+    try { return await this.launchNow(g, id, opts); } finally { this.launching = false; }
+  }
+  async launchNow(g, id, opts) {
     let built;
     // chosen cheats, written for the built-in RetroArch to switch on as the game starts
     const cheats = !this.ownEmu() && !this.cfg.systems[g.system].emulator ? await this.writeCheats(g).catch(() => false) : false;
@@ -863,33 +907,44 @@ class Backend extends EventEmitter {
       return [500, { error: `Couldn't start the emulator: ${e.message}` }];
     }
     proc.stdin.on("error", () => {});
-    const rec = { id, since: now(), proc, alive: true, builtIn: built.builtIn, stopping: false };
-    this.markInPlay(g, true);
-    if (built.builtIn && this.playOpts(g).picture === "crt") this.event("crt");
-    if (this.ui.tv) this.event("tv");
+    // t0: a clock that doesn't jump when the computer's time is changed, for how long it was played
+    const rec = { id, since: now(), t0: performance.now(), proc, alive: true, builtIn: built.builtIn, stopping: false,
+      cheevos: built.builtIn && this.raPending ? this.raPending : null };
+    // RetroArch reads the password as it starts and keeps it in memory: it isn't left in the file while the game runs
+    if (rec.cheevos) setTimeout(() => { try { ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {} }, 5000).unref();
+    // known as running, and watched for its end, before anything else can go wrong (a full disk, say)
     this.running = rec;
-    this.state.last[id] = Math.floor(rec.since);
-    this.state.plays[id] = (this.state.plays[id] || 0) + 1;
-    this.saveState();
     proc.once("exit", (code, signal) => this.onExit(rec, { code, signal }));
+    try {
+      this.markInPlay(g, true);
+      if (built.builtIn && this.playOpts(g).picture === "crt") this.event("crt");
+      if (this.ui.tv) this.event("tv");
+      this.state.last[id] = Math.floor(rec.since);
+      this.state.plays[id] = (this.state.plays[id] || 0) + 1;
+      this.saveState();
+    } catch {}
     this.emit("launch", g);
     return [200, { ok: true, since: rec.since, now: now() }];
   }
 
   onExit(rec, how = {}) {
     rec.alive = false;
-    const eg = this.games.get(rec.id); if (eg) this.markInPlay(eg, false);
-    const dt = now() - rec.since;
-    this.state.time[rec.id] = (this.state.time[rec.id] || 0) + Math.floor(dt);
-    // a game that closed right away wasn't really played
-    if (dt >= 10) {
-      this.state.sessions.push([rec.id, Math.floor(rec.since), Math.floor(dt)]);
-      if (this.state.sessions.length > 20000) this.state.sessions.splice(0, this.state.sessions.length - 20000);
-    }
-    try { this.checkPins(); } catch {}
     if (this.running === rec) this.running = null;
-    this.saveState();
-    this.cheevosAfter();
+    this.markInPlay(null, false);
+    const dt = Math.max(0, rec.t0 != null ? (performance.now() - rec.t0) / 1000 : now() - rec.since);
+    try {
+      this.state.time[rec.id] = (this.state.time[rec.id] || 0) + Math.floor(dt);
+      // a game that closed right away wasn't really played
+      if (dt >= 10) {
+        this.state.sessions.push([rec.id, Math.floor(rec.since), Math.floor(dt)]);
+        if (this.state.sessions.length > 20000) this.state.sessions.splice(0, this.state.sessions.length - 20000);
+      }
+      try { this.checkPins(); } catch {}
+      this.saveState();
+    } catch {} finally {
+      // whatever else failed, a password RetroArch was handed doesn't stay behind
+      try { this.cheevosAfter(rec); } catch {}
+    }
     let error = "";
     if (dt < 4 && !rec.stopping) error = (rec.builtIn && ra.explain(this.files.raLog, how)) || "";
     this.lastExit = { id: rec.id, at: now(), dt, error, code: how.code ?? null, signal: how.signal || null };
@@ -947,6 +1002,8 @@ class Backend extends EventEmitter {
     user = String(user || "").trim(); pass = String(pass || "");
     if (!/^[A-Za-z0-9_]{2,32}$/.test(user)) return [400, { error: "That isn't a RetroAchievements user name." }];
     if (!pass || pass.length > 256) return [400, { error: "Type your password." }];
+    // RetroArch's settings file can't hold quotation marks or line breaks in a value
+    if (/["\x00-\x1f]/.test(pass)) return [400, { error: "RetroArch can't take a password with quotation marks in it. Sign in from RetroArch's own menu instead, or change the password on retroachievements.org." }];
     this.raPending = { user, pass }; this.raFailed = false;
     return [200, { ok: true }];
   }
@@ -956,9 +1013,11 @@ class Backend extends EventEmitter {
     if (fs.existsSync(this.files.raCfg)) ra.writeConfig(this.files.raCfg, { cheevos_enable: "false", cheevos_username: "", cheevos_password: "", cheevos_token: "" });
     return [200, { ok: true }];
   }
-  /** after a game: signed in if RetroArch kept a token; any password left in its settings is wiped either way */
-  cheevosAfter() {
-    if (!this.raPending) return;
+  /** after a game that was handed the password: signed in if RetroArch kept a token; the password left in its settings
+      is wiped either way. A game that wasn't handed it (another emulator, your own RetroArch) leaves the sign-in waiting */
+  cheevosAfter(rec) {
+    try { if (ra.readConfigKey(this.files.raCfg, "cheevos_password")) ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {}
+    if (!this.raPending || !rec || rec.cheevos !== this.raPending) return;
     const user = this.raPending.user, token = ra.readConfigKey(this.files.raCfg, "cheevos_token");
     this.raPending = null;
     if (token) { this.state.cheevos.user = user; this.raFailed = false; } else this.raFailed = true;
@@ -1976,4 +2035,4 @@ function flatPng(b) {
   } catch { return false; }
 }
 
-module.exports = { Backend, cleanTitle, regionTag, norm, pick, flatPng, GAME_CHOICES };
+module.exports = { Backend, cleanTitle, regionTag, norm, pick, flatPng, GAME_CHOICES, within, jload, jsave };
