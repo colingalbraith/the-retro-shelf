@@ -89,9 +89,25 @@ function sms() {
   Buffer.from("TMR SEGA", "latin1").copy(b, 0x7ff0);
   return b;
 }
+/** MSX: a 16 KB cartridge ("AB", then where its code starts), jr -2; runs on the free C-BIOS that comes with the app */
+function msx() {
+  const b = Buffer.alloc(16384);
+  Buffer.from("AB", "latin1").copy(b, 0); b.writeUInt16LE(0x4010, 2);
+  Buffer.from([0xf3, 0x18, 0xfe]).copy(b, 0x10);
+  return b;
+}
+/** Atari 7800: the .a78 header, then 16 KB at $C000: sei; cld; loop: jmp loop */
+function a7800() {
+  const h = Buffer.alloc(128), rom = Buffer.alloc(16384);
+  h[0] = 1; Buffer.from("ATARI7800", "latin1").copy(h, 1); Buffer.from("SMOKE TEST", "latin1").copy(h, 0x11);
+  h.writeUInt32BE(rom.length, 0x31); h[0x37] = 1; h[0x38] = 1; Buffer.from("ACTUAL CART DATA STARTS HERE", "latin1").copy(h, 0x64);
+  Buffer.from([0x78, 0xd8, 0x4c, 0x02, 0xc0]).copy(rom, 0);
+  for (const at of [0x3ffa, 0x3ffc, 0x3ffe]) rom.writeUInt16LE(0xc000, at);
+  return Buffer.concat([h, rom]);
+}
 const GAMES = [["nes", "Smoke Test (World).nes", nes], ["gb", "Smoke Test GB (World).gb", gb], ["gba", "Smoke Test GBA (World).gba", gba],
   ["genesis", "Smoke Test MD (World).md", md], ["sms", "Smoke Test SMS (World).sms", sms], ["gg", "Smoke Test GG (World).gg", sms],
-  ["sg1000", "Smoke Test SG (World).sg", sms]];
+  ["sg1000", "Smoke Test SG (World).sg", sms], ["msx", "Smoke Test MSX (World).rom", msx], ["atari7800", "Smoke Test 7800 (World).a78", a7800]];
 // each console's own picture (By console): old TV, handheld screen, or plain sharp pixels
 const PICTURE = Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync(path.join(ROOT, "src", "config.json"), "utf8")).systems).map(([k, v]) => [k, v.picture]));
 

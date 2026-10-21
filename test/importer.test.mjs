@@ -49,6 +49,7 @@ before(() => {
   file("Sonic CD (USA).bin", 2352 * 20, [[16, "SEGADISCSYSTEM  "]]);
   fs.writeFileSync(path.join(dir, "Sonic CD (USA).cue"), 'FILE "Sonic CD (USA).bin" BINARY\n  TRACK 01 MODE1/2352\n    INDEX 01 00:00:00\n');
   file("Nights into Dreams (USA).iso", 0x9000, [[0, "SEGA SEGASATURN "]]);
+  file("Gex (USA).iso", 0x9000, [[0, Buffer.from([1, 0x5a, 0x5a, 0x5a, 0x5a, 0x5a, 1])]]);
   zip("Tetris (World).zip", [["Tetris (World).gb", Buffer.alloc(32768)]]);
   zip("sf2.zip", ["sf2e_30g.11e", "sf2e_37b.11f", "sf2e_31g.12e", "sf2-5m.4a"].map(n => [n, Buffer.alloc(64)]));
   fs.writeFileSync(path.join(dir, "readme.txt"), "not a game");
@@ -69,10 +70,11 @@ test("dropped files are sorted onto the right shelf by their contents", () => {
     "Spyro the Dragon (USA).bin": "PS1",
     "Sonic CD (USA).cue": "Sega CD",
     "Nights into Dreams (USA).iso": "Saturn",
+    "Gex (USA).iso": "3DO",
     "Tetris (World).zip": "Game Boy",
     "sf2.zip": "Arcade",
   });
-  assert.deepEqual(items.find(i => i.name === "Mystery.iso").choices, ["Sega CD", "Saturn", "PSP", "GameCube/Wii", "PS2"]);
+  assert.deepEqual(items.find(i => i.name === "Mystery.iso").choices, ["Sega CD", "Saturn", "3DO", "PSP", "GameCube/Wii", "PS2"]);
   assert.equal(unknown.length, 0, "readme.txt is ignored, not reported");
 });
 

@@ -27,7 +27,8 @@ test("the checker tells found, partly there, missing and wrong-size apart", () =
     put("bios_CD_U.bin", 131072);
     const st = Object.fromEntries(biosStatus(dir, null).map(c => [c.system, c.state]));
     assert.deepEqual(st, { PS1: "ok", "PC Engine": "missing", Dreamcast: "bad", DS: "partial", GBA: "missing", Arcade: "missing",
-      "Sega CD": "ok", Saturn: "missing", Lynx: "missing" });
+      "Sega CD": "ok", Saturn: "missing", Lynx: "missing", "Atari 7800": "missing", ColecoVision: "missing", Intellivision: "missing",
+      "3DO": "missing", "Neo Geo CD": "missing", "Pokémon Mini": "missing" });
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

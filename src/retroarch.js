@@ -27,6 +27,7 @@ function bundled(emuDir) {
     autoconfig: firstDir(path.join(emuDir, "autoconfig"), path.join(raDir, "autoconfig")),
     dolphinSys: path.join(emuDir, "dolphin-Sys"),
     ppsspp: path.join(emuDir, "PPSSPP"),
+    bluemsx: path.join(emuDir, "blueMSX"),
     crt: path.join(emuDir, "shaders", "crt", "zfast-crt.slangp"),
     lcd: path.join(emuDir, "shaders", "handheld", "zfast-lcd.slangp"),
   };
@@ -164,22 +165,26 @@ function writeConfig(file, keys) {
  */
 function linkSystemData(ra, systemDir, core) {
   if (!ra) return;
-  const want = { dolphin_libretro: [ra.dolphinSys, path.join(systemDir, "dolphin-emu", "Sys")], ppsspp_libretro: [ra.ppsspp, path.join(systemDir, "PPSSPP")] }[core];
-  if (!want || !fs.existsSync(want[0])) return;
-  const [from, link] = want;
-  try {
-    if (fs.realpathSync(link) === fs.realpathSync(from)) return;
-  } catch {}
-  fs.mkdirSync(path.dirname(link), { recursive: true });
-  fs.rmSync(link, { recursive: true, force: true });
-  try {
-    fs.symlinkSync(from, link, process.platform === "win32" ? "junction" : "dir");
-  } catch {
-    fs.cpSync(from, link, { recursive: true });
+  const want = {
+    dolphin_libretro: [[ra.dolphinSys, path.join(systemDir, "dolphin-emu", "Sys")]],
+    ppsspp_libretro: [[ra.ppsspp, path.join(systemDir, "PPSSPP")]],
+    bluemsx_libretro: ra.bluemsx ? [[path.join(ra.bluemsx, "Databases"), path.join(systemDir, "Databases")], [path.join(ra.bluemsx, "Machines"), path.join(systemDir, "Machines")]] : [],
+  }[core] || [];
+  for (const [from, link] of want) {
+    if (!fs.existsSync(from)) continue;
+    try {
+      if (fs.realpathSync(link) === fs.realpathSync(from)) continue;
+    } catch {}
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.rmSync(link, { recursive: true, force: true });
+    try {
+      fs.symlinkSync(from, link, process.platform === "win32" ? "junction" : "dir");
+    } catch {
+      fs.cpSync(from, link, { recursive: true });
+    }
   }
 }
 
-/** Why did RetroArch close right away? Reads its log; returns "" when there's nothing useful. */
 /**
  * Why a game closed right after starting, in plain words, from RetroArch's log; "" when the log doesn't say.
  * exit: how the emulator ended ({code, signal}), to tell a crash apart.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0-beta.4
+
+- **Eight more consoles:** Atari 7800, ColecoVision, Intellivision, Vectrex, MSX, 3DO, Neo Geo CD and Pokémon Mini.
+  MSX games run on C-BIOS, a free MSX BIOS that comes with the app. ColecoVision, Intellivision and 3DO need a BIOS
+  from your own console.
+- Dropped 3DO discs are recognized by what's on them.
+
 ## 0.4.0-beta.3
 
 - **Nine more consoles:** Game Gear (now its own shelf; Game Gear games move there by themselves), SG-1000, Sega CD,

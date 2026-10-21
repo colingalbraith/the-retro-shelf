@@ -185,6 +185,14 @@ button{cursor:pointer}
 .card[data-lv=lynx]{--band:linear-gradient(#151515 calc(100% - 3px),#f08c00 0);--foot:#151515}
 .card[data-lv=ws]{--band:linear-gradient(#2b54a3 calc(100% - 3px),#9fb7ea 0);--foot:#2b54a3}
 .card[data-lv=vb]{--band:linear-gradient(#111 calc(100% - 3px),#d40000 0);--foot:#111}
+.card[data-lv=a7800]{--band:linear-gradient(#121212 60%,#d4472b 60% 80%,#e8892f 80%);--foot:#121212}
+.card[data-lv=coleco]{--band:linear-gradient(#151515 calc(100% - 3px),#2f6fd1 0);--foot:#151515}
+.card[data-lv=intv]{--band:linear-gradient(#2a2420 calc(100% - 3px),#c9a24a 0);--foot:#2a2420}
+.card[data-lv=vectrex]{--band:linear-gradient(#0f0f0f calc(100% - 3px),#e8e4da 0);--foot:#0f0f0f}
+.card[data-lv=msx]{--band:linear-gradient(#1a1a1a calc(100% - 3px),#e6c229 0);--foot:#1a1a1a}
+.card[data-lv=3do]{--body:#131313;--si:#f2efe6;--band:linear-gradient(#1e1e1e calc(100% - 2px),#e1b12c 0);--foot:var(--gm)}
+.card[data-lv=neocd]{--body:#121212;--si:#f2f0ec;--band:linear-gradient(#1c1c1c calc(100% - 2px),#c8102e 0);--foot:var(--gm)}
+.card[data-lv=pmini]{--band:linear-gradient(#f1efe9 calc(100% - 3px),#d8312b 0);--foot:#1b1b1b}
 .man .sp .sys{height:max(18px,calc(var(--t) * .95));display:flex;align-items:center;justify-content:center;background:var(--bd);color:var(--bf);font:700 clamp(7px,calc(var(--t) * .3),11px)/1 var(--disp)}
 .card.man{--body:#ece6d6;--si:#1c1916;--foot:#1c1916}
 .stk{position:absolute;z-index:2;border-radius:50%;background:#e9c341;color:#1c1916;text-align:center;box-shadow:0 1px 1px rgba(0,0,0,.4)}
@@ -986,7 +994,7 @@ function logoInfo(im) {
   return {ar, l};
 }
 /* consoles whose spines are always black or always white; everywhere else the spine takes the cover's color */
-const DARK_BODY = /^(ps1|psp|gc|ps2|arcade|scd|saturn)$/, LIGHT_BODY = /^(sms|dc|ds)$/;
+const DARK_BODY = /^(ps1|psp|gc|ps2|arcade|scd|saturn|3do|neocd)$/, LIGHT_BODY = /^(sms|dc|ds)$/;
 /* keep a logo readable: a cover-colored spine moves lighter or darker away from the logo; on a fixed black spine
    a dark logo gets a light edge */
 function logoContrast(c) {

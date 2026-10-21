@@ -193,6 +193,17 @@ async function ppssppAssets() {
   console.log("  PPSSPP system files");
 }
 
+// blueMSX's game databases and C-BIOS, the free MSX BIOS (cartridge games), from libretro's system files. The real MSX
+// machines' firmware in the same download is copyrighted and left out
+async function blueMsxFiles() {
+  const z = await download(`${BOT}/assets/system/blueMSX.zip`, "blueMSX-system.zip");
+  const tmp = path.join(CACHE, "x", "bluemsx"); rm(tmp); unzip(z, tmp);
+  fs.cpSync(path.join(tmp, "Databases"), path.join(OUT, "blueMSX", "Databases"), { recursive: true });
+  for (const m of ["MSX - C-BIOS", "MSX2 - C-BIOS", "MSX2+ - C-BIOS"])
+    fs.cpSync(path.join(tmp, "Machines", m), path.join(OUT, "blueMSX", "Machines", m), { recursive: true });
+  console.log("  blueMSX databases and C-BIOS");
+}
+
 async function pictureShaders() {
   for (const f of SHADER_FILES) {
     const src = await download(`${SHADERS}/${f}`, "shader-" + f.replace(/\//g, "-"));
@@ -212,6 +223,7 @@ async function pictureShaders() {
   await infos();
   if (CORES.includes("dolphin_libretro")) dolphinSys();
   if (CORES.includes("ppsspp_libretro")) await ppssppAssets();
+  if (CORES.includes("bluemsx_libretro")) await blueMsxFiles();
   await pictureShaders();
   fs.writeFileSync(path.join(OUT, "versions.json"), JSON.stringify({ retroarch: RA_VERSION, cores: CORES, fetched: new Date().toISOString() }, null, 2));
   console.log(`Done: ${mb(OUT)} in ${path.relative(ROOT, OUT)}`);

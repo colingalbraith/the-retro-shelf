@@ -37,6 +37,7 @@ td.m{font:12.5px var(--mono)}
 <h2>Dolphin system files</h2>
 <p>The GameCube/Wii core uses Dolphin's Sys folder. GNU General Public License v2 or later. Source: <a href="https://github.com/libretro/dolphin">github.com/libretro/dolphin</a>.</p>
 <p>The CRT picture uses the zfast-crt shader by Greg Hogan. GNU General Public License v2 or later. Source: <a href="https://github.com/libretro/slang-shaders">github.com/libretro/slang-shaders</a>.</p>
+<p>MSX games run on C-BIOS, a free MSX BIOS, with blueMSX's game databases. C-BIOS: BSD-style license, <a href="https://cbios.sourceforge.net">cbios.sourceforge.net</a>.</p>
 <p>The PSP core uses PPSSPP's system files (fonts and dialogs). GNU General Public License v2 or later, with the notices in its LICENSE.TXT; Roboto fonts Apache 2.0, Inconsolata SIL Open Font License. Source: <a href="https://github.com/hrydgard/ppsspp">github.com/hrydgard/ppsspp</a>.</p>
 
 <h2>Electron and Chromium</h2>
@@ -59,7 +60,10 @@ const REPO = {
   flycast_libretro: "flyinghead/flycast", melondsds_libretro: "JesseTG/melonds-ds", ppsspp_libretro: "hrydgard/ppsspp",
   fbneo_libretro: "libretro/FBNeo", dolphin_libretro: "libretro/dolphin", picodrive_libretro: "libretro/picodrive",
   yabasanshiro_libretro: "libretro/yabause", mednafen_ngp_libretro: "libretro/beetle-ngp-libretro", handy_libretro: "libretro/libretro-handy",
-  mednafen_wswan_libretro: "libretro/beetle-wswan-libretro", mednafen_vb_libretro: "libretro/beetle-vb-libretro"
+  mednafen_wswan_libretro: "libretro/beetle-wswan-libretro", mednafen_vb_libretro: "libretro/beetle-vb-libretro",
+  prosystem_libretro: "libretro/prosystem-libretro", gearcoleco_libretro: "drhelius/Gearcoleco", freeintv_libretro: "libretro/FreeIntv",
+  vecx_libretro: "libretro/libretro-vecx", bluemsx_libretro: "libretro/blueMSX-libretro", opera_libretro: "libretro/opera-libretro",
+  neocd_libretro: "libretro/neocd_libretro", pokemini_libretro: "libretro/PokeMini"
 };
 fetch("/api/licenses").then(r => r.json()).then(d => {
   if (d.retroarch) document.getElementById("rav").textContent = d.retroarch;

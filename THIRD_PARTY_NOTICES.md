@@ -28,16 +28,24 @@ Settings → About → Licenses.
 | 32X | PicoDrive | **Non-commercial** (MAME license) | https://github.com/libretro/picodrive |
 | PC Engine | Beetle PCE Fast | GPLv2 | https://github.com/libretro/beetle-pce-fast-libretro |
 | Atari 2600 | Stella | GPLv2 | https://github.com/stella-emu/stella |
+| Atari 7800 | ProSystem | GPLv2 | https://github.com/libretro/prosystem-libretro |
 | Atari Lynx | Handy | zlib | https://github.com/libretro/libretro-handy |
+| ColecoVision | Gearcoleco | GPLv3 | https://github.com/drhelius/Gearcoleco |
+| Intellivision | FreeIntv | GPLv2+ | https://github.com/libretro/FreeIntv |
+| Vectrex | vecx | GPLv3 | https://github.com/libretro/libretro-vecx |
+| MSX | blueMSX | GPLv2 | https://github.com/libretro/blueMSX-libretro |
 | N64 | Mupen64Plus-Next | GPLv2 | https://github.com/libretro/mupen64plus-libretro-nx |
 | PlayStation | PCSX ReARMed | GPLv2 | https://github.com/libretro/pcsx_rearmed |
 | Saturn | YabaSanshiro | GPLv2 | https://github.com/libretro/yabause |
+| 3DO | Opera | **Non-commercial** (LGPL and non-commercial parts) | https://github.com/libretro/opera-libretro |
+| Neo Geo CD | NeoCD | LGPLv3 | https://github.com/libretro/neocd_libretro |
 | Dreamcast | Flycast | GPLv2 | https://github.com/flyinghead/flycast |
 | DS | melonDS DS | GPLv3+ | https://github.com/JesseTG/melonds-ds |
 | PSP | PPSSPP | GPLv2+ | https://github.com/hrydgard/ppsspp |
 | Neo Geo Pocket (Color) | Beetle NeoPop | GPLv2 | https://github.com/libretro/beetle-ngp-libretro |
 | WonderSwan (Color) | Beetle WonderSwan | GPLv2 | https://github.com/libretro/beetle-wswan-libretro |
 | Virtual Boy | Beetle VB | GPLv2 | https://github.com/libretro/beetle-vb-libretro |
+| Pokémon Mini | PokeMini | GPLv3 | https://github.com/libretro/PokeMini |
 | Arcade | FinalBurn Neo | **Non-commercial** | https://github.com/libretro/FBNeo |
 | GameCube / Wii | Dolphin | GPLv2+ | https://github.com/libretro/dolphin |
 
@@ -67,6 +75,12 @@ Release years, genres, arcade game names and the series lists Collections use (`
 `src/data/arcade-names.json`, `src/data/franchises.json`) are built from https://github.com/libretro/libretro-database
 by the `scripts/fetch-*.mjs` scripts.
 Creative Commons Attribution-ShareAlike 4.0 International; these files are shared under the same license.
+
+## C-BIOS and blueMSX's databases
+
+MSX games run on C-BIOS (https://cbios.sourceforge.net), a free MSX BIOS for cartridge games, under its BSD-style
+license (in `blueMSX/Machines/*/cbios.txt`), with blueMSX's game databases. Both come from libretro's
+`assets/system/blueMSX.zip`; the real MSX machines' firmware in that download is copyrighted and not included.
 
 ## Electron
 

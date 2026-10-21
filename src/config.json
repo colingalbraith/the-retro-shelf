@@ -339,6 +339,40 @@
         "#c9a24a"
       ]
     },
+    "Atari 7800": {
+      "folder": "atari7800",
+      "exts": [
+        ".a78",
+        ".zip",
+        ".7z"
+      ],
+      "core": "prosystem_libretro",
+      "thumbs": "Atari - 7800",
+      "media": "cart",
+      "picture": "crt",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "7800",
+      "look": [
+        "a7800",
+        "card",
+        1
+      ],
+      "pile": [
+        "#1d1b19",
+        "#d4472b"
+      ],
+      "bios": {
+        "label": "Atari 7800",
+        "note": "Optional.",
+        "files": [
+          [
+            "7800 BIOS (U).rom",
+            4096
+          ]
+        ]
+      }
+    },
     "Lynx": {
       "folder": "lynx",
       "exts": [
@@ -372,6 +406,128 @@
           ]
         ]
       }
+    },
+    "ColecoVision": {
+      "folder": "coleco",
+      "exts": [
+        ".col",
+        ".cv",
+        ".zip",
+        ".7z"
+      ],
+      "core": "gearcoleco_libretro",
+      "thumbs": "Coleco - ColecoVision",
+      "media": "cart",
+      "picture": "crt",
+      "light": true,
+      "abbr": "CV",
+      "look": [
+        "coleco",
+        "card",
+        1
+      ],
+      "pile": [
+        "#191919",
+        "#2f6fd1"
+      ],
+      "bios": {
+        "label": "ColecoVision",
+        "note": "Needed for ColecoVision games.",
+        "files": [
+          [
+            "colecovision.rom",
+            8192
+          ]
+        ]
+      }
+    },
+    "Intellivision": {
+      "folder": "intellivision",
+      "exts": [
+        ".int",
+        ".zip",
+        ".7z"
+      ],
+      "core": "freeintv_libretro",
+      "thumbs": "Mattel - Intellivision",
+      "media": "wide",
+      "picture": "crt",
+      "light": true,
+      "abbr": "INTV",
+      "look": [
+        "intv",
+        "card"
+      ],
+      "pile": [
+        "#2a2420",
+        "#c9a24a"
+      ],
+      "bios": {
+        "label": "Intellivision",
+        "note": "Needed for Intellivision games.",
+        "files": [
+          [
+            "exec.bin",
+            8192
+          ],
+          [
+            "grom.bin",
+            2048
+          ]
+        ]
+      }
+    },
+    "Vectrex": {
+      "folder": "vectrex",
+      "exts": [
+        ".vec",
+        ".zip",
+        ".7z"
+      ],
+      "core": "vecx_libretro",
+      "thumbs": "GCE - Vectrex",
+      "media": "wide",
+      "picture": "smooth",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "VEC",
+      "look": [
+        "vectrex",
+        "card",
+        1
+      ],
+      "pile": [
+        "#121212",
+        "#e8e4da"
+      ]
+    },
+    "MSX": {
+      "folder": "msx",
+      "exts": [
+        ".rom",
+        ".mx1",
+        ".mx2",
+        ".zip",
+        ".7z"
+      ],
+      "core": "bluemsx_libretro",
+      "thumbs": [
+        "Microsoft - MSX",
+        "Microsoft - MSX2"
+      ],
+      "media": "cart",
+      "picture": "crt",
+      "light": true,
+      "abbr": "MSX",
+      "look": [
+        "msx",
+        "card",
+        1
+      ],
+      "pile": [
+        "#1c1c1c",
+        "#e6c229"
+      ]
     },
     "N64": {
       "folder": "n64",
@@ -481,6 +637,105 @@
           [
             "saturn_bios.bin",
             524288
+          ]
+        ]
+      }
+    },
+    "3DO": {
+      "folder": "3do",
+      "exts": [
+        ".iso",
+        ".chd",
+        ".cue"
+      ],
+      "core": "opera_libretro",
+      "thumbs": "The 3DO Company - 3DO",
+      "media": "cd",
+      "picture": "crt",
+      "abbr": "3DO",
+      "look": [
+        "3do",
+        "jewel"
+      ],
+      "pile": [
+        "#141312",
+        "#e1b12c"
+      ],
+      "bios": {
+        "label": "3DO",
+        "note": "Needed for 3DO games: any one of these.",
+        "any": true,
+        "files": [
+          [
+            "panafz10.bin"
+          ],
+          [
+            "panafz1.bin"
+          ],
+          [
+            "panafz10-norsa.bin"
+          ],
+          [
+            "goldstar.bin"
+          ],
+          [
+            "sanyotry.bin"
+          ]
+        ]
+      }
+    },
+    "Neo Geo CD": {
+      "folder": "neocd",
+      "exts": [
+        ".cue",
+        ".chd"
+      ],
+      "core": "neocd_libretro",
+      "thumbs": "SNK - Neo Geo CD",
+      "media": "cd",
+      "picture": "crt",
+      "light": true,
+      "freeTriggers": true,
+      "abbr": "NGCD",
+      "look": [
+        "neocd",
+        "jewel"
+      ],
+      "pile": [
+        "#121212",
+        "#c8102e"
+      ],
+      "bios": {
+        "label": "Neo Geo CD",
+        "note": "Optional: more games work with one.",
+        "any": true,
+        "files": [
+          [
+            "neocd/neocd_z.rom"
+          ],
+          [
+            "neocd/neocd_f.rom"
+          ],
+          [
+            "neocd/neocd_t.rom"
+          ],
+          [
+            "neocd/neocd_sz.rom"
+          ],
+          [
+            "neocd/neocd_sf.rom"
+          ],
+          [
+            "neocd/neocd_st.rom"
+          ],
+          [
+            "neocd/front-sp1.bin"
+          ],
+          [
+            "neocd/top-sp1.bin"
+          ],
+          [
+            "neocd/uni-bioscd.rom"
           ]
         ]
       }
@@ -663,6 +918,38 @@
         "#1a1a1a",
         "#d40000"
       ]
+    },
+    "Pokémon Mini": {
+      "folder": "pokemini",
+      "exts": [
+        ".min",
+        ".zip",
+        ".7z"
+      ],
+      "core": "pokemini_libretro",
+      "thumbs": "Nintendo - Pokemon Mini",
+      "media": "mini",
+      "picture": "lcd",
+      "light": true,
+      "abbr": "PM",
+      "look": [
+        "pmini",
+        "card"
+      ],
+      "pile": [
+        "#e9e6df",
+        "#d8312b"
+      ],
+      "bios": {
+        "label": "Pokémon Mini",
+        "note": "Optional.",
+        "files": [
+          [
+            "bios.min",
+            4096
+          ]
+        ]
+      }
     },
     "Arcade": {
       "folder": "arcade",

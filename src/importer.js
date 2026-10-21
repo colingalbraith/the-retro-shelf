@@ -86,10 +86,15 @@ class Importer {
   /** Best guess of which system a file is for, from its contents. Returns {system, makeCue?} or null. */
   sniff(p, ext, cands) {
     const pick = folder => { const s = this.sys(folder); return s && cands.includes(s) ? s : null; };
-    // Sega's discs say so in their first sector: at the start of an .iso, 16 bytes in on a raw 2352-byte sector
+    // Sega's and 3DO discs say so in their first sector: at the start of an .iso, 16 bytes in on a raw 2352-byte
+    // sector. A 3DO disc starts with the Opera file system's record: 1, then five 0x5A, then 1
     const sega = fd => {
       const h = readAt(fd, 0, 0x30), at = o => ascii(h, o, 15);
-      for (const o of [0, 16]) { if (at(o).startsWith("SEGADISCSYSTEM")) return "segacd"; if (at(o) === "SEGA SEGASATURN") return "saturn"; }
+      for (const o of [0, 16]) {
+        if (at(o).startsWith("SEGADISCSYSTEM")) return "segacd";
+        if (at(o) === "SEGA SEGASATURN") return "saturn";
+        if (h.length >= o + 7 && h[o] === 1 && h[o + 6] === 1 && [1, 2, 3, 4, 5].every(k => h[o + k] === 0x5a)) return "3do";
+      }
       return null;
     };
     if (ext === ".zip") {

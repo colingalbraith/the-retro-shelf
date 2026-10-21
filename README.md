@@ -111,16 +111,24 @@ Atari 2600, N64, DS, PlayStation, PSP, Dreamcast, GameCube, Wii and Arcade. Thei
 | 32X | PicoDrive | Not needed |
 | PC Engine / TurboGrafx-16 | Beetle PCE Fast | Only for CD games |
 | Atari 2600 | Stella | Not needed |
+| Atari 7800 | ProSystem | Optional |
 | Atari Lynx | Handy | Optional |
+| ColecoVision | Gearcoleco | Required |
+| Intellivision | FreeIntv | Required |
+| Vectrex | vecx | Not needed |
+| MSX, MSX2 | blueMSX | Not needed (the free C-BIOS comes with the app) |
 | Nintendo 64 | Mupen64Plus-Next | Not needed |
 | PlayStation | PCSX ReARMed | Optional, improves compatibility |
 | Saturn | YabaSanshiro | Required |
+| 3DO | Opera | Required |
+| Neo Geo CD | NeoCD | Optional |
 | Dreamcast | Flycast | Optional |
 | Nintendo DS | melonDS DS | Optional |
 | PSP | PPSSPP | Not needed |
 | Neo Geo Pocket, Neo Geo Pocket Color | Beetle NeoPop | Not needed |
 | WonderSwan, WonderSwan Color | Beetle WonderSwan | Not needed |
 | Virtual Boy | Beetle VB | Not needed |
+| Pokémon Mini | PokeMini | Optional |
 | GameCube, Wii | Dolphin | Not needed |
 | Arcade | FinalBurn Neo | Not needed (romsets named like `sf2.zip`) |
 | PlayStation 2 | PCSX2, installed separately | Required |
