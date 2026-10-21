@@ -1661,7 +1661,13 @@ async function rescan() {
 }
 
 /* ---------- adding games (desktop app): drop files or pick them, the app sorts them by system ---------- */
-const plural = (n, one, many) => n.toLocaleString(LOCALE) + " " + t(n === 1 ? one : many);
+/* the word after a number: the language's own rule says which form (Russian has three: 1 игра, 2 игры, 5 игр). Forms
+   beyond the two English ones are listed as "games|few". Japanese and Korean counters join the number (3本, 3개) */
+const plural = (n, one, many) => {
+  const form = new Intl.PluralRules(LOCALE).select(n), extra = form !== "one" && WORDS[LANG] && WORDS[LANG][many + "|" + form];
+  const word = extra || t(form === "one" ? one : many), joined = (LANG === "ja" || LANG === "ko") && /^[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(word);
+  return n.toLocaleString(LOCALE) + (joined ? "" : " ") + word;
+};
 /* pressed with a controller just now: the system's file windows need a mouse, so the app's own folder browser instead */
 const byPad = () => Date.now() - padAt < 2000;
 /* something that opens a window of the system's (to choose a file or folder): with only a controller it would leave
@@ -3665,8 +3671,9 @@ function t(text, vars) {
    Text is translated as it appears: t() for sentences with blanks to fill, and for the rest, any piece of text that is
    exactly an English entry in the language's list. Each piece keeps its English, so switching again starts from it.
    The shelves' own text (game names, console plates) is the games', and stays as it is */
-const LANGS = [["auto", "Automatic"], ["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["pt", "Português"], ["ja", "日本語"]];
-const LOCALES = {es: "es", fr: "fr", de: "de", pt: "pt-BR", ja: "ja"};
+const LANGS = [["auto", "Automatic"], ["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["it", "Italiano"], ["pt", "Português"],
+  ["ru", "Русский"], ["ja", "日本語"], ["ko", "한국어"], ["zh", "简体中文"]];
+const LOCALES = {es: "es", fr: "fr", de: "de", it: "it", pt: "pt-BR", ru: "ru", ja: "ja", ko: "ko", zh: "zh-CN"};
 const T_ATTRS = ["aria-label", "title", "placeholder"], T_SKIP = "#shelves,script,style,.card,.ci,.tro,.lslot,#saver,#nlist,#oskv,[translate=no]";
 let langObs = null, HARVEST = null;
 function trText(n) {
@@ -3676,8 +3683,8 @@ function trText(n) {
   if (HARVEST) HARVEST.add(k);
   const w = WORDS[LANG] && WORDS[LANG][k];
   if (n.__en === undefined) { if (!w) return; n.__en = en; }
-  /* Japanese runs on without spaces: none before words that follow bold text */
-  const out = w ? (LANG === "ja" && /^[\u3000-\u9fff\uff00-\uffef]/.test(w) ? en.replace(/^\s+/, "") : en).replace(k, w) : en;
+  /* Japanese and Chinese run on without spaces: none before words that follow bold text */
+  const out = w ? ((LANG === "ja" || LANG === "zh") && /^[\u3000-\u9fff\uff00-\uffef]/.test(w) ? en.replace(/^\s+/, "") : en).replace(k, w) : en;
   n.__tr = out; if (n.nodeValue !== out) n.nodeValue = out;
 }
 function trAttrs(e) {
@@ -3701,13 +3708,15 @@ function trTree(root) {
 }
 /* the language: as chosen in Settings, or the computer's own when there's a list for it */
 async function setLang(code) {
-  const want = code && code !== "auto" ? code : (navigator.language || "en").slice(0, 2).toLowerCase();
+  /* the Chinese list is Simplified: a computer set to Traditional Chinese (Taiwan, Hong Kong) stays in English unless
+     it's chosen */
+  const nav = navigator.language || "en", want = code && code !== "auto" ? code : /^zh-(hant|tw|hk|mo)/i.test(nav) ? "en" : nav.slice(0, 2).toLowerCase();
   const lang = LOCALES[want] || want === "xx" ? want : "en";
   if (lang !== "en" && lang !== "xx" && !WORDS[lang]) { try { const r = await fetch("/words/" + lang + ".json"); if (r.ok) WORDS[lang] = await r.json(); } catch (e) {} }
   LANG = WORDS[lang] || lang === "xx" ? lang : "en";
   /* English keeps the computer's own way of writing dates when it's an English one (US, UK, …) */
   LOCALE = LOCALES[LANG] || (/^en/i.test(navigator.language || "") ? navigator.language : "en");
-  HTML.lang = LANG === "xx" ? "en" : LANG;
+  HTML.lang = LANG === "xx" ? "en" : LOCALES[LANG] || LANG;
   /* while English with nothing translated, nothing needs watching */
   if (LANG !== "en" && !langObs) {
     langObs = new MutationObserver(ms => { for (const m of ms) { if (m.type === "attributes") { if (!m.target.closest(T_SKIP)) trAttrs(m.target); } else m.addedNodes.forEach(trTree); } });

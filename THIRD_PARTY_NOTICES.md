@@ -93,6 +93,12 @@ license (in `blueMSX/Machines/*/cbios.txt`), with blueMSX's game databases. Both
 MIT License. Electron bundles Chromium, Node.js and other components; their notices ship in the app as
 `LICENSES.chromium.html` and `LICENSE.electron.txt`.
 
+## AppImage runtime
+
+The Linux AppImage starts with the AppImage project's runtime (https://github.com/AppImage/type2-runtime, MIT),
+which carries libfuse (LGPL 2.1), squashfuse (BSD-style) and zstd (BSD) inside it, so it needs no libfuse2 from the
+system.
+
 ## Menu music
 
 From OpenGameArt, each given to the public domain by its maker (CC0 1.0,

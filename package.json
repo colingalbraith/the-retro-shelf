@@ -1,7 +1,7 @@
 {
   "name": "the-retro-shelf",
   "productName": "The Retro Shelf",
-  "version": "0.4.0-beta.13",
+  "version": "0.4.0-beta.14",
   "description": "Your retro game collection as boxes on a shelf. Emulators built in, games not included.",
   "author": "Colin Galbraith",
   "license": "GPL-3.0-or-later",
@@ -134,7 +134,10 @@
       "executableName": "the-retro-shelf",
       "synopsis": "A retro game shelf with the emulators built in"
     },
-    "detectUpdateChannel": false
+    "detectUpdateChannel": false,
+    "toolsets": {
+      "appimage": "1.0.3"
+    }
   },
   "dependencies": {
     "electron-updater": "^6.8.9"

@@ -259,22 +259,25 @@ try {
   await p.ev(`(UI.tv = false, applyTv(), 1)`);
   console.log("· Steam Deck (TV mode) done");
 
-  // German, the longest words: every screen still fits at the smallest window (and the language comes back)
-  if (!harvest && fs.existsSync(path.join(ROOT, "src", "words", "de.json"))) {
-    await p.ev(`(async () => { await setLang("de"); renderHints(); renderShelves(focusId); return 1; })()`); await sleep(800);
+  // German and Russian, the longest words (Russian in the computer's own font, which is wider): every screen still fits
+  // at the smallest window (and the language comes back)
+  for (const [code, lname] of [["de", "German"], ["ru", "Russian"]]) {
+  if (!harvest && fs.existsSync(path.join(ROOT, "src", "words", code + ".json"))) {
+    await p.ev(`(async () => { await setLang("${code}"); renderHints(); renderShelves(focusId); return 1; })()`); await sleep(800);
     await p.send("Emulation.setDeviceMetricsOverride", { width: 720, height: 520, deviceScaleFactor: 1, mobile: false }); await sleep(600);
     const bad = await p.ev(BACKS);
-    for (const b of bad) problems.push(`German, 720×520: ${b}`);
+    for (const b of bad) problems.push(`${lname}, 720×520: ${b}`);
     for (const [name, open, close] of SCREENS) {
       await p.ev(open + "; 1"); await sleep(1300);
-      for (const b of await p.ev(PANEL)) problems.push(`${name} in German at 720×520: ${b}`);
+      for (const b of await p.ev(PANEL)) problems.push(`${name} in ${lname} at 720×520: ${b}`);
       const shot = await p.send("Page.captureScreenshot", { format: "jpeg", quality: 70 });
-      fs.writeFileSync(path.join(OUT, `de-${name}-720x520.jpg`), Buffer.from(shot.result.data, "base64"));
+      fs.writeFileSync(path.join(OUT, `${code}-${name}-720x520.jpg`), Buffer.from(shot.result.data, "base64"));
       await p.ev(close + "; 1"); await sleep(400);
     }
     await p.ev(`(async () => { await setLang("en"); renderHints(); renderShelves(focusId); return 1; })()`); await sleep(500);
     await p.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-    console.log("· German done");
+    console.log(`· ${lname} done`);
+  }
   }
 
   // a controller through every panel: Select opens options, each panel opens from there, B closes it

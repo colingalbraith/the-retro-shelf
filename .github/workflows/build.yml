@@ -66,7 +66,13 @@ jobs:
 
       # installs the last release and has it update itself to this build, the way people get it
       - name: Update from the last release
+        if: matrix.target != 'linux'
         run: node scripts/update-test.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Update from the last release (on a virtual screen)
+        if: matrix.target == 'linux'
+        run: xvfb-run -a --server-args="-screen 0 1920x1080x24" node scripts/update-test.mjs
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -103,6 +109,22 @@ jobs:
       - name: Open the app and play a game (on a virtual screen)
         if: matrix.target == 'linux'
         run: xvfb-run -a --server-args="-screen 0 1920x1080x24" node scripts/smoke.mjs
+      # the AppImage itself, opened the way a desktop does (mounted, no extra libraries installed): Ubuntu 22.04 and later
+      # don't come with the libfuse2 older AppImages need
+      - name: The AppImage opens
+        if: matrix.target == 'linux'
+        run: |
+          A=$(ls dist/*.AppImage); chmod +x "$A"
+          # a desktop has fuse3 (it's what mounts the AppImage); GitHub's machines may not
+          command -v fusermount3 > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq fuse3 > /dev/null; }
+          echo "libfuse2: $(ldconfig -p | grep -c 'libfuse.so.2')  fusermount3: $(command -v fusermount3 || echo none)"
+          H=$(mktemp -d); mkdir -p "$H/data"; echo '{"ui":{"welcomed":true,"updates":false}}' > "$H/data/settings.json"
+          ARCADE_HOME="$H" timeout 60 xvfb-run -a "$A" > appimage.log 2>&1 &
+          for i in $(seq 30); do sleep 2; pgrep -f '\.mount_.*/the-retro-shelf' > /dev/null && break; done
+          sleep 8
+          if pgrep -f '\.mount_.*/the-retro-shelf' > /dev/null; then echo "ok: the AppImage opens"; ok=1; else ok=0; fi
+          pkill -f '\.mount_.*/the-retro-shelf' || true
+          [ "$ok" = 1 ] || { echo "FAILED: the AppImage didn't open"; cat appimage.log; exit 1; }
 
       - uses: actions/upload-artifact@v4
         if: always()

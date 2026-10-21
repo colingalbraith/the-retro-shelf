@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Checks that people on the last release get this build as an update: installs the published release (Windows: its
-// installer; Mac: its app), points its updater at this build in dist/, and has it download, check and install the
-// update the way it would from GitHub. Passes when the installed app is this build's version afterwards. Skipped
-// when the last release isn't older than this build. CI runs it after each build.
+// installer; Mac: its app; Linux: its AppImage), points its updater at this build in dist/, and has it download, check
+// and install the update the way it would from GitHub. Passes when the installed app is this build's version
+// afterwards (Linux: and the new one opens by itself). Skipped when the last release isn't older than this build.
+// CI runs it after each build (Linux: on a virtual screen).
 //   node scripts/update-test.mjs
 import fs from "node:fs";
 import http from "node:http";
@@ -19,7 +20,8 @@ const { compare } = require("../src/version.js"), asar = require("@electron/asar
 const NEW = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const step = s => console.log("· " + s);
-const win = process.platform === "win32";
+const win = process.platform === "win32", linux = process.platform === "linux";
+const appimage = x => x.name.endsWith(".AppImage"), version = r => r.tag_name.replace(/^v/, "");
 /** the version an installed app really is: the one in its own package.json (Windows file versions lose "-beta.1") */
 const versionIn = resources => {
   const archive = path.join(resources, "app.asar");
@@ -86,9 +88,14 @@ fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: 
 
 let app = null, server = null, failed = false;
 try {
-  const rel = await github("releases/latest"), OLD = rel.tag_name.replace(/^v/, "");
-  // Linux builds start with 0.4.0: until a release has one, there's nothing to update from
-  if (process.platform === "linux" && !rel.assets.some(x => x.name.endsWith(".AppImage"))) { console.log(`skipped: the last release (${OLD}) has no Linux build to update from`); process.exit(0); }
+  let rel = await github("releases/latest");
+  // Linux builds start with 0.4.0: until a release has one, the newest test version older than this build stands in
+  if (linux && !rel.assets.some(appimage)) {
+    const older = (await github("releases?per_page=50")).filter(r => !r.draft && r.assets.some(appimage) && compare(version(r), NEW) < 0);
+    if (!older.length) { console.log(`skipped: no release older than ${NEW} has a Linux build to update from`); process.exit(0); }
+    rel = older.sort((a, b) => compare(version(b), version(a)))[0];
+  }
+  const OLD = version(rel);
   if (compare(OLD, NEW) >= 0) { console.log(`skipped: the last release (${OLD}) isn't older than this build (${NEW})`); process.exit(0); }
   step(`updating ${OLD} → ${NEW}`);
 
@@ -103,6 +110,21 @@ try {
     exe = fs.readdirSync(progs).map(d => path.join(progs, d, "The Retro Shelf.exe")).find(f => fs.existsSync(f));
     if (!exe) throw new Error("the old version didn't install");
     installed = () => versionIn(path.join(path.dirname(exe), "resources"));
+  } else if (linux) {
+    const a = rel.assets.find(appimage);
+    exe = path.join(work, a.name);
+    await download(a.browser_download_url, exe);
+    fs.chmodSync(exe, 0o755);
+    // the version inside it: the AppImage takes out just its app archive. One named with its version (before
+    // 0.4.0-beta.13) is replaced by one with the new name; since then they keep one name and are replaced in place
+    const peek = path.join(home, "peek");
+    installed = () => {
+      const image = fs.existsSync(exe) ? exe : fs.readdirSync(work).filter(f => f.endsWith(".AppImage")).map(f => path.join(work, f))[0];
+      if (!image) return "";
+      fs.rmSync(peek, { recursive: true, force: true }); fs.mkdirSync(peek);
+      spawnSync(image, ["--appimage-extract", "resources/app.asar"], { cwd: peek, stdio: "ignore" });
+      return versionIn(path.join(peek, "squashfs-root", "resources"));
+    };
   } else {
     const arch = process.arch === "arm64" ? "arm64" : "x64", a = rel.assets.find(x => x.name.endsWith(`-mac-${arch}.zip`));
     const zip = path.join(work, a.name);
@@ -117,7 +139,10 @@ try {
 
   server = await serve();
   step("opening " + OLD);
-  app = spawn(exe, [`--remote-debugging-port=${PORT}`], { env: { ...process.env, ARCADE_HOME: home, RETRO_SHELF_UPDATE_FEED: `http://127.0.0.1:${FEED}` }, stdio: "ignore" });
+  // Linux: GitHub's machines can't mount an AppImage the way a desktop does, so it unpacks itself and runs (the new one
+  // the update opens does the same)
+  app = spawn(exe, [`--remote-debugging-port=${PORT}`, ...(linux ? ["--no-sandbox"] : [])], {
+    env: { ...process.env, ARCADE_HOME: home, RETRO_SHELF_UPDATE_FEED: `http://127.0.0.1:${FEED}`, ...(linux ? { APPIMAGE_EXTRACT_AND_RUN: "1", APPIMAGE: exe } : {}) }, stdio: "ignore" });
   const p = await page();
   await sleep(1500);
   let s = await p.evaluate(`APP.update("check")`);
@@ -135,6 +160,15 @@ try {
   if (now !== NEW) throw new Error(`after restarting, the installed app is ${now || "missing"}, not ${NEW}`);
   step(`the installed app is now ${now}`);
   if (!fs.existsSync(path.join(home, "data", "settings.json"))) throw new Error("the update lost the settings");
+  // Linux: the AppImage opens the new version once it's in place; it should start and stay open
+  if (linux) {
+    const running = () => spawnSync("pgrep", ["-f", "appimage_extracted_.*/the-retro-shelf"], { encoding: "utf8" }).stdout.trim();
+    let up = false;
+    for (let i = 0; i < 30 && !up; i++) { await sleep(2000); up = (app.exitCode !== null || app.signalCode !== null) && !!running(); }
+    if (up) { await sleep(8000); up = !!running(); }
+    if (!up) throw new Error("the new version didn't open after updating");
+    step("the new version opened by itself");
+  }
   console.log(`ok: ${OLD} updates itself to ${NEW}`);
 } catch (e) {
   failed = true;
@@ -149,7 +183,11 @@ try {
     for (let i = 0; i < 90 && running(); i++) await sleep(2000);
     for (let i = 0; i < 6; i++) { spawnSync("taskkill", ["/IM", "The Retro Shelf.exe", "/T", "/F"], { stdio: "ignore" }); await sleep(1500); }
   }
-  else { if (app) try { process.kill(app.pid, "SIGTERM"); } catch {} spawnSync("pkill", ["-f", work], { stdio: "ignore" }); }
+  else {
+    if (app) try { process.kill(app.pid, "SIGTERM"); } catch {}
+    spawnSync("pkill", ["-f", work], { stdio: "ignore" });
+    if (linux) spawnSync("pkill", ["-f", "appimage_extracted_.*/the-retro-shelf"], { stdio: "ignore" });
+  }
   await sleep(1500);
   try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
   process.exit(failed ? 1 : 0);
