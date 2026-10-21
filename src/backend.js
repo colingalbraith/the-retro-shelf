@@ -43,6 +43,12 @@ const KNOWN_APPS = {
 // ---------------------------------------------------------------- storage
 /** whether p is the folder dir or inside it. On Windows a path on another drive isn't (path.relative gives it whole,
     without ".."), and neither is a sibling whose name starts with two dots */
+/** whether f is one of this game's own pictures: Name.png, Name.logo.png, Name.snap.png (not "Name 3.png", whose
+    name only starts the same) */
+function ownPic(f, stem) {
+  if (!f.startsWith(stem + ".") || !IMG.includes(path.extname(f).toLowerCase())) return false;
+  return /^(\.(logo|snap))?$/i.test(f.slice(stem.length, f.length - path.extname(f).length));
+}
 function within(p, dir, pp = path) {
   const r = pp.relative(pp.resolve(dir), pp.resolve(p));
   return r === "" || (!pp.isAbsolute(r) && r !== ".." && !r.startsWith(".." + pp.sep));
@@ -233,7 +239,7 @@ class Backend extends EventEmitter {
     // shouldn't stop it from opening: it says so instead
     this.setupError = "";
     try { this.firstRun(); } catch (e) { this.setupError = e.message; }
-    fs.rmSync(path.join(this.files.covers, ".previews"), { recursive: true, force: true });
+    try { fs.rmSync(path.join(this.files.covers, ".previews"), { recursive: true, force: true }); } catch {}
     if (!this.state.ggShelf) { try { this.moveGameGear(); } catch {} this.state.ggShelf = 1; this.saveState(); }
     // a password left behind by a game that never finished (the app was force-quit) goes
     try { if (ra.readConfigKey(this.files.raCfg, "cheevos_password")) ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {}
@@ -323,12 +329,12 @@ class Backend extends EventEmitter {
       if (SHEETS.includes(path.extname(r).toLowerCase())) for (const x of sheetFiles(r)) add(x);
     };
     add(g.path);
-    for (const f of fs.readdirSync(dir)) if (f.startsWith(stem + ".") && IMG.includes(path.extname(f).toLowerCase())) own.add(path.resolve(dir, f));
+    for (const f of fs.readdirSync(dir)) if (ownPic(f, stem)) own.add(path.resolve(dir, f));
     const sysDir = path.join(this.romsRoot(), this.cfg.systems[g.system].folder || g.system);
     if (path.resolve(dir) !== path.resolve(sysDir) && within(dir, sysDir)) {
       const rest = [], walk = (d, depth) => {
         for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-          if (e.name.startsWith(".") || /^(desktop\.ini|thumbs\.db)$/i.test(e.name)) continue;
+          if (hiddenEntry(e) || /^(desktop\.ini|thumbs\.db)$/i.test(e.name)) continue;
           const p = path.resolve(d, e.name);
           if (e.isDirectory()) { if (depth < 4) walk(p, depth + 1); else rest.push(p); } else if (!own.has(p)) rest.push(p);
         }
@@ -410,7 +416,8 @@ class Backend extends EventEmitter {
       this._meta[folder] = { m, byNorm };
     }
     const { m, byNorm } = this._meta[folder];
-    if (m[look]) return m[look];
+    // own entries only: a game file called "constructor" or "toString" isn't a lookup into the object itself
+    if (Object.hasOwn(m, look)) return m[look];
     const c = byNorm.get(norm(look));
     return c ? m[pick(c, look)] : null;
   }
@@ -496,7 +503,8 @@ class Backend extends EventEmitter {
   gameRecord(p, system, root) {
     const s = this.cfg.systems[system], folder = s.folder || system, stem = path.parse(p).name, id = gid(p);
     // arcade files are short codes ("sf2"); the full name is the title and what art is looked up by
-    let full = s.names && (this.names[s.names] || {})[stem.toLowerCase()], year = "", pub = "", dev = "", genre = "";
+    const names = s.names && this.names[s.names];
+    let full = names && Object.hasOwn(names, stem.toLowerCase()) ? names[stem.toLowerCase()] : undefined, year = "", pub = "", dev = "", genre = "";
     if (Array.isArray(full)) [full, year, pub] = full;
     const look = full || stem;
     if (!full) { const md = this.metaFor(folder, look); if (md) [year, pub, dev, genre] = md; }
@@ -851,7 +859,8 @@ class Backend extends EventEmitter {
   buildCmd(g, opts = {}) {
     const s = this.cfg.systems[g.system];
     if (s.emulator) {
-      const args = s.emulator.map(a => a.replace("{rom}", g.path));
+      // a function, so a path with "$$" or "$&" in it is put in as it is
+      const args = s.emulator.map(a => a.replace("{rom}", () => g.path));
       const exe = this.resolveApp(args[0]);
       if (!exe) throw new Error(`${g.system} games need ${path.basename(args[0])}, which isn't included. Install it, then try again.`
         + (g.system === "PS2" ? " PS2 games also need a BIOS from your own console." : ""));
@@ -931,7 +940,8 @@ class Backend extends EventEmitter {
     rec.alive = false;
     if (this.running === rec) this.running = null;
     this.markInPlay(null, false);
-    const dt = Math.max(0, rec.t0 != null ? (performance.now() - rec.t0) / 1000 : now() - rec.since);
+    // never less than nothing, and no more than half a day: a game left open overnight isn't 20 hours of play
+    const dt = Math.min(12 * 3600, Math.max(0, rec.t0 != null ? (performance.now() - rec.t0) / 1000 : now() - rec.since));
     try {
       this.state.time[rec.id] = (this.state.time[rec.id] || 0) + Math.floor(dt);
       // a game that closed right away wasn't really played
@@ -1244,7 +1254,7 @@ class Backend extends EventEmitter {
         try {
           fs.mkdirSync(destDir, { recursive: true });
           fs.renameSync(p, dest);
-          for (const f of ents) if (f.isFile() && f.name.startsWith(stem + ".") && IMG.includes(path.extname(f.name).toLowerCase()))
+          for (const f of ents) if (f.isFile() && ownPic(f.name, stem))
             try { fs.renameSync(path.join(dir, f.name), path.join(destDir, f.name)); } catch {}
           this.moveStats(gid(p), gid(dest));
         } catch {}
@@ -1805,7 +1815,8 @@ class Backend extends EventEmitter {
     const core = this.cfg.systems[g.system].core, cn = core && this._coreNames && this._coreNames[core];
     if (!cn) return [];
     const stem = path.parse(g.path).name, out = [];
-    const list = dir => { try { return fs.readdirSync(dir).filter(f => f.startsWith(stem + ".")).map(f => path.join(dir, f)); } catch { return []; } };
+    // this game's own: Name.srm, Name.state2.png — not "Name 3.srm", whose name only starts the same
+    const list = dir => { try { return fs.readdirSync(dir).filter(f => f.startsWith(stem + ".") && /^(\.[^.\s]+)+$/.test(f.slice(stem.length))).map(f => path.join(dir, f)); } catch { return []; } };
     const info = f => { try { const st = fs.statSync(f); return { file: f, size: st.size, at: Math.floor(st.mtimeMs / 1000) }; } catch { return null; } };
     for (const f of list(path.join(this.folders.saves, cn))) { const i = info(f); if (i) out.push({ kind: "battery", n: null, ...i, pic: false }); }
     for (const f of list(path.join(this.folders.states, cn))) {

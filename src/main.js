@@ -33,9 +33,15 @@ if (!HOME) {
     try { if (signs.some(f => fs.existsSync(path.join(from, f))) && !fs.existsSync(to)) { fs.renameSync(from, to); return true; } } catch {}
     return false;
   };
-  move(path.join(app.getPath("appData"), "Arcade"), app.getPath("userData"), ["settings.json", "state.json", "covers", "retroarch"]);
+  // only folders that are surely this app's: its settings (with their ui.accent), or the README it puts in its games
+  // folder. Someone else's "Arcade" folder stays where it is
+  const oldData = path.join(app.getPath("appData"), "Arcade"), oldDocs = path.join(app.getPath("documents"), "Arcade");
+  let ours = false, oursDocs = false;
+  try { const st = JSON.parse(fs.readFileSync(path.join(oldData, "settings.json"), "utf8")); ours = !!(st && st.ui && "accent" in st.ui); } catch {}
+  try { oursDocs = fs.readFileSync(path.join(oldDocs, "Games", "README.txt"), "utf8").startsWith("Your games go here, one folder per system"); } catch {}
+  if (ours) move(oldData, app.getPath("userData"), ["settings.json", "state.json", "covers", "retroarch"]);
   // games are known by their path, so their play history is moved over to the new paths once the backend is up
-  if (move(path.join(app.getPath("documents"), "Arcade"), DOCS, ["Games"])) OLD_GAMES = path.join(app.getPath("documents"), "Arcade", "Games");
+  if ((ours || oursDocs) && move(oldDocs, DOCS, ["Games"])) OLD_GAMES = path.join(oldDocs, "Games");
 }
 if (!app.requestSingleInstanceLock()) app.quit();
 const EMU = app.isPackaged ? path.join(process.resourcesPath, "emulators")

@@ -621,3 +621,22 @@ test("a state file cut short by a crash isn't replaced with an empty one: it's k
   assert.deepEqual(typeof jload(f, {}), "object");
   assert.deepEqual(jload(path.join(home, "none.json"), { x: 1 }), { x: 1 });
 });
+
+test("game files named like JavaScript's own words don't break the shelf", () => {
+  for (const n of ["constructor", "toString", "__proto__", "hasOwnProperty"]) put(`nes/${n}.nes`);
+  put("arcade/constructor.zip");
+  assert.doesNotThrow(() => be.scan());
+  assert.ok(byTitle("constructor"));
+});
+
+test("a game's saves and pictures are its own, not a sequel's whose name starts the same", () => {
+  put("nes/Super Mario Bros.nes"); put("nes/Super Mario Bros. 3.nes");
+  put("nes/Super Mario Bros.png"); put("nes/Super Mario Bros. 3.png"); put("nes/Super Mario Bros.logo.png");
+  be.scan();
+  const smb = byTitle("Super Mario Bros"), files = be.gameFiles(smb).files.map(f => path.basename(f)).sort();
+  assert.deepEqual(files, ["Super Mario Bros.logo.png", "Super Mario Bros.nes", "Super Mario Bros.png"]);
+  be.resumeAt = () => 0; be._coreNames = { fceumm_libretro: "FCEUmm" };
+  fs.mkdirSync(path.join(be.folders.saves, "FCEUmm"), { recursive: true });
+  for (const f of ["Super Mario Bros.srm", "Super Mario Bros. 3.srm"]) fs.writeFileSync(path.join(be.folders.saves, "FCEUmm", f), "s");
+  assert.deepEqual(be.gameSaves(smb).map(s => path.basename(s.file)), ["Super Mario Bros.srm"]);
+});
