@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Retro Shelf</title>
+<meta name="description" content="Your retro game collection as real boxes on a shelf. Emulators built in, games not included. Free for Mac, Windows and Linux, with no account and no tracking.">
+<meta property="og:title" content="The Retro Shelf">
+<meta property="og:description" content="Your retro game collection as real boxes on a shelf. Emulators built in. Games not included.">
+<meta property="og:image" content="https://colingalbraith.github.io/the-retro-shelf/images/selected.jpg">
+<meta property="og:type" content="website">
+<link rel="icon" href="images/icon.png">
+<style>
+/* the app's own look: a dark wall, wooden shelves, paper slips, orange label tape and brass plates */
+@font-face{font-family:"Plex Cond";src:url(fonts/plex-cond-400.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Plex Cond";src:url(fonts/plex-cond-600.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Plex Cond";src:url(fonts/plex-cond-700.woff2) format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"Plex Mono";src:url(fonts/plex-mono-400.woff2) format("woff2");font-weight:400;font-display:swap}
+:root{
+  --wall:#1e1c1a;--wall-hi:#272420;--chalk:#ddd6c8;--dust:#9a9285;
+  --paper:#ece6d6;--paper-hi:#f4efe3;--ink:#1c1916;--ink2:#5f584d;
+  --acc:#e2582b;--acc-ink:#b8401a;--w-front:#876041;--w-top:#a67b54;--w-shadow:#24170d;
+  --disp:"Plex Cond","IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --mono:"Plex Mono","IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{margin:0;background:linear-gradient(180deg,var(--wall-hi),var(--wall) 600px) var(--wall);color:var(--chalk);font:17px/1.5 var(--disp);-webkit-font-smoothing:antialiased}
+img{max-width:100%;display:block}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+
+/* top */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;font:700 20px/1 var(--disp);letter-spacing:.02em}
+.brand img{width:40px;height:40px}
+.top nav{display:flex;gap:6px 20px;flex-wrap:wrap;font-size:15px}
+.top nav a{text-decoration:none;color:var(--dust)}
+.top nav a:hover{color:var(--chalk)}
+
+/* the label tape and the brass plate, as on the shelves */
+.tape{display:inline-block;background:var(--acc);color:#fff;font:700 14px/1 var(--disp);letter-spacing:.16em;text-transform:uppercase;padding:8px 18px 7px;
+  text-shadow:0 1px 0 rgba(0,0,0,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.25),0 3px 6px rgba(0,0,0,.45);
+  clip-path:polygon(5px 0,calc(100% - 5px) 0,100% 50%,calc(100% - 5px) 100%,5px 100%,0 50%);transform:rotate(-1.2deg)}
+.plate{display:inline-flex;align-items:center;gap:7px;height:22px;padding:0 13px;white-space:nowrap;
+  background:linear-gradient(180deg,#cdb27a,#a88a52);color:#3a2c14;font:700 11.5px/1 var(--disp);letter-spacing:.12em;text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(255,240,200,.45);box-shadow:inset 0 1px 0 rgba(255,245,215,.55),inset 0 -1px 0 rgba(0,0,0,.25),0 1px 2px rgba(0,0,0,.5)}
+.plate::before,.plate::after{content:"";width:4px;height:4px;border-radius:50%;background:#7d6436;box-shadow:inset 0 1px 0 rgba(0,0,0,.4)}
+
+/* the opening: what it is, and the download */
+.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:40px;align-items:center;padding-block:36px 28px}
+.hero h1{font:700 clamp(36px,5.4vw,58px)/1.02 var(--disp);margin:0 0 18px;letter-spacing:-.01em;text-wrap:balance}
+.hero p{margin:0 0 12px;color:var(--chalk);max-width:52ch}
+.hero .quiet{color:var(--dust);font-size:15px}
+.slip{background:var(--paper);color:var(--ink);padding:30px 28px 24px;position:relative;transform:rotate(.6deg);box-shadow:0 14px 28px rgba(0,0,0,.5),0 2px 3px rgba(0,0,0,.4)}
+.slip::before{content:"";position:absolute;top:-9px;left:50%;width:18px;height:18px;margin-left:-9px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f08a74,#b8432c 60%,#7c2414);box-shadow:0 3px 4px rgba(0,0,0,.45)}
+.slip .tape{position:absolute;top:-14px;left:18px}
+.dl{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;margin:10px 0 14px;padding:16px 20px;border:0;background:var(--ink);color:var(--paper-hi);text-decoration:none;cursor:pointer;box-shadow:0 3px 0 #000}
+.dl:hover{background:#2c2722}
+.dl b{font:700 22px/1.1 var(--disp)}
+.dl small{font:13px/1.3 var(--mono);color:#bdb4a4}
+.slip .alt{font-size:15px;color:var(--ink2);margin:0 0 6px}
+.slip .alt a{color:var(--ink)}
+.slip details{margin-top:10px;font-size:15px}
+.slip summary{cursor:pointer;color:var(--ink2)}
+.slip ul{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px}
+.slip li a{color:var(--ink);font-weight:600}
+.slip li span{color:var(--ink2);font:13px var(--mono);margin-left:6px}
+.slip .fine{font:12.5px/1.4 var(--mono);color:var(--ink2);margin:14px 0 0}
+
+/* the moving picture, on a shelf */
+.stage{padding-block:12px 54px}
+.stage img{width:100%;border-radius:2px;box-shadow:0 18px 40px rgba(0,0,0,.55)}
+.plank{height:20px;margin:-2px -12px 0;background:linear-gradient(180deg,var(--w-top),var(--w-front) 30%,#6f4e34);box-shadow:0 10px 18px rgba(0,0,0,.55)}
+
+section{padding-block:44px}
+section > .wrap > h2{font:700 clamp(28px,3.6vw,38px)/1.1 var(--disp);margin:14px 0 8px;text-wrap:balance}
+section > .wrap > p.lead{color:var(--dust);margin:0 0 28px;max-width:62ch}
+
+/* opening it the first time */
+.tabs{display:inline-flex;border:1.5px solid var(--chalk);border-radius:2px;margin-bottom:18px}
+.tabs button{font:600 15px/1 var(--disp);background:none;border:0;color:var(--chalk);padding:9px 16px;cursor:pointer}
+.tabs button+button{border-left:1.5px solid var(--chalk)}
+.tabs button[aria-selected="true"]{background:var(--chalk);color:var(--wall)}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:12px;max-width:720px}
+.steps li{counter-increment:s;display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:start}
+.steps li::before{content:counter(s);font:700 15px/34px var(--mono);text-align:center;width:34px;height:34px;border-radius:50%;background:var(--paper);color:var(--ink)}
+.steps b{color:#fff}
+.after{color:var(--dust);margin:18px 0 0;max-width:62ch}
+
+/* what it does: pictures with their captions */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:34px 30px}
+.grid figure{margin:0}
+.grid img{width:100%;border-radius:2px;box-shadow:0 10px 24px rgba(0,0,0,.5)}
+.grid figcaption{margin-top:12px}
+.grid figcaption b{display:block;font:700 19px/1.25 var(--disp);color:#fff}
+.grid figcaption span{color:var(--dust);font-size:16px}
+.also{margin:44px 0 0;padding:26px 28px;background:var(--paper);color:var(--ink);transform:rotate(-.4deg);box-shadow:0 14px 28px rgba(0,0,0,.45)}
+.also h3{margin:0 0 12px;font:700 13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
+.also ul{margin:0;padding:0;list-style:none;columns:2;column-gap:36px}
+.also li{break-inside:avoid;padding:6px 0;border-bottom:1px dashed #cfc6b2;font-size:16px}
+.also li b{font-weight:700}
+
+/* consoles */
+.plates{display:flex;flex-wrap:wrap;gap:12px 10px;max-width:900px}
+.wood{margin-top:26px;padding:22px 20px;background:linear-gradient(180deg,#2a2622,#1d1b19);border-bottom:14px solid var(--w-front);box-shadow:0 12px 20px rgba(0,0,0,.5)}
+
+/* questions */
+.faq{display:grid;gap:10px;max-width:780px}
+.faq details{background:rgba(255,255,255,.035);border:1px solid rgba(221,214,200,.14);padding:14px 18px}
+.faq summary{cursor:pointer;font:600 18px/1.3 var(--disp);color:#fff}
+.faq details p{margin:10px 0 2px;color:var(--chalk);max-width:66ch}
+
+footer{padding-block:40px 56px;color:var(--dust);font-size:14.5px;border-top:1px solid rgba(221,214,200,.12);margin-top:30px}
+footer .links{display:flex;flex-wrap:wrap;gap:8px 22px;margin-bottom:14px}
+footer p{margin:6px 0;max-width:72ch}
+
+@media (max-width:820px){
+  .hero{grid-template-columns:1fr;gap:34px}
+  .grid{grid-template-columns:1fr}
+  .also ul{columns:1}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="wrap top">
+  <a class="brand" href="#"><img src="images/icon.png" alt="">The Retro Shelf</a>
+  <nav aria-label="On this page"><a href="#download">Download</a><a href="#features">What it does</a><a href="#consoles">Consoles</a><a href="#questions">Questions</a><a href="https://github.com/colingalbraith/the-retro-shelf">GitHub</a></nav>
+</div>
+
+<main>
+<div class="wrap hero" id="download">
+  <div>
+    <h1>Your retro games, as real boxes on a shelf.</h1>
+    <p>Drag your games onto the window and they land on the right shelf with their box art, ready to play with a keyboard or a controller. The emulators come inside the app, so there's nothing else to set up.</p>
+    <p class="quiet">Free for Mac, Windows and Linux. No account, no ads, no tracking. Games not included.</p>
+  </div>
+  <div class="slip">
+    <span class="tape">Download</span>
+    <a class="dl" id="dl" href="https://github.com/colingalbraith/the-retro-shelf/releases/latest">
+      <b id="dl-name">Download The Retro Shelf</b>
+      <small id="dl-info">From the releases page</small>
+    </a>
+    <p class="alt" id="dl-alt"></p>
+    <details>
+      <summary>Every download</summary>
+      <ul id="dl-all"></ul>
+    </details>
+    <p class="fine" id="dl-version"></p>
+  </div>
+</div>
+
+<div class="wrap stage">
+  <img src="images/demo.gif" width="840" height="525" alt="Moving along the shelf: boxes slide out when picked, turn over to show play history, and each console's games stand spines-out on their own shelf">
+  <div class="plank" aria-hidden="true"></div>
+</div>
+
+<section id="first">
+  <div class="wrap">
+    <span class="tape">The first time</span>
+    <h2>Opening it the first time</h2>
+    <p class="lead">The app isn't signed by Apple or Microsoft, so your computer asks once whether you trust it. After that it opens normally and updates itself.</p>
+    <div class="tabs" role="tablist" aria-label="Your computer">
+      <button role="tab" id="t-mac" aria-controls="p-mac">Mac</button><button role="tab" id="t-win" aria-controls="p-win">Windows</button><button role="tab" id="t-linux" aria-controls="p-linux">Linux and Steam Deck</button>
+    </div>
+    <div role="tabpanel" id="p-mac" aria-labelledby="t-mac">
+      <ol class="steps">
+        <li><span>Open the <b>.dmg</b> and drag The Retro Shelf into <b>Applications</b>.</span></li>
+        <li><span>Open it from Applications. macOS says it can't check the app: click <b>Done</b>.</span></li>
+        <li><span>Open <b>System Settings → Privacy &amp; Security</b> and scroll down to Security. Next to "The Retro Shelf was blocked to protect your Mac", click <b>Open Anyway</b> and confirm with your password or Touch ID.</span></li>
+        <li><span>Click <b>Open Anyway</b> once more when asked.</span></li>
+      </ol>
+    </div>
+    <div role="tabpanel" id="p-win" aria-labelledby="t-win" hidden>
+      <ol class="steps">
+        <li><span>Run the <b>Setup .exe</b> you downloaded.</span></li>
+        <li><span>If a blue "Windows protected your PC" box appears, click <b>More info</b>, then <b>Run anyway</b>.</span></li>
+        <li><span>It installs and opens by itself. For a USB stick, take the portable zip instead: unzip it anywhere and open The Retro Shelf inside. Games, saves and settings stay in its Data folder.</span></li>
+      </ol>
+    </div>
+    <div role="tabpanel" id="p-linux" aria-labelledby="t-linux" hidden>
+      <ol class="steps">
+        <li><span>Download the <b>.AppImage</b> and put it somewhere it can stay, like your home folder.</span></li>
+        <li><span>Right-click it, open <b>Properties</b> and allow it to run as a program (or run <code>chmod +x</code> on it).</span></li>
+        <li><span>Double-click it. On a Steam Deck, the <a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md">Steam Deck guide</a> adds it to Game Mode.</span></li>
+      </ol>
+    </div>
+    <p class="after">No games are included. The app's <b>Help → Where to Get Games</b> shows the legal ways to get them.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <span class="tape">What it does</span>
+    <h2>A game collection you'd want to look at</h2>
+    <p class="lead">Every console gets its own shelf and box style, with art, logos and details filled in for 38,000+ games.</p>
+    <div class="grid">
+      <figure><img src="images/selected.jpg" alt="A game pulled out of the shelf, among other games standing spines-out" loading="lazy"><figcaption><b>Pull a box out to play</b><span>Arrows or a controller to browse; each console's games stand spines-out on their own shelf.</span></figcaption></figure>
+      <figure><img src="images/back.jpg" alt="The back of a box: last played, playtime, progress, rating and a note" loading="lazy"><figcaption><b>Turn it over</b><span>When you last played, for how long, how far you are, your stars and a note of your own.</span></figcaption></figure>
+      <figure><img src="images/your-play.jpg" alt="The trophy shelf: the five most played games with brass plates showing their hours" loading="lazy"><figcaption><b>Your play</b><span>A trophy shelf of your most played games, and a time card stamped with the days you played.</span></figcaption></figure>
+      <figure><img src="images/recap.jpg" alt="A month's recap card with hours played, the most played games and the pins earned" loading="lazy"><figcaption><b>A recap every month</b><span>Your month or year of play on one card, to save as a picture and share.</span></figcaption></figure>
+      <figure><img src="images/collections.jpg" alt="Collections: the Zelda and Mario Kart series, with games not owned standing faded" loading="lazy"><figcaption><b>Collections</b><span>Every series your games belong to, with the ones you don't have yet standing faded.</span></figcaption></figure>
+      <figure><img src="images/pins.jpg" alt="A corkboard of pins: bronze and silver ones earned, faded ones still to earn" loading="lazy"><figcaption><b>208 pins to earn</b><span>From how you play: time, habits, finishing games, every console and famous series.</span></figcaption></figure>
+      <figure><img src="images/controller-test.jpg" alt="The controller test: an Xbox controller drawing with the A button lit up" loading="lazy"><figcaption><b>Controllers just work</b><span>Xbox, PlayStation, Switch Pro and more, with a button test and your own layout for each console.</span></figcaption></figure>
+      <figure><img src="images/time-card.jpg" alt="A paper time card with twelve weeks of days stamped in ink" loading="lazy"><figcaption><b>A time card</b><span>Twelve weeks of play, a stamp for each day; darker means longer.</span></figcaption></figure>
+    </div>
+    <div class="also">
+      <h3>And also</h3>
+      <ul>
+        <li><b>Rewind and fast-forward</b> on the triggers</li>
+        <li><b>An old TV's look,</b> or a handheld's screen</li>
+        <li><b>TV mode</b> for the couch, and the <b>Steam Deck</b></li>
+        <li><b>Watched folders:</b> new games appear by themselves</li>
+        <li><b>Saves backed up</b> every week, and shared between computers</li>
+        <li><b>Cheats</b> and <b>RetroAchievements</b></li>
+        <li><b>Games on several discs</b> in one box</li>
+        <li><b>Menu music,</b> five public-domain chiptunes</li>
+        <li><b>Ten languages,</b> bigger text and screen reader labels</li>
+        <li><b>Updates itself</b> in the background</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="consoles">
+  <div class="wrap">
+    <span class="tape">Consoles</span>
+    <h2>From the Atari 2600 to the GameCube</h2>
+    <p class="lead">Their emulators come with the app, inside RetroArch: nothing else to install. PlayStation 2 works too, with PCSX2 installed separately.</p>
+    <div class="wood"><div class="plates" id="plates"></div></div>
+  </div>
+</section>
+
+<section id="questions">
+  <div class="wrap">
+    <span class="tape">Questions</span>
+    <h2>Good to know</h2>
+    <div class="faq">
+      <details><summary>Where do I get games?</summary><p>No games are included, and the app doesn't link to sites that hand out commercial games. You can copy the cartridges and discs you own, play free homebrew, or buy official re-releases. The app's Help → Where to Get Games walks through each of these.</p></details>
+      <details><summary>Some consoles ask for a BIOS file. What's that?</summary><p>A small file from inside the console itself, which a few emulators need (Sega CD, Saturn, 3DO, ColecoVision and Intellivision). Copy it from your own console and drop it on the window: it goes in the right place. Settings → Saves &amp; BIOS shows what each console has. Most consoles don't need one, and MSX uses a free one that comes with the app.</p></details>
+      <details><summary>Which controllers work?</summary><p>Xbox, PlayStation and Switch Pro controllers, and most others. Settings → While you play → Your controller has a test that lights up every button, and lets you choose your own buttons for each console. Two controllers are numbered player 1 and 2 on screen.</p></details>
+      <details><summary>Does it work on a Steam Deck?</summary><p>Yes. Download the Linux AppImage in desktop mode, then add it to Steam with the <a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md">Steam Deck guide</a>. In Game Mode, TV mode makes everything work with the Deck's controls.</p></details>
+      <details><summary>Is it really free?</summary><p>Yes, and open source (GPL-3.0). There's no account, no ads and no tracking, and nothing about your games leaves your computer. Some of the emulators inside are for non-commercial use only, so the app can never be sold.</p></details>
+      <details><summary>Why does my computer warn me about it?</summary><p>Apps from Apple and Microsoft's paid developer programs are signed, and this one isn't. Your computer asks once; the steps above get you past it. After that it opens normally, and updates install without asking again.</p></details>
+      <details><summary>How do updates work?</summary><p>The app checks in the background and downloads a new version by itself. It's put in place when you restart. To try new features early, turn on Settings → App → Get test versions.</p></details>
+      <details><summary>Something isn't working</summary><p>Tell us on <a href="https://github.com/colingalbraith/the-retro-shelf/issues">GitHub</a>. Settings → App → Copy info puts what helps track it down on your clipboard.</p></details>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="links"><a href="https://github.com/colingalbraith/the-retro-shelf">Source on GitHub</a><a href="https://github.com/colingalbraith/the-retro-shelf/releases">All releases</a><a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a><a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/LICENSE">License (GPL-3.0)</a></div>
+    <p>The emulators keep their own licenses. Box art comes from libretro-thumbnails and belongs to its owners. The Retro Shelf isn't affiliated with any console maker.</p>
+    <p>This page uses no cookies and no analytics.</p>
+  </div>
+</footer>
+
+<script>
+/* the latest release's files, written in when the site is built (scripts/site.mjs); null if that couldn't be found */
+const LATEST = /*LATEST*/null;
+const CONSOLES = ["NES", "SNES", "Game Boy", "Game Boy Color", "Game Boy Advance", "Genesis / Mega Drive", "Sega CD", "32X", "Saturn", "Master System",
+  "Game Gear", "SG-1000", "PC Engine", "Atari 2600", "Atari 7800", "Atari Lynx", "ColecoVision", "Intellivision", "Vectrex", "MSX", "Nintendo 64",
+  "Nintendo DS", "PlayStation", "PSP", "Dreamcast", "GameCube", "Wii", "3DO", "Neo Geo CD", "Neo Geo Pocket", "WonderSwan", "Virtual Boy", "Pokémon Mini", "Arcade"];
+const $ = id => document.getElementById(id);
+const mb = n => Math.round(n / 1048576) + " MB";
+
+/* which computer this is: Mac (and which chip, when the browser says), Windows, Linux, or something else */
+function computer() {
+  const ua = navigator.userAgent, plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  if (/Android|iPhone|iPad|iPod|CrOS/i.test(ua) || (/Mac/i.test(plat) && navigator.maxTouchPoints > 1)) return "other";
+  if (/Mac/i.test(plat)) return "mac";
+  if (/Win/i.test(plat)) return "win";
+  if (/Linux/i.test(plat)) return "linux";
+  return "other";
+}
+function graphics() {
+  try { const gl = document.createElement("canvas").getContext("webgl"), x = gl && gl.getExtension("WEBGL_debug_renderer_info"); return x ? String(gl.getParameter(x.UNMASKED_RENDERER_WEBGL)) : ""; } catch (e) { return ""; }
+}
+async function macChip() {
+  try { if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) { const a = (await navigator.userAgentData.getHighEntropyValues(["architecture"])).architecture; if (a === "arm") return "arm64"; if (a === "x86") return "x64"; } } catch (e) {}
+  const g = graphics();
+  if (/Apple M\d/i.test(g)) return "arm64";
+  if (/Intel|AMD|Radeon|NVIDIA/i.test(g)) return "x64";
+  return "";   // not said: most Macs since 2020 are Apple silicon
+}
+
+const FILES = [
+  ["mac_arm64", "Mac with Apple silicon (M1 and newer)", ".dmg"],
+  ["mac_x64", "Mac with Intel", ".dmg"],
+  ["win", "Windows 10 and 11", "installer"],
+  ["portable", "Windows, portable (for a USB stick)", ".zip"],
+  ["linux", "Linux and Steam Deck (64-bit)", ".AppImage"],
+];
+function link(key) { const f = LATEST && LATEST.files[key]; return f ? f.url : "https://github.com/colingalbraith/the-retro-shelf/releases/latest"; }
+function info(key, what) { const f = LATEST && LATEST.files[key]; return [what, LATEST ? LATEST.version : "", f ? mb(f.size) : ""].filter(Boolean).join(" · "); }
+
+async function download() {
+  const os = computer(), chip = os === "mac" ? await macChip() : "";
+  const key = os === "mac" ? (chip === "x64" ? "mac_x64" : "mac_arm64") : os === "win" ? "win" : os === "linux" ? "linux" : "";
+  if (key) {
+    $("dl").href = link(key);
+    $("dl-name").textContent = { mac: "Download for Mac", win: "Download for Windows", linux: "Download for Linux" }[os];
+    $("dl-info").textContent = info(key, { mac_arm64: "Apple silicon", mac_x64: "Intel", win: "Windows 10 and 11", linux: "AppImage, Steam Deck too" }[key]);
+  } else {
+    $("dl-name").textContent = "For Mac, Windows and Linux";
+    $("dl-info").textContent = "Open this page on your computer to download";
+  }
+  const alt = $("dl-alt");
+  if (os === "mac") {
+    const other = key === "mac_arm64" ? "mac_x64" : "mac_arm64";
+    alt.append(key === "mac_arm64" ? "Mac with Intel? " : "Mac with Apple silicon? ");
+    const a = document.createElement("a"); a.href = link(other); a.textContent = "Get that one instead"; alt.append(a);
+    alt.append(". Not sure? Apple menu → About This Mac: “Chip” means Apple silicon, “Processor” means Intel.");
+  } else if (os === "win") {
+    alt.append("For a USB stick: "); const a = document.createElement("a"); a.href = link("portable"); a.textContent = "the portable zip"; alt.append(a, ".");
+  } else if (os === "linux") {
+    alt.append("On a Steam Deck? "); const a = document.createElement("a"); a.href = "https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md"; a.textContent = "The Steam Deck guide"; alt.append(a, " adds it to Game Mode.");
+  } else alt.hidden = true;
+  for (const [k, label, kind] of FILES) {
+    const li = document.createElement("li"), a = document.createElement("a"), s = document.createElement("span");
+    a.href = link(k); a.textContent = label; s.textContent = [kind, LATEST && LATEST.files[k] ? mb(LATEST.files[k].size) : ""].filter(Boolean).join(" · ");
+    li.append(a, s); $("dl-all").append(li);
+  }
+  $("dl-version").textContent = LATEST ? `Version ${LATEST.version}, ${new Date(LATEST.date).toLocaleDateString(undefined, {month: "long", day: "numeric", year: "numeric"})}. Updates itself after this.` : "Updates itself after this.";
+  showTab(os === "other" ? "mac" : os);
+}
+
+/* the first-time steps for each computer, as tabs */
+const TABS = ["mac", "win", "linux"];
+function showTab(k) {
+  for (const t of TABS) { const on = t === k; $("t-" + t).setAttribute("aria-selected", on); $("t-" + t).tabIndex = on ? 0 : -1; $("p-" + t).hidden = !on; }
+}
+TABS.forEach((t, i) => {
+  $("t-" + t).addEventListener("click", () => showTab(t));
+  $("t-" + t).addEventListener("keydown", e => {
+    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (d) { const n = TABS[(i + d + TABS.length) % TABS.length]; showTab(n); $("t-" + n).focus(); }
+  });
+});
+
+for (const c of CONSOLES) { const p = document.createElement("span"); p.className = "plate"; p.textContent = c; $("plates").append(p); }
+download();
+</script>
+</body>
+</html>
