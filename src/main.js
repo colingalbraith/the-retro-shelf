@@ -6,7 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { Backend, GAME_CHOICES } = require("./backend");
 const { Updater } = require("./updater");
-const { zipFolder, unzipInto, filesIn } = require("./zip");
+const { zipFolder, zipFiles, unzipInto, filesIn } = require("./zip");
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "arcade", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -233,6 +233,18 @@ function ipc() {
   ipcMain.handle("reveal-game", (_, id) => { const g = backend.games.get(String(id)); if (g) shell.showItemInFolder(g.path); });
   ipcMain.handle("game-menu", (_, id) => gameMenu(String(id)));
   ipcMain.handle("open-url", (_, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
+  // one game's saves, in one .zip
+  ipcMain.handle("export-saves", async (_, id) => {
+    const g = backend.games.get(String(id));
+    if (!g) return { ok: false, error: "Unknown game." };
+    const files = backend.gameSaves(g);
+    if (!files.length) return { ok: false, error: "This game has no saves yet." };
+    const r = await dialog.showSaveDialog(win, { title: "Export saves", buttonLabel: "Export",
+      defaultPath: path.join(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves.zip`), filters: [{ name: "Zip archive", extensions: ["zip"] }] });
+    if (r.canceled || !r.filePath) return { ok: false };
+    const list = files.flatMap(s => [s.file, ...(s.pic ? [s.file + ".png"] : [])]).map(f => ({ name: path.basename(f), full: f }));
+    try { return { ok: true, count: await zipFiles(list, r.filePath) }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
+  });
   // a folder of games to show where it is, without copying
   ipcMain.handle("watch-folder", async () => {
     const r = await dialog.showOpenDialog(win, { title: "Watch a folder of games", buttonLabel: "Watch", properties: ["openDirectory"] });
@@ -281,6 +293,7 @@ app.on("web-contents-created", (_, wc) => {
 app.whenReady().then(() => {
   if (!app.isPackaged && process.platform === "darwin") app.dock.setIcon(DEV_ICON);
   backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion() }, fetchUrl);
+  backend.trash = p => shell.trashItem(p);
   backend.init();
   if (OLD_GAMES) backend.remapIds(OLD_GAMES);
   backend.on("exit", () => setTimeout(focusApp, 150));

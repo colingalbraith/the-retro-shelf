@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("arcade", {
   update: what => ipcRenderer.invoke("update", what),
   backupSaves: () => ipcRenderer.invoke("backup-saves"),
   watchFolder: () => ipcRenderer.invoke("watch-folder"),
+  exportSaves: id => ipcRenderer.invoke("export-saves", id),
   restoreSaves: () => ipcRenderer.invoke("restore-saves"),
   copyReport: () => ipcRenderer.invoke("copy-report"),
   tvMode: on => ipcRenderer.invoke("tv-mode", !!on),

@@ -453,6 +453,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 #lstl .lrow span{flex:1;min-width:0;font:500 15px var(--disp);color:var(--ink);overflow-wrap:anywhere}
 #lstl .lrow small{display:block;color:var(--ink2);font-size:12.5px;font-weight:400}
 #lstl .lrow .btn{padding:6px 10px;font-size:13px}
+#lstl .lrow img{flex:none;width:72px;aspect-ratio:4/3;object-fit:cover;background:#141312;border:1px solid rgba(28,25,22,.3)}
 /* a game's cheats: a box to tick for each */
 #cheatl{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15);scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
 #cheatl button{display:flex;width:100%;gap:12px;align-items:baseline;padding:9px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.1);background:none;text-align:left;color:var(--ink);font:500 15px var(--disp)}
@@ -1251,6 +1252,7 @@ function fillBack(c, g) {
   const fine = el("div", "fine", "Enter play · F favorite · Space turn back");
   const link = (t, fn) => { const u = el("u", "", t); u.onclick = e => { e.stopPropagation(); fn(); }; fine.appendChild(document.createTextNode(" · ")); fine.appendChild(u); };
   link("More…", () => APP.gameMenu(g.id));
+  if (g.plays && cons(g.system).builtin && !PATHS.own) link(t("Saves…"), () => openSaves(g.id));
   link(g.cv ? "Change cover" : "Find cover art", () => openPicker(g.id));
   inn.appendChild(fine);
   const bar = el("div", "bar"); bar.appendChild(el("i", "", g.id.slice(0, 8).toUpperCase())); inn.appendChild(bar);
@@ -1847,6 +1849,7 @@ function openOpts(sub) {
       item(g.progress ? t("Progress: {p}…", {p: t(PROGRESS[g.progress])}) : t("Progress…"), () => setTimeout(() => openOpts("progress"), 30));
       item(g.rating ? t("Rating: {s}…", {s: stars(g.rating)}) : t("Rate it…"), () => setTimeout(() => openOpts("rating"), 30));
       item(g.note ? t("Edit note…") : t("Add a note…"), () => openNote(g.id));
+      if (cons(g.system).builtin && !PATHS.own) item(t("Saves…"), () => openSaves(g.id));
       item(t("Picture…"), () => setTimeout(() => openOpts("picture"), 30));
       item(t("Screen shape…"), () => setTimeout(() => openOpts("shape"), 30));
       if (cons(g.system).builtin && !PATHS.own) item(g.cheats ? t("Cheats ({n} on)…", {n: g.cheats}) : t("Cheats…"), () => openCheats(g.id));
@@ -2149,8 +2152,9 @@ function openList(title, about, fill) {
 function closeList() { if (!isOpen("lst")) return; $("#lst").classList.remove("show"); listFill = null; focusById(focusId); light(); beep(330); }
 const redrawList = () => { if (listFill) { const l = $("#lstl"), refocus = keepFocus(l); clear(l); listFill(l); refocus(); } };
 $("#lstok").onclick = closeList;
-function listRow(list, label, sub, buttons) {
+function listRow(list, label, sub, buttons, pic) {
   const r = el("div", "lrow"), s = el("span", "", label);
+  if (pic) { const im = new Image(); im.alt = ""; im.src = pic; im.onerror = () => im.remove(); r.appendChild(im); }
   if (sub) s.appendChild(el("small", "", sub));
   r.appendChild(s);
   for (const [text, fn] of buttons) { const b = el("button", "btn", text); b.onclick = fn; r.appendChild(b); }
@@ -2167,6 +2171,30 @@ async function openUnsure() {
       if (!a.ok) return toast(a.data.error || t("Couldn't do that."), true);
       files = files.filter(x => x !== f); await refresh(true); redrawList();
     }]));
+  });
+}
+/* one game's saves: its own save, where you left off, and numbered saves, each to start from or put in the Trash */
+async function openSaves(id) {
+  const g = byId.get(id); if (!g) return;
+  let saves = [];
+  const load = async () => { const r = await api("/api/saves/list", {id}); saves = r.ok ? r.data.saves : []; };
+  await load();
+  const trash = s => async () => {
+    const r = await api("/api/saves/trash", {id, file: s.file});
+    if (!r.ok) return toast(r.data.error || t("Couldn't move it to the Trash."), true);
+    toast(t("Moved to the Trash. It can come back from there.")); await load(); await refresh(true); redrawList();
+  };
+  openList(t("Saves for {title}", {title: g.title}), t("Everything the emulator has saved for this game. The Trash keeps what you move there, in case."), list => {
+    if (!saves.length) return list.appendChild(el("p", "", t("No saves yet. They appear here once you've played.")));
+    listRow(list, t("All of them"), plural(saves.length, "file", "files"), [[t("Export…"), async () => {
+      const r = await APP.exportSaves(id); if (r && r.ok) toast(t("Exported {n}.", {n: plural(r.count, "file", "files")})); else if (r && r.error) toast(r.error, true);
+    }]]);
+    for (const s of saves) {
+      const when = fmtWhen(s.at) + " · " + fmtSize(s.size), label = s.kind === "battery" ? t("The game's own save") + " (" + s.name.split(".").pop() + ")"
+        : s.kind === "resume" ? t("Where you left off") : t("Save {n}", {n: s.n});
+      const buttons = s.kind === "battery" ? [] : [[s.kind === "resume" ? t("Continue") : t("Start here"), () => { closeList(); play(g, s.kind === "resume" ? {} : {slot: s.n}); }]];
+      listRow(list, label, when, [...buttons, [t("Move to the Trash"), trash(s)]], s.pic ? "/state/" + id + "/" + (s.kind === "resume" ? "auto" : s.n) + "?v=" + s.at : "");
+    }
   });
 }
 /* hidden games, to bring back */

@@ -159,6 +159,8 @@ class Backend extends EventEmitter {
     this.games = new Map();
     this.running = null;
     this.lastExit = null;
+    // moving a file to the system Trash: the app hands this in (Electron's shell), so nothing is ever deleted for good
+    this.trash = async () => { throw new Error("there's no Trash to move it to"); };
     this.cov = { running: false, done: 0, total: 0, found: 0, error: "" };
     this.imp = { running: false, done: 0, total: 0, current: "", added: 0, already: 0, failed: 0, error: "", seq: 0 };
     this.pending = new Map();
@@ -1496,6 +1498,40 @@ class Backend extends EventEmitter {
     if (!this._blank.has(key)) this._blank.set(key, flatPng(fs.readFileSync(file)));
     return this._blank.get(key);
   }
+  /**
+   * One game's saves, as files: its battery save (and whatever else its emulator keeps beside it), its resume point
+   * and numbered saves, with their pictures. [{kind: battery|resume|slot, n, file, size, at, pic}], newest first
+   * within each kind.
+   */
+  gameSaves(g) {
+    this.resumeAt(g);                                    // looks up the emulator's name, which names its save folders
+    const core = this.cfg.systems[g.system].core, cn = core && this._coreNames && this._coreNames[core];
+    if (!cn) return [];
+    const stem = path.parse(g.path).name, out = [];
+    const list = dir => { try { return fs.readdirSync(dir).filter(f => f.startsWith(stem + ".")).map(f => path.join(dir, f)); } catch { return []; } };
+    const info = f => { try { const st = fs.statSync(f); return { file: f, size: st.size, at: Math.floor(st.mtimeMs / 1000) }; } catch { return null; } };
+    for (const f of list(path.join(this.folders.saves, cn))) { const i = info(f); if (i) out.push({ kind: "battery", n: null, ...i, pic: false }); }
+    for (const f of list(path.join(this.folders.states, cn))) {
+      const rest = f.slice(path.join(this.folders.states, cn, stem).length), m = /^\.state(\d?)(\.auto)?$/.exec(rest);
+      if (!m) continue;
+      const i = info(f); if (!i) continue;
+      out.push({ kind: m[2] ? "resume" : "slot", n: m[2] ? null : +(m[1] || 0), ...i, pic: fs.existsSync(f + ".png") && !this.blankPic(f + ".png") });
+    }
+    return out.sort((a, b) => ["battery", "resume", "slot"].indexOf(a.kind) - ["battery", "resume", "slot"].indexOf(b.kind) || (a.n ?? 0) - (b.n ?? 0));
+  }
+  /** one of a game's save files to the Trash (with its picture): never deleted for good, so it can come back */
+  async trashSave(id, file) {
+    const g = this.games.get(id);
+    if (!g) return [404, { error: "Unknown game." }];
+    const s = this.gameSaves(g).find(x => x.file === file);
+    if (!s) return [404, { error: "That isn't one of this game's saves." }];
+    try {
+      await this.trash(file);
+      if (fs.existsSync(file + ".png")) await this.trash(file + ".png");
+    } catch (e) { return [500, { error: "Couldn't move it to the Trash: " + e.message }]; }
+    return [200, { ok: true }];
+  }
+
   /** the picture RetroArch saved with a resume point ("auto") or slot */
   statePic(g, which) {
     const core = this.cfg.systems[g.system].core, cn = core && this._coreNames && this._coreNames[core];
@@ -1604,6 +1640,8 @@ class Backend extends EventEmitter {
       case "/api/games/search": return j(this.gameSearch(d.q));
       case "/api/game/opts": return j(this.setGameOpts(String(d.id || ""), d.opts));
       case "/api/game/info": return j(this.setGameInfo(String(d.id || ""), d));
+      case "/api/saves/list": { const g = this.games.get(String(d.id || "")); return j(g ? [200, { saves: this.gameSaves(g).map(({ file, ...x }) => ({ ...x, name: path.basename(file), file })) }] : [404, { error: "Unknown game." }]); }
+      case "/api/saves/trash": return j(await this.trashSave(String(d.id || ""), String(d.file || "")));
       case "/api/retroarch/find": { const games = this.retroArchGames(); return j([200, { games: games.length, consoles: [...new Set(games.map(g => g.system))] }]); }
       case "/api/retroarch/import": return j(this.importRetroArch());
       case "/api/watch/add": return j(this.addWatch(String(d.dir || "")));

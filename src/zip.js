@@ -35,16 +35,22 @@ const deflate = util.promisify(zlib.deflateRaw), inflate = util.promisify(zlib.i
  * puts the folder back. Returns how many files went in. Works a file at a time without holding up the app.
  */
 async function zipFolder(dir, out) {
-  const top = path.basename(dir), files = filesIn(dir), central = [];
-  if (files.length > 0xffff) throw new Error(TOO_BIG);
+  const top = path.basename(dir);
+  return zipFiles(filesIn(dir).map(rel => ({ name: top + "/" + rel, full: path.join(dir, ...rel.split("/")) })), out);
+}
+
+/** Zips these files ({name in the zip, full path}) into the file out. Returns how many went in. */
+async function zipFiles(list, out) {
+  const central = [];
+  if (list.length > 0xffff) throw new Error(TOO_BIG);
   const tmp = out + ".part", fh = await fsp.open(tmp, "w");
   let offset = 0;
   const write = async b => { await fh.write(b); offset += b.length; };
   try {
-    for (const rel of files) {
-      const full = path.join(dir, ...rel.split("/")), data = await fsp.readFile(full), st = await fsp.stat(full);
+    for (const { name: entry, full } of list) {
+      const data = await fsp.readFile(full), st = await fsp.stat(full);
       const packed = await deflate(data), stored = packed.length >= data.length;
-      const body = stored ? data : packed, name = Buffer.from(top + "/" + rel, "utf8"), crc = zlib.crc32(data), t = dosTime(st.mtime);
+      const body = stored ? data : packed, name = Buffer.from(entry, "utf8"), crc = zlib.crc32(data), t = dosTime(st.mtime);
       if (offset + 30 + name.length + body.length > MAX) throw new Error(TOO_BIG);
       const head = Buffer.alloc(30);
       head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(20, 4); head.writeUInt16LE(0x0800, 6); head.writeUInt16LE(stored ? 0 : 8, 8);
@@ -61,7 +67,7 @@ async function zipFolder(dir, out) {
     const cd = Buffer.concat(central), end = Buffer.alloc(22), start = offset;
     if (start + cd.length > MAX) throw new Error(TOO_BIG);
     await write(cd);
-    end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10);
+    end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(list.length, 8); end.writeUInt16LE(list.length, 10);
     end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(start, 16);
     await write(end);
     await fh.close();
@@ -71,7 +77,7 @@ async function zipFolder(dir, out) {
     throw e;
   }
   await fsp.rename(tmp, out);
-  return files.length;
+  return list.length;
 }
 
 /**
@@ -160,4 +166,4 @@ async function readEntry(file, entry) {
   } finally { await fh.close(); }
 }
 
-module.exports = { zipFolder, unzipInto, filesIn, entries, readEntry };
+module.exports = { zipFolder, zipFiles, unzipInto, filesIn, entries, readEntry };

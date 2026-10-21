@@ -410,3 +410,21 @@ test("games from RetroArch's playlists come in on their playlist's console, wher
   const got = [...be.games.values()].filter(g => g.watched).map(g => [g.title, g.system]).sort();
   assert.deepEqual(got, [["Chrono Trigger", "SNES"], ["Streets of Rage 2", "Genesis"]]);
 });
+
+test("a game's saves: its battery save, resume point and numbered saves, each to the Trash on its own", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const g = byTitle("Chrono Trigger");
+  be.resumeAt = () => 0; be._coreNames = { snes9x_libretro: "Snes9x" };
+  const sv = path.join(be.folders.saves, "Snes9x"), st = path.join(be.folders.states, "Snes9x");
+  fs.mkdirSync(sv, { recursive: true }); fs.mkdirSync(st, { recursive: true });
+  for (const f of ["Chrono Trigger (USA).srm"]) fs.writeFileSync(path.join(sv, f), "battery");
+  for (const f of ["Chrono Trigger (USA).state.auto", "Chrono Trigger (USA).state", "Chrono Trigger (USA).state3", "Chrono Trigger (USA) Rev 1.state"]) fs.writeFileSync(path.join(st, f), "state");
+  const saves = be.gameSaves(g);
+  assert.deepEqual(saves.map(s => [s.kind, s.n]), [["battery", null], ["resume", null], ["slot", 0], ["slot", 3]]);   // not another game's
+  const trashed = [];
+  be.trash = async p => { trashed.push(path.basename(p)); fs.rmSync(p); };
+  assert.equal((await be.route("POST", "/api/saves/trash", { id: g.id, file: path.join(st, "Chrono Trigger (USA).state3") })).code, 200);
+  assert.equal((await be.route("POST", "/api/saves/trash", { id: g.id, file: path.join(home, "elsewhere.txt") })).code, 404);   // only its own saves
+  assert.deepEqual(trashed, ["Chrono Trigger (USA).state3"]);
+  assert.equal(be.gameSaves(g).length, 3);
+});

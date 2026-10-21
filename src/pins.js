@@ -129,7 +129,7 @@ const STATIC = [
   { key: "complete5", title: "Set Collector", desc: "Have every game in five series.", tier: "gold", icon: "✔", cat: "collecting", test: c => [c.completeSeries, 5] },
   { key: "complete10", title: "Box Set", desc: "Have every game in ten series.", tier: "gold", icon: "✔", cat: "collecting", test: c => [c.completeSeries, 10] },
   // making it yours (firsts the app records)
-  { key: "crt", title: "Old TV", desc: "Play with the CRT picture.", tier: "bronze", icon: "▭", cat: "app", test: c => !!c.events.crt },
+  { key: "crt", title: "Old TV", desc: "Play with the old-TV picture.", tier: "bronze", icon: "▭", cat: "app", test: c => !!c.events.crt },
   { key: "tv", title: "Couch Mode", desc: "Play a game in TV mode.", tier: "bronze", icon: "▢", cat: "app", test: c => !!c.events.tv },
   { key: "backup", title: "Safe Keeping", desc: "Back up your saves.", tier: "bronze", icon: "⛁", cat: "app", test: c => !!c.events.backup },
   { key: "bios", title: "Ready to Boot", desc: "Add a BIOS file from your own console.", tier: "bronze", icon: "⌁", cat: "app", test: c => c.bios },
