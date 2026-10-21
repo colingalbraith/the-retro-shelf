@@ -71,7 +71,8 @@ async function page() {
         ws.onmessage = m => { const d = JSON.parse(m.data); if (pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); } };
         ws.onclose = () => { for (const f of pending.values()) f({ result: { result: { value: null } } }); pending.clear(); };
         const evaluate = expr => new Promise(r => { const n = ++id; pending.set(n, r); ws.send(JSON.stringify({ id: n, method: "Runtime.evaluate", params: { expression: expr, awaitPromise: true, returnByValue: true } })); })
-          .then(d => d.result && d.result.result ? d.result.result.value : null);
+          .then(d => d.result && d.result.exceptionDetails ? { error: d.result.exceptionDetails.exception?.description || d.result.exceptionDetails.text }
+            : d.result && d.result.result ? d.result.result.value : null);
         return { ws, evaluate };
       }
     } catch {}
@@ -147,7 +148,13 @@ try {
   await sleep(1500);
   // the old app answers once it has started (on a slow machine's first launch that's a while after the window opens)
   let s = null;
-  for (let i = 0; i < 60 && !(s && s.status); i++) { s = await p.evaluate(`APP.update("check").catch(() => null)`); if (!(s && s.status)) await sleep(1000); }
+  let why = "";
+  for (let i = 0; i < 60 && !(s && s.status); i++) {
+    s = await p.evaluate(`APP.update("check")`);
+    if (s && s.error && !s.status) { why = s.error; s = null; }
+    if (!(s && s.status)) await sleep(1000);
+  }
+  if (!s && why) throw new Error("the old app couldn't check: " + why);
   const end = Date.now() + 5 * 60000;
   while (s && ["checking", "downloading"].includes(s.status) && Date.now() < end) { await sleep(1000); s = await p.evaluate(`APP.update("state")`); }
   if (!s || s.status !== "ready") throw new Error(`the update didn't download: ${JSON.stringify(s)}`);
