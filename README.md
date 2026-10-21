@@ -6,7 +6,8 @@
 
 <p align="center">
   Your retro game collection as real boxes on a shelf.<br>
-  Emulators built in. Games not included.
+  Emulators built in. Games not included.<br>
+  <a href="https://colingalbraith.github.io/the-retro-shelf/"><b>Download it from the website</b></a>
 </p>
 
 <p align="center">
@@ -76,7 +77,7 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 
 ## Download
 
-Grab the latest version from [Releases](https://github.com/colingalbraith/the-retro-shelf/releases):
+The easiest way is the [website](https://colingalbraith.github.io/the-retro-shelf/): its button picks the right file for your computer. Or grab one from [Releases](https://github.com/colingalbraith/the-retro-shelf/releases):
 
 - **Mac with Apple silicon** (M1 and newer): `mac-arm64.dmg`. **Mac with Intel**: `mac-x64.dmg`. Open it and drag
   The Retro Shelf into Applications. Not sure which Mac you have? Apple menu → About This Mac: "Chip" means
