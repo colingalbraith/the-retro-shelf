@@ -232,7 +232,9 @@ class Backend extends EventEmitter {
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
     // saves somewhere of your own (a cloud folder, to share them between computers)
-    if (this.paths.saves_dir && fs.existsSync(this.paths.saves_dir)) { this.folders.saves = this.paths.saves_dir; this.folders.states = path.join(this.paths.saves_dir, "States"); }
+    // kept even while it isn't there (a cloud drive not started yet): games wait for it, rather than playing on with old
+    // saves from before it was shared
+    if (this.paths.saves_dir) { this.folders.saves = this.paths.saves_dir; this.folders.states = path.join(this.paths.saves_dir, "States"); }
     this.ra = ra.bundled(this.dirs.emu);
     this.names = { arcade: jload(path.join(this.dirs.app, "data", "arcade-names.json"), {}) };
     this.importer = new Importer(this.cfg.systems);
@@ -650,7 +652,7 @@ class Backend extends EventEmitter {
   async moveSaves(dir) {
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
     const to = dir ? path.join(path.resolve(String(dir)), "The Retro Shelf Saves") : path.join(this.dirs.docs, "Saves"), from = this.folders.saves;
-    if (path.resolve(to) === path.resolve(from)) return [200, { ok: true, copied: 0 }];
+    if (path.resolve(to) === path.resolve(from)) { if (!dir && this.paths.saves_dir) { this.paths.saves_dir = ""; this.saveSettings(); } return [200, { ok: true, copied: 0 }]; }
     if (within(to, from)) return [400, { error: "That's inside the saves folder already." }];
     let copied = 0;
     try {
@@ -918,6 +920,9 @@ class Backend extends EventEmitter {
     try { return await this.launchNow(g, id, opts); } finally { this.launching = false; }
   }
   async launchNow(g, id, opts) {
+    // saves shared through a cloud folder that isn't there right now: playing would start from old saves, or none
+    if (this.paths.saves_dir && !fs.existsSync(this.paths.saves_dir))
+      return [409, { error: `Your saves folder isn't there right now (${this.paths.saves_dir}). Open iCloud Drive, Dropbox or OneDrive so it's back, then play.` }];
     let built;
     // chosen cheats, written for the built-in RetroArch to switch on as the game starts
     const cheats = !this.ownEmu() && !this.cfg.systems[g.system].emulator ? await this.writeCheats(g).catch(() => false) : false;
@@ -996,10 +1001,19 @@ class Backend extends EventEmitter {
   // ---------------------------------------------------------------- per-game changes
   /** stats belong to a game's id (its path); when the file moves they move with it */
   moveStats(from, to) {
+    if (from === to) return;
     const st = this.state;
-    for (const k of ["last", "plays", "time", "names", "gameOpts", "cheats", "progress", "rating", "notes"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
-    for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(from); if (i >= 0) st[k][i] = to; }
-    for (const sh of st.shelves) { const i = sh.ids.indexOf(from); if (i >= 0) sh.ids[i] = to; }
+    // added to what the game already has there, never over it: plays and time add up, the latest play counts, and
+    // its own name, settings and notes stay
+    for (const k of ["last", "plays", "time", "names", "gameOpts", "cheats", "progress", "rating", "notes"]) {
+      if (!(from in st[k])) continue;
+      if (!(to in st[k])) st[k][to] = st[k][from];
+      else if (k === "plays" || k === "time") st[k][to] += st[k][from];
+      else if (k === "last") st[k][to] = Math.max(st[k][to], st[k][from]);
+      delete st[k][from];
+    }
+    for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(from); if (i >= 0) { if (st[k].includes(to)) st[k].splice(i, 1); else st[k][i] = to; } }
+    for (const sh of st.shelves) { const i = sh.ids.indexOf(from); if (i >= 0) { if (sh.ids.includes(to)) sh.ids.splice(i, 1); else sh.ids[i] = to; } }
     for (const ses of st.sessions) if (ses[0] === from) ses[0] = to;
   }
 
@@ -1773,7 +1787,7 @@ class Backend extends EventEmitter {
     }
     const p = data.paths;
     if (p && typeof p === "object") {
-      const r = this.cfg.retroarch;
+      const r = this.cfg.retroarch, oldRoot = path.resolve(this.romsRoot());
       if ("roms_dir" in p) {
         const v = unquote(p.roms_dir);
         this.paths.roms_dir = !v || path.resolve(v) === this.folders.games ? "" : v;
@@ -1784,6 +1798,9 @@ class Backend extends EventEmitter {
       if ("args" in p) r.args = splitArgs(String(p.args));
       if ("exe" in p || "cores_dir" in p || "args" in p) this.saveUserCfg();
       this.scan();
+      // a games folder moved by hand, or a drive back with another letter: games are known by their path, so their
+      // history follows them by where they sit in the folder
+      if (path.resolve(this.romsRoot()) !== oldRoot) this.remapIds(oldRoot);
     }
   }
 

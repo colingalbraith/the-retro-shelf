@@ -667,3 +667,16 @@ test("cheats: a cheat file made in RetroArch's menu is left alone, and a downloa
   assert.equal(await be.writeCheats(g), true);
   assert.match(fs.readFileSync(target, "utf8"), /^# Cheats chosen in The Retro Shelf/);
 });
+
+test("pointing Settings at the games folder in its new place keeps every game's history", async () => {
+  const f = put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const old = byTitle("Chrono Trigger").id;
+  be.state.time[old] = 3600; be.state.plays[old] = 3; be.state.fav.push(old);
+  // moved by hand to another folder
+  const moved = path.join(home, "elsewhere", "Games");
+  fs.mkdirSync(path.join(moved, "snes"), { recursive: true }); fs.renameSync(f, path.join(moved, "snes", "Chrono Trigger (USA).sfc"));
+  await be.route("POST", "/api/settings", { paths: { roms_dir: moved } });
+  const now = byTitle("Chrono Trigger").id;
+  assert.notEqual(now, old);
+  assert.deepEqual([be.state.time[now], be.state.plays[now], be.state.fav.includes(now)], [3600, 3, true]);
+});
