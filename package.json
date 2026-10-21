@@ -134,7 +134,10 @@
       "executableName": "the-retro-shelf",
       "synopsis": "A retro game shelf with the emulators built in"
     },
-    "detectUpdateChannel": false
+    "detectUpdateChannel": false,
+    "toolsets": {
+      "appimage": "1.0.3"
+    }
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
