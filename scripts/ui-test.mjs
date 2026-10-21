@@ -144,7 +144,7 @@ fs.writeFileSync(path.join(home, "data", "state.json"), JSON.stringify({ seenVer
 
 const given = process.argv[2], electron = path.join(ROOT, "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
 const args = [...(given ? [] : ["."]), `--remote-debugging-port=${PORT}`, ...(process.platform === "linux" ? ["--no-sandbox"] : [])];
-const app = spawn(given || electron, args, { cwd: ROOT, env: { ...process.env, ARCADE_HOME: home }, stdio: "ignore", shell: !given && process.platform === "win32" });
+const app = spawn(given || electron, args, { cwd: ROOT, env: { ...process.env, ARCADE_HOME: home, RETRO_SHELF_TEST: "1" }, stdio: "ignore", shell: !given && process.platform === "win32" });
 const problems = [];
 try {
   const p = await connect();

@@ -153,7 +153,7 @@ try {
   const exe = findApp();
   step("opening " + exe);
   const out = fs.openSync(path.join(OUT, "app.log"), "w");
-  app = spawn(exe, [`--remote-debugging-port=${PORT}`], { env: { ...process.env, ARCADE_HOME: home }, stdio: ["ignore", out, out] });
+  app = spawn(exe, [`--remote-debugging-port=${PORT}`], { env: { ...process.env, ARCADE_HOME: home, RETRO_SHELF_TEST: "1" }, stdio: ["ignore", out, out] });
   app.once("exit", code => { if (app) console.log("  (the app closed, code " + code + ")"); });
   const page = await connect();
 

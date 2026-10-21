@@ -36,7 +36,7 @@ fs.writeFileSync(path.join(home, "data", "state.json"), JSON.stringify({ seenVer
 const electron = path.join(ROOT, "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
 const t0 = Date.now();
 const app = spawn(given || electron, [...(given ? [] : ["."]), `--remote-debugging-port=${PORT}`, ...(process.platform === "linux" ? ["--no-sandbox"] : [])],
-  { cwd: ROOT, env: { ...process.env, ARCADE_HOME: home }, stdio: "ignore", shell: !given && process.platform === "win32" });
+  { cwd: ROOT, env: { ...process.env, ARCADE_HOME: home, RETRO_SHELF_TEST: "1" }, stdio: "ignore", shell: !given && process.platform === "win32" });
 const out = {}, over = [];
 try {
   let ws = null;

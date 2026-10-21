@@ -70,10 +70,18 @@ function tvMode(on) {
   if (win.isFullScreen() !== on) win.setFullScreen(on);
 }
 
+// the app's own tests (scripts/*-test.mjs) open it without taking focus, almost all off the bottom right of the
+// screen, so they keep out of the way of whoever is using the computer while they run
+const TESTING = process.env.RETRO_SHELF_TEST === "1";
+function testBounds() {
+  const area = screen.getPrimaryDisplay().workArea;
+  return { x: area.x + area.width - 48, y: area.y + area.height - 48, width: 1280, height: 820 };
+}
+
 function createWindow() {
   const saved = loadBounds();
   win = new BrowserWindow({
-    width: 1280, height: 820, ...onScreen(saved.bounds), minWidth: 720, minHeight: 520,
+    width: 1280, height: 820, ...(TESTING ? testBounds() : onScreen(saved.bounds)), minWidth: 720, minHeight: 520,
     title: "The Retro Shelf", backgroundColor: "#1e1c1a", show: false, autoHideMenuBar: true,
     // installed builds get their icon from the installer; running from source would otherwise show Electron's
     ...(app.isPackaged ? {} : { icon: DEV_ICON }),
@@ -85,9 +93,12 @@ function createWindow() {
     },
   });
   win.setMenuBarVisibility(false);
-  if (saved.maximized) win.maximize();
-  if (saved.fullscreen) win.setFullScreen(true);
-  win.once("ready-to-show", () => { win.show(); if (backend && backend.ui.tv) tvMode(true); });
+  if (saved.maximized && !TESTING) win.maximize();
+  if (saved.fullscreen && !TESTING) win.setFullScreen(true);
+  win.once("ready-to-show", () => {
+    if (TESTING) { win.setBounds(testBounds()); win.showInactive(); return; }
+    win.show(); if (backend && backend.ui.tv) tvMode(true);
+  });
   for (const ev of ["resize", "move", "enter-full-screen", "leave-full-screen"]) win.on(ev, () => { clearTimeout(win._st); win._st = setTimeout(saveBounds, 500); });
   win.on("close", saveBounds);
   win.on("closed", () => { win = null; });
