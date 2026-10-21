@@ -312,7 +312,7 @@ kbd{font:600 11.5px/1 var(--disp);color:var(--chalk);border:1px solid #4a453e;bo
 /* ---------- loading bar + toast ---------- */
 #lbar{position:fixed;top:0;left:0;height:2px;width:100%;z-index:150;background:var(--acc);transform:scaleX(0);transform-origin:left;opacity:0;transition:opacity .3s}
 #lbar.on{opacity:1;animation:lbar 1.2s ease-in-out infinite}
-#toast{position:fixed;left:50%;bottom:52px;transform:translate(-50%,10px) rotate(-.6deg);z-index:160;background:var(--paper-hi);color:var(--ink);padding:10px 18px;border-left:4px solid var(--acc);box-shadow:0 10px 24px rgba(0,0,0,.5);max-width:80vw;font:500 14px/1.4 var(--disp);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+#toast{position:fixed;left:50%;bottom:52px;transform:translate(-50%,10px) rotate(-.6deg);z-index:100160;background:var(--paper-hi);color:var(--ink);padding:10px 18px;border-left:4px solid var(--acc);box-shadow:0 10px 24px rgba(0,0,0,.5);max-width:80vw;font:500 14px/1.4 var(--disp);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
 #toast.show{opacity:1;transform:translate(-50%,0) rotate(-.6deg)}
 #toast.bad{border-left-color:#c23b22}
 
@@ -455,7 +455,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .slip.wide{width:560px;max-width:86vw}
 #waddr{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15)}
 /* the screensaver: the shelves drift behind, pictures from your games fade through in front */
-#saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,9,8,.6);opacity:0;visibility:hidden;transition:opacity 1.5s,visibility 1.5s;cursor:none}
+#saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,9,8,.6);opacity:0;visibility:hidden;transition:opacity 1.5s,visibility 1.5s;cursor:none}
 #saver.show{opacity:1;visibility:visible}
 .svpic{position:relative;width:70vw;height:62vh}
 .svpic img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity 2.2s;filter:drop-shadow(0 24px 40px rgba(0,0,0,.75))}
@@ -537,7 +537,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 #optl button{padding:11px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.12);background:none;text-align:left;color:var(--ink);font:600 17px var(--disp)}
 #optl button:hover,#optl button:focus{background:rgba(28,25,22,.07);outline:none;padding-left:12px}
 #optl .sep{height:10px}
-#osk{position:fixed;left:0;right:0;bottom:0;z-index:300;display:flex;justify-content:center;padding:18px;background:rgba(12,11,10,.6);transform:translateY(100%);transition:transform .18s ease;visibility:hidden}
+#osk{position:fixed;left:0;right:0;bottom:0;z-index:100300;display:flex;justify-content:center;padding:18px;background:rgba(12,11,10,.6);transform:translateY(100%);transition:transform .18s ease;visibility:hidden}
 #osk.show{transform:none;visibility:visible}
 .oskin{background:var(--paper);padding:16px 18px 10px;box-shadow:0 -10px 30px rgba(0,0,0,.5)}
 #oskv{min-height:30px;margin-bottom:10px;padding:4px 10px;border:1.5px solid var(--ink);background:var(--paper-hi);color:var(--ink);font:600 18px/30px var(--disp);white-space:pre}
@@ -585,7 +585,7 @@ html.tv body.kb,html.tv body.kb *{cursor:none!important}
 .pin.locked .badge{background:rgba(70,42,18,.22);color:rgba(60,35,15,.55);text-shadow:none;box-shadow:inset 0 2px 5px rgba(40,20,5,.5)}
 .pin.locked .badge::after{border-color:rgba(60,35,15,.25)}
 .pin.locked b{color:#4a3119}
-#pinpop{position:fixed;right:24px;bottom:58px;z-index:170;display:flex;align-items:center;gap:14px;padding:12px 18px 12px 12px;background:var(--paper-hi);color:var(--ink);
+#pinpop{position:fixed;right:24px;bottom:58px;z-index:100170;display:flex;align-items:center;gap:14px;padding:12px 18px 12px 12px;background:var(--paper-hi);color:var(--ink);
   box-shadow:0 12px 26px rgba(0,0,0,.5);border-left:4px solid var(--acc);transform:translateY(20px);opacity:0;visibility:hidden;transition:transform .25s ease,opacity .25s,visibility .25s}
 #pinpop.show{transform:none;opacity:1;visibility:visible}
 #pinpop .pin{flex-direction:row}#pinpop .badge{width:48px;height:48px;font-size:20px}
@@ -660,7 +660,7 @@ html:not([data-fx="off"]) #pick.show .panel{animation:rise .22s ease}
 #nlist .v{list-style:none;margin:14px 0 6px -1.1em;font:600 12px var(--disp);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
 
 /* ---------- adding games: drop target and the "which system?" slip ---------- */
-#drop{position:fixed;top:0;left:0;right:0;bottom:0;z-index:140;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s,visibility .15s}
+#drop{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100140;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s,visibility .15s}
 #drop.show{opacity:1;visibility:visible}
 .slip{width:min(520px,86vw);background:var(--paper);color:var(--ink);padding:26px 30px 28px;transform:rotate(-1.2deg);box-shadow:6px 8px 16px rgba(0,0,0,.45);outline:2px dashed var(--ink2);outline-offset:-12px}
 .slip h2{margin:0 0 6px;font:700 30px/1.05 var(--disp)}
@@ -675,7 +675,7 @@ html:not([data-fx="off"]) #pick.show .panel{animation:rise .22s ease}
 .note .fine{margin:-6px 0 14px;font-size:13px;color:var(--ink2)}
 
 /* ---------- splash ---------- */
-#splash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--wall);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .4s ease}
+#splash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100400;background:var(--wall);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .4s ease}
 #splash.out{opacity:0;pointer-events:none}
 #swm{font:700 15px/1 var(--disp);letter-spacing:.42em;padding-left:.42em}
 #smsg{margin:0;color:var(--dust);font-size:14px}
@@ -1762,7 +1762,7 @@ function showLaunch(g) {
   $("#ltitle").textContent = g.title; $("#ltitle").translate = false;
   const holder = $(".lart"); clear(holder);
   const c = el("div", "lslot"); paintVars(c, g); c.appendChild(box(c, g)); fillCover(c, g); holder.appendChild(c);
-  L.classList.add("starting"); $("#lstat").textContent = MEDIA_VERB[media(g)] + "…"; $("#lhint").style.visibility = "hidden";
+  L.classList.add("starting"); $("#lstat").textContent = t(MEDIA_VERB[media(g)] + "…"); $("#lhint").style.visibility = "hidden";
   /* what this console's games can do besides */
   const c2 = cons(g.system), rw = c2.light && UI.rewind !== false;
   $("#lhint2").textContent = /\.m3u$/i.test(g.file || "") ? t("Asked for another disc? On a keyboard, E opens the tray, D picks the next disc, E closes it. With a controller, hold Select, then Disc Control.")
@@ -1806,7 +1806,7 @@ function tick() {
   const e = Math.max(0, (Date.now() + offset) / 1000 - STATUS.running.since), starting = e < 3, g = byId.get(STATUS.running.id);
   $("#launch").classList.toggle("starting", starting);
   const s = $("#lstat"); clear(s);
-  if (starting) s.textContent = (g ? MEDIA_VERB[media(g)] : "Starting") + "…";
+  if (starting) s.textContent = t((g ? MEDIA_VERB[media(g)] : "Starting") + "…");
   else { s.appendChild(document.createTextNode("Playing  ")); s.appendChild(el("span", "clk", clock(e))); }
   $("#lhint").style.visibility = $("#lhint2").style.visibility = starting ? "hidden" : "visible";
 }
@@ -1836,11 +1836,16 @@ function updAction() {
   else if (UPD.status === "manual") APP.update("page");
   else APP.update("check");
 }
+/* launched: the game just started, until the shelf has seen it run (or end straight away). launchingNow: a press
+   while one is starting doesn't start another */
+let launched = null, launchingNow = false;
 async function play(g, o) {
-  if (!g) return;
+  if (!g || launchingNow) return;
   if (STATUS.running) { showLaunch(byId.get(STATUS.running.id) || g); return; }
   beep(780, .08); showLaunch(g);
-  const r = await api("/api/launch", {id: g.id, slot: o && o.slot, fresh: !!(o && o.fresh), force: !!(o && o.force), pads: padsForPlayers()});
+  launchingNow = true;
+  let r;
+  try { r = await api("/api/launch", {id: g.id, slot: o && o.slot, fresh: !!(o && o.fresh), force: !!(o && o.force), pads: padsForPlayers()}); } finally { launchingNow = false; }
   if (!r.ok && r.data.elsewhere) {
     /* open on another computer that shares the saves: say so, and let you choose */
     hideLaunch();
@@ -1849,16 +1854,17 @@ async function play(g, o) {
     });
     return;
   }
-  if (!r.ok) { hideLaunch(); toast(r.data.error || "Couldn't start the game.", true); return; }
-  offset = r.data.now * 1000 - Date.now(); STATUS.running = {id: g.id, since: r.data.since};
+  if (!r.ok) { hideLaunch(); toast(r.data.error ? t(r.data.error) : t("Couldn't start the game."), true); return; }
+  offset = r.data.now * 1000 - Date.now(); STATUS.running = {id: g.id, since: r.data.since}; launched = {id: g.id, since: r.data.since};
   g.last = Math.floor(r.data.since); setTimeout(poll, 900);
 }
 function onExit(prev) {
-  const dt = (Date.now() + offset) / 1000 - prev.since, wasStop = stopping; stopping = false;
+  const ex = STATUS.exit, mine = ex && ex.id === prev.id;
+  /* how long it ran, as the app measured it (the shelf may only have looked after it ended) */
+  const dt = mine && ex.dt != null ? ex.dt : (Date.now() + offset) / 1000 - prev.since, wasStop = stopping; stopping = false;
   hideLaunch();
-  const ex = STATUS.exit;
-  if (dt < 4 && !wasStop) toast((ex && ex.id === prev.id && ex.error) || (!PATHS.own ? "The game closed right away. The file may be damaged, or not a game for this system."
-    : "The emulator closed right away. Check the RetroArch program and cores folder in Settings."), true);
+  if (dt < 4 && !wasStop) toast((mine && ex.error && t(ex.error)) || (!PATHS.own ? t("The game closed right away. The file may be damaged, or not a game for this system.")
+    : t("The emulator closed right away. Check the RetroArch program and cores folder in Settings.")), true);
   refresh(true);
 }
 
@@ -1873,7 +1879,10 @@ async function poll() {
   if (s.moving) { busy(true); toast(t("Moving the games… {p}%", {p: Math.floor(100 * s.moving.done / Math.max(1, s.moving.total))})); } else if (STATUS.moving) busy(false);
   STATUS.moving = s.moving;
   if (s.newPins && s.newPins.length && !LAUNCH.open && !s.running && !isOpen("news")) showNewPins(s.newPins);
-  if (prev && !s.running) onExit(prev);
+  if (s.running) launched = null;
+  if (prev && !s.running) { launched = null; onExit(prev); }
+  /* a game that ended before the shelf ever saw it running (it closed within a second): its end, all the same */
+  else if (!s.running && launched && s.exit && s.exit.id === launched.id && s.exit.at >= launched.since - 1) { const l = launched; launched = null; onExit(l); }
   if (!prev && s.running && !LAUNCH.open) showLaunch(byId.get(s.running.id));
   const c = s.covers;
   if (c.found !== lastFound || (lastRun && !c.running)) refresh();
@@ -1912,7 +1921,27 @@ async function loadLibrary(force) {
 const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["ctest", () => closeCtest()], ["lst", () => closeList()], ["recap", () => closeRecap()], ["keys", () => closeKeys()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
-const topPanel = () => PANELS.find(([id]) => isOpen(id));
+/* the panel on top: the one opened last (each is raised as it opens), whatever order they're listed in */
+let zTop = 0;
+const topPanel = () => {
+  let best = null, bz = -1;
+  for (const p of PANELS) if (isOpen(p[0])) { const z = +($("#" + p[0]).style.zIndex || 0); if (z > bz) { bz = z; best = p; } }
+  return best;
+};
+for (const [id] of PANELS) {
+  const e = document.getElementById(id); if (!e) continue;
+  let was = e.classList.contains("show");
+  new MutationObserver(() => {
+    const now = e.classList.contains("show");
+    if (now && !was) {
+      /* numbered afresh now and then, in the same order, so they stay below toasts and the keyboard (100000 and up) */
+      if (zTop > 5000) { zTop = 0; PANELS.filter(q => isOpen(q[0])).map(q => $("#" + q[0])).sort((x, y) => +x.style.zIndex - +y.style.zIndex).forEach(x => { x.style.zIndex = String(140 + ++zTop); }); }
+      e.style.zIndex = String(140 + ++zTop);
+    }
+    was = now;
+  })
+    .observe(e, {attributes: true, attributeFilter: ["class"]});
+}
 function focusables(root) {
   return $$("button, input, select, a[href]", root).filter(e => !e.disabled && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden"
     && !(e.type === "checkbox" && !e.closest(".sw")));
@@ -2759,7 +2788,7 @@ async function saveNote() {
   await refresh(true); focusById(id);
 }
 $("#notesok").onclick = saveNote; $("#notesno").onclick = closeNote;
-$("#notesq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); saveNote(); } });
+/* Enter in the note box saves it: the keyboard handler below does that (once) */
 
 /* ---------- signing in to RetroAchievements: the password goes to the app's memory, and from there to RetroArch once ---------- */
 function openRas() { blurActive(); $("#rasu").value = CHEEVOS.user || CHEEVOS.pending || ""; $("#rasp").value = ""; $("#ras").classList.add("show"); light(); setTimeout(() => ($("#rasu").value ? $("#rasp") : $("#rasu")).focus(), 50); }
@@ -3354,6 +3383,8 @@ document.addEventListener("keydown", e => {
     return;
   }
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
+  /* Esc closes the panel on top, the same one a controller's B would */
+  if (k === "Escape" && !LISTEN) { const tp = topPanel(); if (tp) { e.preventDefault(); tp[1](); return; } }
   if (isOpen("opts")) { if (k === "Escape") closeOpts(); else if (arrow) { e.preventDefault(); padNav($("#opts"), arrow); } return; }
   if (isOpen("ras")) { if (k === "Escape") closeRas(); else if (k === "Enter") saveRas(); return; }
   if (isOpen("notes")) { if (k === "Escape") closeNote(); else if (k === "Enter") saveNote(); return; }
@@ -3381,6 +3412,8 @@ document.addEventListener("keydown", e => {
     else if (k === "ArrowDown" || k === "Enter") { e.preventDefault(); e.target.blur(); focusById(null); paintQ(); }
     return;
   }
+  /* Enter or Space held down after a panel closed (its Save, say) doesn't repeat into playing or turning a box */
+  if (e.repeat && (k === "Enter" || k === " ")) { e.preventDefault(); return; }
   if (k === "/") { e.preventDefault(); $("#q").focus(); paintQ(); }
   else if (k === "ArrowRight") { e.preventDefault(); moveH(1); }
   else if (k === "ArrowLeft") { e.preventDefault(); moveH(-1); }
