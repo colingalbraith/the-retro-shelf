@@ -4,6 +4,7 @@
 //
 //   node scripts/fetch-emulators.mjs mac   -> vendor/mac/{RetroArch.app,cores,info,dolphin-Sys,PPSSPP,shaders}
 //   node scripts/fetch-emulators.mjs win   -> vendor/win/{RetroArch,cores,info,dolphin-Sys,PPSSPP,shaders}
+//   node scripts/fetch-emulators.mjs linux -> vendor/linux/{RetroArch,cores,info,…} (on Linux: RetroArch's AppImage unpacks itself)
 //
 // Cores come from src/config.json (every system with a "core"). Downloads are cached in vendor/.cache.
 // No games are downloaded, ever.
@@ -25,9 +26,9 @@ const SHADER_FILES = ["crt/zfast-crt.slangp", "crt/shaders/zfast_crt/zfast_crt_f
 // Dolphin's libretro core needs the Sys folder from the same source tree it was built from.
 const DOLPHIN_SYS_REPO = "https://github.com/libretro/dolphin.git";
 
-const os_ = process.argv[2] || (process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "");
-if (!["mac", "win"].includes(os_)) {
-  console.error("usage: fetch-emulators.mjs mac|win");
+const os_ = process.argv[2] || (process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : process.platform === "linux" ? "linux" : "");
+if (!["mac", "win", "linux"].includes(os_)) {
+  console.error("usage: fetch-emulators.mjs mac|win|linux");
   process.exit(1);
 }
 const OUT = path.join(ROOT, "vendor", os_);
@@ -80,7 +81,7 @@ function unzip(archive, dir) {
 }
 
 async function core(arch, name, ext) {
-  const plat = os_ === "mac" ? `apple/osx/${arch}` : "windows/x86_64";
+  const plat = os_ === "mac" ? `apple/osx/${arch}` : os_ === "linux" ? "linux/x86_64" : "windows/x86_64";
   const zip = await download(`${BOT}/nightly/${plat}/latest/${name}${ext}.zip`, `${os_}-${arch}-${name}${ext}.zip`);
   const dir = path.join(CACHE, "x", `${os_}-${arch}-${name}`);
   rm(dir); unzip(zip, dir);
@@ -97,7 +98,8 @@ async function cores() {
       sh("lipo", ["-create", a, x, "-output", dest]);
       adhoc(dest);
     } else {
-      fs.copyFileSync(await core("x86_64", c, ".dll"), path.join(dir, c + ".dll"));
+      const ext = os_ === "linux" ? ".so" : ".dll";
+      fs.copyFileSync(await core("x86_64", c, ext), path.join(dir, c + ext));
     }
     console.log(`  core ${c}`);
   }
@@ -173,6 +175,36 @@ async function retroarchWin() {
   return fs.existsSync(path.join(base, "autoconfig"));
 }
 
+// Linux: RetroArch comes as an AppImage, with its menu assets and controller profiles in a folder beside it. The
+// AppImage is unpacked (it unpacks itself, so this runs on Linux) to run from inside The Retro Shelf's own AppImage,
+// started through a small script called retroarch
+async function retroarchLinux() {
+  if (process.platform !== "linux") throw new Error("the Linux emulators are fetched on Linux: RetroArch's AppImage unpacks itself");
+  const z = await download(`${BOT}/stable/${RA_VERSION}/linux/x86_64/RetroArch.7z`, `RetroArch-linux-${RA_VERSION}.7z`);
+  const tmp = path.join(CACHE, "x", "ra-linux"); rm(tmp); unzip(z, tmp);
+  const top = path.join(tmp, "RetroArch-Linux-x86_64"), img = path.join(top, "RetroArch-Linux-x86_64.AppImage");
+  fs.chmodSync(img, 0o755);
+  sh(img, ["--appimage-extract"], { cwd: tmp });
+  const base = path.join(OUT, "RetroArch");
+  fs.cpSync(path.join(tmp, "squashfs-root"), base, { recursive: true, verbatimSymlinks: true });
+  // RetroArch is linked against JACK's library even when it plays sound through PulseAudio or ALSA: where JACK isn't
+  // installed, it gets a stand-in that does nothing (scripts/linux/jack-stub.c)
+  mkdir(path.join(base, "fallback"));
+  sh("cc", ["-shared", "-fPIC", "-O2", "-Wl,-soname,libjack.so.0", "-o", path.join(base, "fallback", "libjack.so.0"), path.join(ROOT, "scripts", "linux", "jack-stub.c")]);
+  fs.writeFileSync(path.join(base, "retroarch"), [
+    "#!/bin/sh",
+    "# RetroArch, from its unpacked AppImage. Without JACK installed, it gets The Retro Shelf's stand-in for JACK's library",
+    'HERE="$(dirname "$(readlink -f "$0")")"',
+    "if ! { /sbin/ldconfig -p 2>/dev/null || ldconfig -p 2>/dev/null; } | grep -q 'libjack\\.so\\.0 '; then",
+    '  export LD_LIBRARY_PATH="$HERE/fallback${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
+    "fi",
+    'exec "$HERE/AppRun" "$@"', ""].join("\n"), { mode: 0o755 });
+  const home = path.join(top, "RetroArch-Linux-x86_64.AppImage.home", ".config", "retroarch");
+  for (const k of KEEP_ASSETS) if (fs.existsSync(path.join(home, "assets", k))) fs.cpSync(path.join(home, "assets", k), path.join(OUT, "assets", k), { recursive: true });
+  fs.cpSync(path.join(home, "autoconfig"), path.join(OUT, "autoconfig"), { recursive: true });
+  return true;
+}
+
 function dolphinSys() {
   const dest = path.join(OUT, "dolphin-Sys");
   const src = path.join(CACHE, "dolphin-src");
@@ -216,7 +248,7 @@ async function pictureShaders() {
 (async () => {
   console.log(`The Retro Shelf: fetching emulators for ${os_} -> ${path.relative(ROOT, OUT)}`);
   rm(OUT); mkdir(OUT);
-  const hasAuto = os_ === "mac" ? await retroarchMac() : await retroarchWin();
+  const hasAuto = os_ === "mac" ? await retroarchMac() : os_ === "linux" ? await retroarchLinux() : await retroarchWin();
   console.log(`  RetroArch ${RA_VERSION}`);
   await autoconfig(hasAuto);
   await cores();

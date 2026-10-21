@@ -12,9 +12,17 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "arcade", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ]);
 
+// Ubuntu 24.04 and later don't let an app make the sandbox Chromium uses unless it's installed with its own AppArmor
+// profile, which an AppImage can't bring: there it runs without it, as other AppImages do. The page it shows is its own.
+if (process.platform === "linux") {
+  try { if (fs.readFileSync("/proc/sys/kernel/apparmor_restrict_unprivileged_userns", "utf8").trim() === "1") app.commandLine.appendSwitch("no-sandbox"); } catch {}
+}
+
 // ARCADE_HOME keeps everything (settings, games, saves) in one folder: handy for testing. Set before the
 // single-instance lock, which lives in the data folder, so a test copy can run next to the real one.
-const HOME = process.env.ARCADE_HOME;
+// The portable Windows copy (portable.txt beside the app) does the same with a Data folder beside it, for a USB stick.
+const PORTABLE = process.platform === "win32" && fs.existsSync(path.join(path.dirname(process.execPath), "portable.txt"));
+const HOME = process.env.ARCADE_HOME || (PORTABLE ? path.join(path.dirname(process.execPath), "Data") : "");
 if (HOME) { app.setPath("userData", path.join(HOME, "data")); app.setPath("pictures", path.join(HOME, "Pictures")); }
 const DOCS = HOME ? path.join(HOME, "The Retro Shelf") : path.join(app.getPath("documents"), "The Retro Shelf");
 // The app used to be called Arcade: the first time, move its settings and games folders to the new name

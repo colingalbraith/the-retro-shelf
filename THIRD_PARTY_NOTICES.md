@@ -13,6 +13,12 @@ Binaries: https://buildbot.libretro.com/stable/1.22.2/
 The macOS copy is re-signed ad hoc so it can run inside the app, and unused extras (game database,
 shaders, overlays, alternate menu themes) are left out. No code is changed.
 
+The Linux copy is libretro's AppImage, unpacked. It carries the libraries libretro bundled with it (among them SDL2,
+PulseAudio's client library, libsndfile, FLAC, Ogg and Vorbis, libpng, libjpeg, the Wayland and X11 client libraries
+and Boost), each under its own license (LGPL, BSD-style, zlib and MIT); they're listed in its usr/lib folder. Where
+JACK isn't installed, RetroArch is given The Retro Shelf's own stand-in for JACK's library (scripts/linux/jack-stub.c,
+GPL-3.0), which only fails every call.
+
 ## libretro cores
 
 Nightly builds from https://buildbot.libretro.com/nightly/. Exact versions are listed in the app under

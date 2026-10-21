@@ -892,7 +892,7 @@ class Backend extends EventEmitter {
     this.cheevosAfter();
     let error = "";
     if (dt < 4 && !rec.stopping) error = (rec.builtIn && ra.explain(this.files.raLog, how)) || "";
-    this.lastExit = { id: rec.id, at: now(), dt, error };
+    this.lastExit = { id: rec.id, at: now(), dt, error, code: how.code ?? null, signal: how.signal || null };
     this.emit("exit", this.lastExit);
   }
 
