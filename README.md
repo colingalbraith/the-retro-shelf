@@ -13,7 +13,7 @@
   <a href="https://github.com/colingalbraith/the-retro-shelf/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/colingalbraith/the-retro-shelf?include_prereleases&sort=semver&label=release&color=e2582b"></a>
   <a href="https://github.com/colingalbraith/the-retro-shelf/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/colingalbraith/the-retro-shelf/total?color=e2582b"></a>
   <a href="https://github.com/colingalbraith/the-retro-shelf/actions/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/colingalbraith/the-retro-shelf/test.yml?branch=main&label=tests"></a>
-  <img alt="macOS and Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-555">
+  <img alt="macOS, Windows and Linux" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-555">
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/github/license/colingalbraith/the-retro-shelf?color=555"></a>
   <a href="https://github.com/colingalbraith/the-retro-shelf/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/colingalbraith/the-retro-shelf?style=social"></a>
 </p>
@@ -27,22 +27,29 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 
 ## Features
 
-- **A real shelf:** every console has its own box style, with spine art and logos from the game's cover.
-- **Pull a box out to play,** or turn it over to see last played, playtime and your saves.
-- **Drag-and-drop import** that works out which console each file is for.
-- **Pick up where you left off:** leaving a game saves your spot.
+- **A real shelf:** every console has its own box style, with spine art and logos from the game's cover. Walnut, oak
+  or painted white wood, on a dark or light wall.
+- **Pull a box out to play,** or turn it over to see last played, playtime, your saves and a note of your own.
+- **Drag-and-drop import** that works out which console each file is for, or **watch a folder** and new games appear
+  by themselves.
+- **Pick up where you left off:** leaving a game saves your spot, and each game's saves are listed with pictures.
+- **Rewind and fast-forward** on the triggers, and a frame less lag, on 8- and 16-bit consoles and Game Boy.
+- **The right look for each console:** an old TV's scanlines, a handheld's screen, or sharp pixels.
 - **Art and details are automatic:** covers, logos, year, publisher and genre for 38,000+ games. Wrong cover? Pick
   the right one from a list.
-- **Shelves your way:** arrange by console, genre, decade or what you've played; make your own like "Couch co-op";
-  sort by title, year or last played.
+- **Shelves your way:** arrange by console, genre, decade or progress; make your own like "Couch co-op"; sort by
+  title, year, last played or rating. Search forgives spelling: try "snes rpg" or "90s".
 - **Collections:** every series your games belong to, with the ones you don't have yet standing faded, and wishlists
   of your own.
-- **Your play:** a trophy shelf of your most played games, a time card stamped with the days you played, and 208
-  pins to earn, no account needed.
-- **TV mode:** fullscreen and bigger, and everything works from a controller, with an on-screen keyboard for search.
-- **CRT look:** play with sharp pixels, smoothed, or the scanlines of an old TV.
-- **Controllers just work:** Xbox, PlayStation and Switch Pro.
-- **Saves are safe:** back them all up to one file, and see which BIOS files each console has.
+- **Your play:** mark games backlog, playing, beaten or 100% and give them stars. A trophy shelf, a time card, monthly
+  and yearly recaps to save as pictures, and 208 pins to earn, no account needed.
+- **TV mode and Steam Deck:** fullscreen and bigger, everything works from a controller, with an on-screen keyboard
+  and a screensaver.
+- **Controllers just work:** Xbox, PlayStation, Switch Pro and more, with a button test, your own layout for each
+  console, and two players numbered on screen.
+- **Saves are safe:** a backup every week by itself, saves shared between computers through iCloud Drive, Dropbox or
+  OneDrive, and the BIOS files each console has.
+- **Extras:** cheats, RetroAchievements, games on several discs, and menu music.
 - **Ten languages:** English, plus Español, Français, Deutsch, Italiano, Português, Русский, 日本語, 한국어 and 简体中文
   (drafts, in beta). Text size and screen reader labels too.
 - **Updates itself** in the background.
@@ -89,7 +96,8 @@ updates included.
 **Windows:** if a blue "Windows protected your PC" box appears, click **More info**, then **Run anyway**.
 
 > [!NOTE]
-> This is an early beta. [Bug reports](https://github.com/colingalbraith/the-retro-shelf/issues) are welcome.
+> Something not working? [Bug reports](https://github.com/colingalbraith/the-retro-shelf/issues) are welcome:
+> Settings → App → Copy info adds what helps track it down.
 
 ## Getting games
 
@@ -155,8 +163,10 @@ console has.
 | Space | Y | Turn box over |
 | F | X | Favorite |
 | Esc | B | Back |
+| ? | Select → Buttons and keys | Every key and button |
 
-In a game, hold **Start** or press **Esc** to return to the shelf.
+In a game, hold **Start** or press **Esc** to return to the shelf. On 8- and 16-bit consoles and Game Boy, hold the
+**left trigger** (or R) to rewind and the **right trigger** (or L) to fast-forward; Space keeps fast-forward on.
 
 ## Build from source
 
@@ -164,10 +174,10 @@ You need [Node.js 22](https://nodejs.org).
 
 ```sh
 npm install
-npm run fetch:mac   # or fetch:win: downloads RetroArch and the cores
+npm run fetch:mac   # or fetch:win or fetch:linux: downloads RetroArch and the cores
 npm start
 npm test
-npm run dist:mac    # or dist:win
+npm run dist:mac    # or dist:win or dist:linux
 ```
 
 Pushing a `v*` tag builds the installers in GitHub Actions and attaches them to a draft release. Publishing it is

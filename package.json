@@ -30,8 +30,10 @@
     "test": "node --test test/*.test.mjs",
     "fetch:mac": "node scripts/fetch-emulators.mjs mac",
     "fetch:win": "node scripts/fetch-emulators.mjs win",
+    "fetch:linux": "node scripts/fetch-emulators.mjs linux",
     "dist:mac": "electron-builder --mac --publish never",
-    "dist:win": "electron-builder --win --publish never"
+    "dist:win": "electron-builder --win --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "devDependencies": {
     "7zip-bin": "5.2.0",
