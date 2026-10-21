@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0-beta.10
+
+- **Five more languages (beta):** Español, Français, Deutsch, Português and 日本語. The app follows your computer's
+  language, or choose one in Settings → App → Language. These are first drafts; "Suggest better words" there opens a
+  page to tell us what reads oddly. Dates and numbers follow the language too.
+- **Text size:** 100%, 115% or 130%, in Settings → App, on top of TV mode's bigger view.
+- **Screen readers** hear each box as its name, console, year and when you last played it, and pins by their tier.
+- **Pins differ in shape, not only color:** bronze ones are round, silver ones eight-sided with a double rim, gold ones
+  a twelve-pointed seal.
+- Stronger outlines show where you are when using the keyboard.
+
 ## 0.4.0-beta.9
 
 - **Shelf themes:** Settings → Shelves → Wood (walnut, oak or painted white) and Wall (dark or light).

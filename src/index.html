@@ -32,7 +32,7 @@ body{margin:0;background:var(--wall);color:var(--chalk);font:16px/1.4 var(--disp
 body.kb{cursor:none}
 button,input{font:inherit;color:inherit}
 button{cursor:pointer}
-:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
 .card:focus-visible{outline:none}
 [hidden]{display:none!important}
 
@@ -463,6 +463,8 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .svcap{min-height:1.4em;margin:26px 0 0;font:700 24px var(--disp);color:#ece6d6;text-shadow:0 2px 8px rgba(0,0,0,.8);opacity:0;transition:opacity 1.2s}
 .svcap.on{opacity:1}
 .svcap small{display:block;margin-top:4px;font:600 13px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#b5ad9f}
+/* the language list in Settings */
+.lsel{padding:6px 10px;border:1.5px solid var(--ink);border-radius:0;background:var(--paper-hi);color:var(--ink);font:600 15px var(--disp)}
 /* every key and button, in two columns */
 .kcols{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin:8px 0 14px;max-height:62vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
 .kcols h3{margin:0 0 6px;font:700 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
@@ -562,7 +564,14 @@ html.tv body.kb,html.tv body.kb *{cursor:none!important}
 .corkg small{margin-left:10px;font:600 12px var(--mono);color:#5a3c1e;letter-spacing:0}
 .pin{display:flex;flex-direction:column;align-items:center;text-align:center;color:#2a1b0d}
 .pin .badge{position:relative;width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 26px/1 var(--disp);
-  color:#fff8e6;text-shadow:0 1px 1px rgba(0,0,0,.45);box-shadow:0 4px 6px rgba(40,20,5,.55),inset 0 2px 0 rgba(255,255,255,.45),inset 0 -3px 4px rgba(0,0,0,.25)}
+  color:#fff8e6;text-shadow:0 1px 1px rgba(0,0,0,.45);box-shadow:inset 0 2px 0 rgba(255,255,255,.45),inset 0 -3px 4px rgba(0,0,0,.25)}
+/* the tiers differ in shape and rim, not only color: bronze round, silver eight-sided with a double rim, gold a
+   twelve-pointed seal with a dashed rim. The shadow is on the wrapper, since the shapes are cut out */
+.pin .bw{display:inline-flex;filter:drop-shadow(0 4px 3px rgba(40,20,5,.5))}
+.pin.silver .badge{border-radius:0;clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%)}
+.pin.silver .badge::after{border-style:double;border-width:4px}
+.pin.gold .badge{border-radius:0;clip-path:polygon(50.0% 0.0%,61.1% 8.5%,75.0% 6.7%,80.4% 19.6%,93.3% 25.0%,91.5% 38.9%,100.0% 50.0%,91.5% 61.1%,93.3% 75.0%,80.4% 80.4%,75.0% 93.3%,61.1% 91.5%,50.0% 100.0%,38.9% 91.5%,25.0% 93.3%,19.6% 80.4%,6.7% 75.0%,8.5% 61.1%,0.0% 50.0%,8.5% 38.9%,6.7% 25.0%,19.6% 19.6%,25.0% 6.7%,38.9% 8.5%)}
+.pin.gold .badge::after{inset:9px;border-style:dashed}
 .pin.bronze .badge{background:radial-gradient(circle at 35% 30%,#f0b27a,#b8692f 60%,#7c4318)}
 .pin.silver .badge{background:radial-gradient(circle at 35% 30%,#ffffff,#b9c1cb 55%,#7d8692)}
 .pin.gold .badge{background:radial-gradient(circle at 35% 30%,#fff1b0,#e2b33d 55%,#a6761b)}
@@ -813,7 +822,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     <rect x="150" y="76" width="44" height="16" rx="8" data-i="8"/><rect x="206" y="76" width="44" height="16" rx="8" data-i="9"/>
     <circle cx="140" cy="140" r="22" class="well" data-i="10"/><circle cx="260" cy="140" r="22" class="well" data-i="11"/>
     <circle cx="140" cy="140" r="8" class="dot" id="ctl"/><circle cx="260" cy="140" r="8" class="dot" id="ctr"/>
-    <g id="ctlabels"></g>
+    <g id="ctlabels" translate="no"></g>
   </svg>
   <p class="cthint" id="cthint"></p>
   <div class="btns"><button class="btn primary" id="ctdone">Done</button></div></div></div>
@@ -877,6 +886,9 @@ const el = (t, c, x) => { const e = document.createElement(t); if (c) e.classNam
 const clear = n => { while (n.firstChild) n.removeChild(n.firstChild); };
 const HTML = document.documentElement;
 
+/* each language's words, keyed by the English (see t() below); LOCALE formats dates and numbers to match */
+const WORDS = {};
+let LANG = "en", LOCALE = undefined;
 let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {}, GAMECHOICES = {};
 let UI = {accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines"};
 let PATHS = {}, STATUS = {running: null, covers: {}}, APPINFO = {}, CHEEVOS = {};
@@ -922,15 +934,28 @@ const MEDIA_VERB = {cart: "Inserting cartridge", wide: "Inserting cartridge", mi
 const LABELS = [["#e9e1cf", "#1d1a16"], ["#d9a531", "#1d1a16"], ["#b8442f", "#f4ecdf"], ["#2f5a7a", "#f1ead9"], ["#3e6b4f", "#f1ead9"], ["#1d1b19", "#e9e1cf"], ["#c9c2b2", "#1d1a16"], ["#7a3b56", "#f1ead9"], ["#e4d9b8", "#7a2e1f"], ["#5b5f66", "#f1ead9"]];
 const BANDS = [["#141312", "#ece6d6"], ["#d8d3c8", "#26231f"], ["#8d1f1c", "#f3ead8"], ["#24384f", "#ece6d6"], ["#e6e1d4", "#8d1f1c"], ["#3a3a3a", "#e9c341"]];
 const abbr = s => cons(s).abbr || s.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
-function fmtDur(s) { if (!s) return "Never played"; if (s < 60) return "Under a minute"; const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h ? h + "h " : "") + m + "m"; }
-function fmtWhen(t) {
-  if (!t) return "Never";
-  const d = new Date(t * 1000), now = new Date(), day = 86400000, start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const time = d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
-  if (d.getTime() >= start) return "Today, " + time;
-  if (d.getTime() >= start - day) return "Yesterday, " + time;
-  if (d.getTime() >= start - 6 * day) return d.toLocaleDateString([], {weekday: "long"}) + ", " + time;
-  return d.toLocaleDateString([], {month: "short", day: "numeric", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric"});
+function fmtDur(s) {
+  if (!s) return t("Never played"); if (s < 60) return t("Under a minute");
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? t("{h}h {m}m", {h, m}) : t("{m}m", {m});
+}
+/* when something happened: "Today, 3:15 PM", "Monday, 9:02 AM", "Mar 4". Mid-sentence (small), "today" and
+   "yesterday" have their own words: some languages start them with a small letter there and others don't */
+function fmtWhen(s, small, dayOnly) {
+  if (!s) return t("Never");
+  const d = new Date(s * 1000), now = new Date(), day = 86400000, start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const time = d.toLocaleTimeString(LOCALE, {hour: "numeric", minute: "2-digit"});
+  /* the day alone ("today", "Monday", "Mar 4"), for when the time doesn't matter */
+  if (dayOnly) {
+    if (d.getTime() >= start) return small ? t("today") : t("Today");
+    if (d.getTime() >= start - day) return small ? t("yesterday") : t("Yesterday");
+    if (d.getTime() >= start - 6 * day) return d.toLocaleDateString(LOCALE, {weekday: "long"});
+    return d.toLocaleDateString(LOCALE, {month: "short", day: "numeric", year: "numeric"});
+  }
+  if (d.getTime() >= start) return small ? t("today, {time}", {time}) : t("Today, {time}", {time});
+  if (d.getTime() >= start - day) return small ? t("yesterday, {time}", {time}) : t("Yesterday, {time}", {time});
+  if (d.getTime() >= start - 6 * day) return d.toLocaleDateString(LOCALE, {weekday: "long"}) + ", " + time;
+  return d.toLocaleDateString(LOCALE, {month: "short", day: "numeric", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric"});
 }
 function fmtSize(b) { return !b ? "" : b < 1048576 ? Math.max(1, Math.round(b / 1024)) + " KB" : b < 1073741824 ? (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB" : (b / 1073741824).toFixed(1) + " GB"; }
 function clock(s) { s = Math.floor(s); const p = n => String(n).padStart(2, "0"); return p(Math.floor(s / 3600)) + ":" + p(Math.floor(s % 3600 / 60)) + ":" + p(s % 60); }
@@ -1193,12 +1218,12 @@ function sections() {
   const words = q ? searchWords(q) : [], match = g => !words.length || words.every(w => wordFits(g, w));
   if (!q) {
     const rec = v.filter(g => g.last).sort((a, b) => b.last - a.last).slice(0, 8);
-    if (rec.length) out.push({key: "recent", name: "Recently played", face: true, games: rec});
+    if (rec.length) out.push({key: "recent", name: t("Recently played"), face: true, games: rec});
     const fav = v.filter(g => FAV.has(g.id)).sort(byTitle);
-    if (fav.length) out.push({key: "fav", name: "Favorites", face: true, games: fav});
+    if (fav.length) out.push({key: "fav", name: t("Favorites"), face: true, games: fav});
     /* games added in the last month, unless the whole library is new */
     const nowS = (Date.now() + offset) / 1000, fresh = v.filter(g => g.added && nowS - g.added < 30 * 86400);
-    if (fresh.length && fresh.length < v.length) out.push({key: "new", name: "Just added", face: true, games: fresh.sort((a, b) => b.added - a.added).slice(0, 8)});
+    if (fresh.length && fresh.length < v.length) out.push({key: "new", name: t("Just added"), face: true, games: fresh.sort((a, b) => b.added - a.added).slice(0, 8)});
     /* your best: four stars and up */
     const top = v.filter(g => g.rating >= 4).sort(SORTS.rating);
     if (top.length >= 2) out.push({key: "top", name: t("Top rated"), face: true, games: top.slice(0, 8)});
@@ -1220,7 +1245,9 @@ function sections() {
   }
   const nowS = (Date.now() + offset) / 1000, groups = new Map();
   v.filter(match).forEach(g => { const k = groupOf(g, how, nowS); (groups.get(k) || groups.set(k, []).get(k)).push(g); });
-  [...groups.keys()].sort(groupOrder(how, groups)).forEach(k => out.push({key: how + ":" + k, name: k, face: UI.shelf === "covers", games: groups.get(k).sort(order)}));
+  /* the groups' names in the chosen language: "1990s" is a decade, the rest are words */
+  const named = k => /^\d{4}s$/.test(k) ? t("{decade}s", {decade: k.slice(0, 4)}) : t(k);
+  [...groups.keys()].sort(groupOrder(how, groups)).forEach(k => out.push({key: how + ":" + k, name: named(k), face: UI.shelf === "covers", games: groups.get(k).sort(order)}));
   return out;
 }
 
@@ -1300,21 +1327,22 @@ function fillBack(c, g) {
   const sv = g.saves || {}, resume = hardcore() ? 0 : sv.resume, played = g.plays ? plural(g.plays, "time", "times") + (g.time ? " · " + fmtDur(g.time) : "") : "";
   inn.appendChild(el("h4", "", g.title));
   inn.appendChild(el("div", "sub", [g.system, g.tag, g.year].filter(Boolean).join(" · ")));
-  const who = [g.pub, g.dev && g.dev !== g.pub ? "by " + g.dev : "", g.genre].filter(Boolean).join(" · ");
+  const who = [g.pub, g.dev && g.dev !== g.pub ? t("by {dev}", {dev: g.dev}) : "", g.genre].filter(Boolean).join(" · ");
   if (who) inn.appendChild(el("div", "sub2", who));
   const src = resume && sv.rpic ? "/state/" + g.id + "/auto?v=" + resume : g.sv ? "/snap/" + g.id + "?v=" + g.sv : "";
   if (src) {
     const pic = el("div", "pic"), im = new Image(); im.alt = ""; im.decoding = "async"; im.src = src;
     im.onerror = () => pic.remove();
     pic.appendChild(im);
-    if (resume && sv.rpic) pic.appendChild(el("i", "", "Where you left off · " + fmtWhen(resume)));
+    if (resume && sv.rpic) pic.appendChild(el("i", "", t("Where you left off · {when}", {when: fmtWhen(resume)})));
     inn.appendChild(pic);
   }
-  inn.appendChild(el("div", "ms", g.last ? "Last played " + fmtWhen(g.last).replace(/^(Today|Yesterday)/, m => m.toLowerCase()) + (played ? " · " + played : "") : "Not played yet" + (g.added ? " · added " + fmtWhen(g.added).replace(/, .*$/, "").replace(/^(Today|Yesterday)/, m => m.toLowerCase()) : "")));
+  inn.appendChild(el("div", "ms", g.last ? t("Last played {when}", {when: fmtWhen(g.last, true)}) + (played ? " · " + played : "")
+    : t("Not played yet") + (g.added ? " · " + t("added {when}", {when: fmtWhen(g.added, true, true)}) : "")));
   const dl = el("dl"), row = (k, v, dim) => { dl.appendChild(el("dt", "", k)); dl.appendChild(el("dd", dim ? "dim" : "", v)); };
-  row("Last played", fmtWhen(g.last), !g.last);
-  row("Played", played || "Not yet", !played);
-  if (g.added) row("Added", fmtWhen(g.added).replace(/, .*$/, m => /\d{4}/.test(m) ? m : ""));
+  row(t("Last played"), fmtWhen(g.last), !g.last);
+  row(t("Played"), played || t("Not yet"), !played);
+  if (g.added) row(t("Added"), fmtWhen(g.added, false, true));
   if (g.progress) row(t("Progress"), t(PROGRESS[g.progress]));
   if (g.rating) row(t("Rating"), stars(g.rating));
   inn.appendChild(dl);
@@ -1325,32 +1353,32 @@ function fillBack(c, g) {
   if (g.note) (c.dataset.m === "wide" ? dl : inn).appendChild(el(c.dataset.m === "wide" ? "dd" : "div", "nt", "“" + g.note + "”"));
   /* numbered saves made from the emulator's menu: start from any of them */
   if (sv.slots && sv.slots.length) {
-    const sl = el("div", "slots"); sl.appendChild(document.createTextNode("Saves"));
+    const sl = el("div", "slots"); sl.appendChild(document.createTextNode(t("Saves")));
     sv.slots.slice(0, 6).forEach(x => {
-      const b = el("button", "", String(x.n)); b.title = "Start from save " + x.n + " · " + fmtWhen(x.at);
+      const b = el("button", "", String(x.n)); b.title = t("Start from save {n} · {when}", {n: x.n, when: fmtWhen(x.at)});
       b.onclick = e => { e.stopPropagation(); play(g, {slot: x.n}); };
       sl.appendChild(b);
     });
     inn.appendChild(sl);
   }
   if (g.file) inn.appendChild(el("div", "file", g.file + (g.size ? " · " + fmtSize(g.size) : "")));
-  const acts = el("div", "acts"), p = el("button", "", resume ? "▶ Continue" : "▶ Play");
+  const acts = el("div", "acts"), p = el("button", "", "▶ " + (resume ? t("Continue") : t("Play")));
   p.onclick = e => { e.stopPropagation(); play(g); };
   acts.appendChild(p);
-  const f = el("button", "star", FAV.has(g.id) ? "★" : "☆"); f.title = FAV.has(g.id) ? "Favorite" : "Add to favorites";
+  const f = el("button", "star", FAV.has(g.id) ? "★" : "☆"); f.title = FAV.has(g.id) ? t("Favorite") : t("Add to favorites");
   f.onclick = e => { e.stopPropagation(); toggleFav(g.id); };
   acts.appendChild(f);
   inn.appendChild(acts);
   if (resume) {
-    const fr = el("div", "fresh"), u = el("u", "", "Start fresh instead");
+    const fr = el("div", "fresh"), u = el("u", "", t("Start fresh instead"));
     u.onclick = e => { e.stopPropagation(); play(g, {fresh: true}); };
     fr.appendChild(u); inn.appendChild(fr);
   }
-  const fine = el("div", "fine", "Enter play · F favorite · Space turn back");
-  const link = (t, fn) => { const u = el("u", "", t); u.onclick = e => { e.stopPropagation(); fn(); }; fine.appendChild(document.createTextNode(" · ")); fine.appendChild(u); };
-  link("More…", () => APP.gameMenu(g.id));
+  const fine = el("div", "fine", t("Enter play · F favorite · Space turn back"));
+  const link = (text, fn) => { const u = el("u", "", text); u.onclick = e => { e.stopPropagation(); fn(); }; fine.appendChild(document.createTextNode(" · ")); fine.appendChild(u); };
+  link(t("More…"), () => APP.gameMenu(g.id));
   if (g.plays && cons(g.system).builtin && !PATHS.own) link(t("Saves…"), () => openSaves(g.id));
-  link(g.cv ? "Change cover" : "Find cover art", () => openPicker(g.id));
+  link(g.cv ? t("Change cover") : t("Find cover art"), () => openPicker(g.id));
   inn.appendChild(fine);
   const bar = el("div", "bar"); bar.appendChild(el("i", "", g.id.slice(0, 8).toUpperCase())); inn.appendChild(bar);
   fitBack(bk, inn);
@@ -1376,12 +1404,19 @@ function fitBack(bk, inn) {
   const nt = inn.querySelector(".nt");
   if (nt) { nt.remove(); shrink(.7); }
 }
+/* what a screen reader says for a box: "Super Mario World, SNES, 1991, favorite, last played yesterday" */
+function cardLabel(g) {
+  const days = g.last ? Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(g.last * 1000).setHours(0, 0, 0, 0)) / 86400000) : null;
+  const when = days === null ? t("never played") : t("last played {when}", {when: new Intl.RelativeTimeFormat(LOCALE, {numeric: "auto"}).format(-days, "day")});
+  return [g.title, g.system, g.year, FAV.has(g.id) ? t("favorite") : "", g.progress ? t(PROGRESS[g.progress]) : "", g.rating ? t("{n} stars", {n: g.rating}) : "", when].filter(Boolean).join(", ");
+}
 function hookSlot(c) {
   c.addEventListener("focus", () => select(c));
   c.onmouseenter = () => { if (!kbMode && !scrolling && sel !== c) c.focus({preventScroll: true}); };
 }
 function slot(g, face, i) {
   const c = el("div", "card far"); c.tabIndex = 0; c.dataset.id = g.id; paintVars(c, g);
+  c.setAttribute("role", "button"); c.setAttribute("aria-label", cardLabel(g));
   if (i < 80) c.style.setProperty("--i", i);
   c.appendChild(box(c, g)); stickers(c, g);
   if (face || (g.cv && SEEN.has("/cover/" + g.id + "?v=" + g.cv))) fillCover(c, g); else if (g.cv && io) io.observe(c);
@@ -1515,14 +1550,14 @@ function emptyShelf() {
   const s = el("section", "sec"), row = el("div", "row"); row.style.height = "calc(var(--rowh) * 2)"; row.style.position = "relative"; s.appendChild(row);
   const n = el("div", "note");
   if (G.length) {
-    n.appendChild(el("h2", "", "Nothing matches “" + q + "”"));
-    n.appendChild(el("p", "", "Try another name. Esc clears the search."));
+    n.appendChild(el("h2", "", t("Nothing matches “{q}”", {q})));
+    n.appendChild(el("p", "", t("Try another name. Esc clears the search.")));
   } else {
-    n.appendChild(el("h2", "", "The shelves are empty"));
-    n.appendChild(el("p", "", "Drag game files onto this window and they'll go on the right shelf. Zips, discs and whole folders are fine."));
-    n.appendChild(el("p", "fine", "The Retro Shelf doesn't come with games. Use copies of games you own."));
-    const a = el("button", "btn primary", "Add games…"); a.id = "hadd"; a.onclick = addGames;
-    const b = el("button", "btn", "Where to get games"); b.id = "hget"; b.style.marginLeft = "8px"; b.onclick = openGetGames;
+    n.appendChild(el("h2", "", t("The shelves are empty")));
+    n.appendChild(el("p", "", t("Drag game files onto this window and they'll go on the right shelf. Zips, discs and whole folders are fine.")));
+    n.appendChild(el("p", "fine", t("The Retro Shelf doesn't come with games. Use copies of games you own.")));
+    const a = el("button", "btn primary", t("Add games…")); a.id = "hadd"; a.onclick = addGames;
+    const b = el("button", "btn", t("Where to get games")); b.id = "hget"; b.style.marginLeft = "8px"; b.onclick = openGetGames;
     n.appendChild(a); n.appendChild(b);
   }
   row.appendChild(n); return s;
@@ -1600,12 +1635,12 @@ async function toggleFav(id) {
   renderShelves(id);
 }
 async function rescan() {
-  busy(true); await api("/api/rescan", {}); await refresh(true); busy(false); toast("Found " + G.length + " games");
+  busy(true); await api("/api/rescan", {}); await refresh(true); busy(false); toast(t("Found {n}.", {n: plural(G.length, "game", "games")}));
   if (isOpen("settings")) renderSettings();
 }
 
 /* ---------- adding games (desktop app): drop files or pick them, the app sorts them by system ---------- */
-const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
+const plural = (n, one, many) => n.toLocaleString(LOCALE) + " " + t(n === 1 ? one : many);
 /* pressed with a controller just now: the system's file windows need a mouse, so the app's own folder browser instead */
 const byPad = () => Date.now() - padAt < 2000;
 async function addGames() { if (byPad()) return openBrowse(); const ps = await APP.pickGames(); if (ps && ps.length) importPaths(ps); }
@@ -1620,9 +1655,9 @@ async function importBatch(paths) {
   busy(true); const r = await api("/api/import/check", {paths}); busy(false);
   if (!r.ok) return toast(r.data.error || "Couldn't read those files.", true);
   const items = r.data.items, fresh = items.filter(i => !i.exists), nb = (r.data.biosAdded || []).length;
-  if (nb) { toast("Put " + plural(nb, "BIOS file", "BIOS files") + " in the BIOS folder (" + r.data.biosAdded.slice(0, 3).join(", ") + (nb > 3 ? "…" : "") + ")."); checkBios(); }
+  if (nb) { toast(t("Put {n} in the BIOS folder ({files}).", {n: plural(nb, "BIOS file", "BIOS files"), files: r.data.biosAdded.slice(0, 3).join(", ") + (nb > 3 ? "…" : "")})); checkBios(); }
   if (!items.length && nb) return;
-  if (!items.length) return toast(r.data.unknownCount ? "Those don't look like games this can play (" + r.data.unknown.slice(0, 3).join(", ") + (r.data.unknownCount > 3 ? "…" : "") + ")." : "No games found there.", true);
+  if (!items.length) return toast(r.data.unknownCount ? t("Those don't look like games this can play ({files}).", {files: r.data.unknown.slice(0, 3).join(", ") + (r.data.unknownCount > 3 ? "…" : "")}) : t("No games found there."), true);
   if (!fresh.length) return toast(items.length === 1 ? "That game is already on your shelves." : "Those games are already on your shelves.");
   const unsure = fresh.filter(i => !i.system), picks = unsure.length ? await askSystems(unsure) : {};
   if (!picks) return;
@@ -1631,7 +1666,7 @@ async function importBatch(paths) {
   const s = await api("/api/import", {items: go});
   if (!s.ok || !s.data.started) return toast(s.data.error || "Couldn't add those games.", true);
   STATUS.import = {running: true, done: 0, total: go.length}; impRun = true;
-  busy(true); toast("Adding " + plural(go.length, "game", "games") + "…"); setTimeout(poll, 400);
+  busy(true); toast(t("Adding {n}…", {n: plural(go.length, "game", "games")})); setTimeout(poll, 400);
 }
 /* files that could belong to more than one system, grouped by kind; resolves {id: system} or null on cancel */
 function askSystems(items) {
@@ -1640,11 +1675,11 @@ function askSystems(items) {
     const groups = new Map(), many = items.length > 8;
     items.forEach(i => { const k = many ? i.name.split(".").pop().toLowerCase() + "|" + i.choices.join("|") : i.id; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
     const b = $("#ibody"); clear(b);
-    b.appendChild(Object.assign(el("p", ""), {textContent: "Couldn't tell which system " + (items.length === 1 ? "this game is" : "these games are") + " for.", style: "margin:16px 0 4px;color:var(--ink2)"}));
+    b.appendChild(Object.assign(el("p", ""), {textContent: items.length === 1 ? t("Couldn't tell which system this game is for.") : t("Couldn't tell which system these games are for."), style: "margin:16px 0 4px;color:var(--ink2)"}));
     const pick = new Map(), paint = [];
     groups.forEach(gs => {
       const r = el("div", "row2"), l = el("div", "rl");
-      l.appendChild(el("b", "", gs.length === 1 ? gs[0].name : gs.length + " ." + gs[0].name.split(".").pop() + " files"));
+      l.appendChild(el("b", "", gs.length === 1 ? gs[0].name : t("{n} .{ext} files", {n: gs.length, ext: gs[0].name.split(".").pop()})));
       if (gs.length > 1) l.appendChild(el("span", "", gs.slice(0, 3).map(g => g.name).join(", ") + (gs.length > 3 ? ", …" : "")));
       const sg = el("div", "seg"), opts = gs[0].choices.concat([""]);
       const draw = () => { clear(sg); opts.forEach((o, i) => { const bt = el("button", pick.get(gs) === o ? "on" : "", o || "Skip"); bt.onclick = () => { const f = document.activeElement === bt; pick.set(gs, o); draw(); if (f) sg.children[i].focus(); beep(520); }; sg.appendChild(bt); }); };
@@ -1659,14 +1694,14 @@ function askSystems(items) {
 let impRun = false;
 function importProgress(m) {
   if (!m) return;
-  if (m.running) { impRun = true; busy(true); toast("Adding games: " + m.done + " of " + m.total + (m.current ? " · " + m.current : "")); return; }
+  if (m.running) { impRun = true; busy(true); toast(t("Adding games: {done} of {total}", {done: m.done, total: m.total}) + (m.current ? " · " + m.current : "")); return; }
   if (!impRun) return;
   impRun = false; busy(false); refresh(true);
   const bits = [];
-  if (m.added) bits.push("Added " + plural(m.added, "game", "games"));
-  if (m.already) bits.push(plural(m.already, "was", "were") + " already here");
-  if (m.failed) bits.push(plural(m.failed, "couldn't be copied", "couldn't be copied") + (m.error ? " (" + m.error + ")" : ""));
-  toast(bits.length ? bits.join(". ") + "." : "Done.", !!m.failed);
+  if (m.added) bits.push(t("Added {n}", {n: plural(m.added, "game", "games")}));
+  if (m.already) bits.push(m.already === 1 ? t("1 was already here") : t("{n} were already here", {n: m.already}));
+  if (m.failed) bits.push(t("{n} couldn't be copied", {n: m.failed}) + (m.error ? " (" + m.error + ")" : ""));
+  toast(bits.length ? bits.join(". ") + "." : t("Done."), !!m.failed);
 }
 
 /* ---------- search: typed onto label tape ---------- */
@@ -1720,7 +1755,7 @@ function showLaunch(g) {
   if (!g) return;
   LAUNCH.open = true; LAUNCH.id = g.id; blurActive();
   const L = $("#launch"); L.classList.remove("closing");
-  $("#ltitle").textContent = g.title;
+  $("#ltitle").textContent = g.title; $("#ltitle").translate = false;
   const holder = $(".lart"); clear(holder);
   const c = el("div", "lslot"); paintVars(c, g); c.appendChild(box(c, g)); fillCover(c, g); holder.appendChild(c);
   L.classList.add("starting"); $("#lstat").textContent = MEDIA_VERB[media(g)] + "…"; $("#lhint").style.visibility = "hidden";
@@ -1773,7 +1808,7 @@ function tick() {
 }
 function updatePill() {
   const p = $("#nowpill"), r = STATUS.running;
-  if (r && !LAUNCH.open) { const g = byId.get(r.id); p.hidden = false; p.textContent = "Playing " + (g ? g.title : "a game"); } else p.hidden = true;
+  if (r && !LAUNCH.open) { const g = byId.get(r.id); p.hidden = false; p.textContent = g ? t("Playing {title}", {title: g.title}) : t("Playing a game"); } else p.hidden = true;
   paintUpd();
 }
 
@@ -1782,15 +1817,15 @@ let UPD = {status: "idle", version: "", progress: 0, error: ""};
 function paintUpd() {
   const p = $("#updpill"), on = !LAUNCH.open && !STATUS.running && (UPD.status === "ready" || UPD.status === "manual");
   p.hidden = !on;
-  if (on) p.textContent = UPD.status === "ready" ? "Update ready · Restart" : "Version " + UPD.version + " is out";
+  if (on) p.textContent = UPD.status === "ready" ? t("Update ready · Restart") : t("Version {v} is out", {v: UPD.version});
 }
 function updText() {
   const v = UPD.version;
   return {checking: "Checking…", current: "You have the latest version.",
     downloading: "Downloading version " + v + "… " + (UPD.progress || 0) + "%",
-    ready: "Version " + v + " is ready. It goes in when you quit, or now with Restart.",
-    manual: "Version " + v + " is out. Download it from the releases page." + (APP.platform === "darwin" ? " (Kept in your Applications folder, The Retro Shelf updates itself.)" : ""),
-    error: UPD.error}[UPD.status] || "Version " + (APPINFO.version || "");
+    ready: t("Version {v} is ready. It goes in when you quit, or now with Restart.", {v}),
+    manual: t("Version {v} is out. Download it from the releases page.", {v}) + (APP.platform === "darwin" ? " " + t("(Kept in your Applications folder, The Retro Shelf updates itself.)") : ""),
+    error: UPD.error}[UPD.status] || t("Version {v}", {v: APPINFO.version || ""});
 }
 function updAction() {
   if (UPD.status === "ready") APP.update("restart");
@@ -1914,7 +1949,7 @@ function openOpts(sub) {
   const g = selGame(), list = $("#optl"); clear(list);
   const item = (label, fn, cls) => { const b = el("button", cls || "", label); b.onclick = () => { closeOpts(true); fn(); }; list.appendChild(b); };
   if (g && sub === "shelf") {
-    $("#optst").textContent = "Put " + g.title + " on a shelf";
+    $("#optst").textContent = t("Put {title} on a shelf", {title: g.title});
     SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast((on ? "Took it off " : "Put it on ") + sh.name + "."); }); });
     item("New shelf…", () => openShelfSlip({id: g.id}));
   } else if (sub === "shelfMany" || sub === "progressMany") {
@@ -1958,7 +1993,7 @@ function openOpts(sub) {
     list.appendChild(el("i", "sep"));
     (GAMECHOICES[sub] || []).forEach(([v, name]) => item((own === v ? "✓ " : "") + t(name), set(v)));
   } else {
-    $("#optst").textContent = g ? g.title : "The Retro Shelf";
+    $("#optst").textContent = g ? g.title : "The Retro Shelf"; $("#optst").translate = !g;
     if (g) {
       const resume = g.saves && g.saves.resume && !hardcore();
       item(resume ? "Continue" : "Play", () => play(g));
@@ -2064,7 +2099,7 @@ function collItem(it, list) {
   b.appendChild(art);
   b.onclick = () => {
     if (it.id) { closeColls(); setTimeout(() => showGame(it.id), 60); }
-    else toast(it.title + " isn't in your library." + (list ? "" : " Help → Where to Get Games has the legal ways to get games."));
+    else toast(t("{title} isn't in your library.", {title: it.title}) + (list ? "" : " " + t("Help → Where to Get Games has the legal ways to get games.")));
   };
   if (list && !it.id) {
     const x = el("button", "x", "×"); x.title = "Take it off this collection";
@@ -2085,7 +2120,7 @@ function renderColls() {
   if (collIO) collIO.disconnect();
   collIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting && e.target._im) { e.target._im.src = e.target._im.dataset.src; collIO.unobserve(e.target); } }), {root: $("#colls"), rootMargin: "300px"});
   const block = (name, have, items, opts) => {
-    const sec = el("section", "col"), h = el("div", "colh"), pl = el("span", "tplate", name); pl.appendChild(el("small", "", have + " of " + (opts.total ?? items.length)));
+    const sec = el("section", "col"), h = el("div", "colh"), pl = el("span", "tplate", name); pl.translate = false; pl.appendChild(el("small", "", t("{n} of {total}", {n: have, total: opts.total ?? items.length})));
     h.appendChild(pl);
     if (opts.counts) { const cb = el("button", "lnk", t("What counts")); cb.onclick = opts.counts; h.appendChild(cb); }
     if (opts.hide) { const hb = el("button", "lnk", opts.hidden ? "Show" : "Hide"); hb.onclick = opts.hide; h.appendChild(hb); }
@@ -2095,13 +2130,14 @@ function renderColls() {
   };
   if (collTab === "series") {
     const shown = COLL.series.filter(s => showHiddenSeries || !hidden.has(s.name)), done = COLL.series.filter(s => s.have === s.total).length;
-    sum.textContent = COLL.series.length ? "Your games are part of " + plural(COLL.series.length, "series", "series") + (done ? ", and you have all of " + done + "." : ".") + " Faded boxes are the ones you don't have."
+    const ns = COLL.series.length === 1 ? t("1 series") : t("{n} series", {n: COLL.series.length});
+    sum.textContent = COLL.series.length ? (done ? t("Your games are part of {n}, and you have all of {done}.", {n: ns, done}) : t("Your games are part of {n}.", {n: ns})) + " " + t("Faded boxes are the ones you don't have.")
       : "None of your games belong to a series we know of yet.";
     shown.forEach(s => block(s.name, s.have, s.items, {total: s.total, counts: () => openCounts(s.name), hidden: hidden.has(s.name), hide: () => {
       UI.hiddenSeries = hidden.has(s.name) ? [...hidden].filter(n => n !== s.name) : [...hidden, s.name]; saveUI(); renderColls();
     }}));
     const nh = COLL.series.filter(s => hidden.has(s.name)).length;
-    if (nh) { const p = el("p", "cmore", plural(nh, "series is", "series are") + " hidden. "), t = el("button", "", showHiddenSeries ? "Hide them again" : "Show them"); t.onclick = () => { showHiddenSeries = !showHiddenSeries; renderColls(); }; p.appendChild(t); list.appendChild(p); }
+    if (nh) { const p = el("p", "cmore", (nh === 1 ? t("1 series is hidden.") : t("{n} series are hidden.", {n: nh})) + " "), tb = el("button", "", showHiddenSeries ? t("Hide them again") : t("Show them")); tb.onclick = () => { showHiddenSeries = !showHiddenSeries; renderColls(); }; p.appendChild(tb); list.appendChild(p); }
   } else {
     sum.textContent = "Your own collections. Add any game, even one you don't have yet: it stands faded until you do.";
     COLL.mine.forEach(c => block(c.name, c.have, c.items, {list: c.name}));
@@ -2119,7 +2155,7 @@ function openCounts(name) {
       if (!r.ok) return toast(r.data.error || t("Couldn't change that."), true);
       const c = await api("/api/collections"); if (c.ok) COLL = c.data;
       redrawList(); renderColls();
-    }]]);
+    }]], null, true);
   });
 }
 $$("#ctabs button").forEach(b => { b.onclick = () => { collTab = b.dataset.t; renderColls(); beep(520); }; });
@@ -2127,7 +2163,7 @@ $$("#ctabs button").forEach(b => { b.onclick = () => { collTab = b.dataset.t; re
 /* adding a game to one of your collections: search every game the app knows */
 let waddList = null, waddT = 0;
 function openWantAdd(name) {
-  waddList = name; $("#waddt").textContent = "Add a game to " + name; $("#waddq").value = ""; clear($("#waddr"));
+  waddList = name; $("#waddt").textContent = t("Add a game to {name}", {name}); $("#waddq").value = ""; clear($("#waddr"));
   $("#wadd").classList.add("show"); setTimeout(() => $("#waddq").focus(), 50);
 }
 function closeWantAdd() { if (!isOpen("wadd")) return; $("#wadd").classList.remove("show"); waddList = null; if (isOpen("colls")) openColls(); }
@@ -2141,7 +2177,7 @@ $("#waddq").addEventListener("input", () => { clearTimeout(waddT); waddT = setTi
     b.onclick = async () => {
       const res = await api("/api/shelves", x.id ? {op: "add", name: waddList, id: x.id} : {op: "want", name: waddList, system: x.system, look: x.look});
       if (!res.ok) return toast(res.data.error || "Couldn't add it.", true);
-      toast("Added " + x.title + "."); if (x.id) refresh(true);
+      toast(t("Added {title}.", {title: x.title})); if (x.id) refresh(true);
     };
     out.appendChild(b);
   });
@@ -2166,7 +2202,7 @@ async function searchCovers() {
   if (!r.ok) { msg.textContent = r.data.error || "Couldn't search for covers."; return; }
   const res = r.data.results;
   msg.textContent = !res.length ? "No covers match. Try fewer or different words."
-    : "Click the right box to use it" + (res.length >= 60 ? " (showing the first 60)." : ".");
+    : res.length >= 60 ? t("Click the right box to use it (showing the first 60).") : t("Click the right box to use it.");
   /* pictures load as they scroll into view: each one is a download */
   if (pickIO) pickIO.disconnect();
   pickIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.src = e.target.dataset.src; pickIO.unobserve(e.target); } }), {root: $("#pick .panel"), rootMargin: "200px"});
@@ -2212,7 +2248,7 @@ async function saveShelfSlip() {
   closeShelfSlip(); await refresh(true);
   if (o.id) focusById(o.id);
   if (isOpen("colls")) openColls("mine");
-  toast(o.from ? "Shelf renamed." : "Made the shelf “" + name + "”.");
+  toast(o.from ? t("Shelf renamed.") : t("Made the shelf “{name}”.", {name}));
 }
 $("#nshok").onclick = saveShelfSlip;
 $("#nshcancel").onclick = closeShelfSlip;
@@ -2240,7 +2276,7 @@ function closeWelcome() { $("#welcome").classList.remove("show"); UI.welcomed = 
 async function showNews() {
   const r = await api("/api/whatsnew"); if (!r.ok || !r.data.changes.length) return;
   const list = $("#nlist"), many = r.data.changes.length > 1; clear(list);
-  $("#ntitle").textContent = many ? "New since you last played" : "New in " + r.data.changes[0].version;
+  $("#ntitle").textContent = many ? t("New since you last played") : t("New in {version}", {version: r.data.changes[0].version});
   for (const c of r.data.changes) {
     if (many) list.appendChild(el("li", "v", c.version));
     for (const [head, text] of c.items) {
@@ -2417,13 +2453,13 @@ function openKeys() {
   if (LAUNCH.open) return;
   const nm = PAD_NAMES[padStyle()], nin = padStyle() === "nintendo", fill = (dl, rows) => { clear(dl); for (const [k, what] of rows) {
     if (!what) { dl.appendChild(el("div", "kh", k)); continue; }
-    dl.appendChild(el("dt", "", k)); dl.appendChild(el("dd", "", what));
+    const dt = el("dt", "", k); dt.translate = false; dl.appendChild(dt); dl.appendChild(el("dd", "", what));
   } };
   fill($("#kkb"), [[t("On the shelves")], ["← → ↑ ↓", t("Browse")], ["Enter", t("Play")], [t("Space"), t("Turn the box over")], ["F", t("Favorite")],
     ["Q  E", t("Previous or next shelf")], ["/", t("Search")], ["O", t("Options for the game")], ["S", t("Settings")], ["R", t("Surprise me")],
     ["X", t("Pick (to do things to several at once)")], ["?", t("This sheet")], ["Esc", t("Back")],
     [t("In a game")], ["Esc", t("Back to the shelves")], ["F1", t("The emulator's menu")], [t("Hold R"), t("Rewind")], [t("Hold L"), t("Fast-forward")], ["E  D  E", t("Change discs")]]);
-  $("#kpadh").textContent = t("Controller") + " (" + {xbox: "Xbox", playstation: "PlayStation", nintendo: "Nintendo"}[padStyle()] + ")";
+  $("#kpadh").textContent = t("Controller ({style})", {style: {xbox: "Xbox", playstation: "PlayStation", nintendo: "Nintendo"}[padStyle()]});
   fill($("#kpad"), [[t("On the shelves")], [t("D-pad"), t("Browse")], [nm[nin ? 1 : 0], t("Play")], [nm[nin ? 0 : 1], t("Back")], [nm[nin ? 2 : 3], t("Turn the box over")],
     [nm[nin ? 3 : 2], t("Favorite")], [nm[4] + "  " + nm[5], t("Previous or next shelf")], [nm[8], t("Options, and this sheet")], [nm[9], t("Settings")],
     [t("In a game")], [t("Hold {b}", {b: nm[9]}), t("Back to the shelves")], [t("Hold {b}", {b: nm[8]}), t("The emulator's menu")],
@@ -2435,7 +2471,6 @@ function closeKeys() { if (!isOpen("keys")) return; $("#keys").classList.remove(
 $("#keysok").onclick = closeKeys;
 
 /* ---------- a month's or a year's play on one card: offered once when a month starts, and from Your play ---------- */
-const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 let RC = null, rcFrom = null;
 async function offerRecap() {
   const r = await api("/api/recap/due", {});
@@ -2449,7 +2484,7 @@ async function openRecap(year, month, offered) {
   if (!isOpen("recap")) { rcFrom = opener(); blurActive(); $("#recap").classList.add("show"); light(); beep(520); setTimeout(() => $("#rcdone").focus({preventScroll: true}), 40); }
 }
 function closeRecap() { if (!isOpen("recap")) return; $("#recap").classList.remove("show"); backTo(rcFrom); light(); beep(330); }
-const recapName = d => d.month === null ? String(d.year) : MONTH_NAMES[d.month] + " " + d.year;
+const recapName = d => d.month === null ? String(d.year) : new Date(d.year, d.month, 1).toLocaleDateString(LOCALE, {month: "long", year: "numeric"});
 async function renderRecap(d) {
   const card = $("#rcard"), name = recapName(d), refocus = keepFocus($("#recap")); clear(card);
   const head = el("div", "tch"); head.appendChild(el("span", "", t("Your {when}", {when: name}))); head.appendChild(el("span", "", "The Retro Shelf"));
@@ -2469,12 +2504,12 @@ async function renderRecap(d) {
         const g = byId.get(x.id); if (!g) continue;
         const row = el("div"), art = el("span", "art"), tx = el("span");
         if (g.cv) { const im = new Image(); im.alt = ""; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); } else art.textContent = g.title;
-        tx.appendChild(el("b", "", g.title)); tx.appendChild(el("span", "", g.system + " · " + fmtDur(x.time)));
+        const ti = el("b", "", g.title); ti.translate = false; tx.appendChild(ti); tx.appendChild(el("span", "", g.system + " · " + fmtDur(x.time)));
         row.appendChild(art); row.appendChild(tx); top.appendChild(row);
       }
       card.appendChild(top);
     }
-    const day = s => new Date(s * 1000).toLocaleDateString(undefined, {weekday: "short", month: "short", day: "numeric"});
+    const day = s => new Date(s * 1000).toLocaleDateString(LOCALE, {weekday: "short", month: "short", day: "numeric"});
     const lines = el("div", "rcl"), line = (label, text) => { const x = el("div"); x.appendChild(el("span", "", label)); x.appendChild(document.createTextNode(text)); lines.appendChild(x); };
     const lg = d.longest && byId.get(d.longest.id);
     if (lg) line(t("Longest sitting"), lg.title + " · " + fmtDur(d.longest.time) + " · " + day(d.longest.at));
@@ -2483,7 +2518,7 @@ async function renderRecap(d) {
     if (d.pins.length) {
       if (!PINCAT) { const r = await api("/api/pins"); if (r.ok) PINCAT = new Map(r.data.pins.map(p => [p.key, p])); }
       const row = el("div", "rcpins"), ps = d.pins.map(k => PINCAT && PINCAT.get(k)).filter(Boolean);
-      for (const p of ps.slice(0, 10)) { const e = el("div", "pin " + p.tier); e.title = p.title; e.appendChild(el("div", "badge", p.icon)); row.appendChild(e); }
+      for (const p of ps.slice(0, 10)) { const e = el("div", "pin " + p.tier); e.title = p.title; e.setAttribute("role", "img"); e.setAttribute("aria-label", pinLabel(p)); e.appendChild(badge(p.icon)); row.appendChild(e); }
       if (ps.length > 10) row.appendChild(el("span", "", "+" + (ps.length - 10)));
       card.appendChild(row);
     }
@@ -2562,7 +2597,7 @@ function openCtest() {
   const loop = () => {
     if (!isOpen("ctest")) return;
     const pads = connectedPads(), gp = pads[0];
-    $("#ctname").textContent = gp ? pads.map((p, i) => (pads.length > 1 ? t("Player {n}: ", {n: i + 1}) : "") + padName(p)).join(" · ") : t("No controller found. Plug one in or turn it on, then press a button.");
+    $("#ctname").textContent = gp ? pads.map((p, i) => (pads.length > 1 ? t("Player {n}:", {n: i + 1}) + " " : "") + padName(p)).join(" · ") : t("No controller found. Plug one in or turn it on, then press a button.");
     const nm = PAD_NAMES[padStyle(gp)], lab = $("#ctlabels");
     if (lab.dataset.style !== padStyle(gp)) {
       clear(lab); lab.dataset.style = padStyle(gp);
@@ -2611,14 +2646,14 @@ function openButtons(system) {
           for (const k of Object.keys(map)) if (+k === map[k]) delete map[k];
           await save(); redrawList(); beep(880, .05);
         };
-      }]]);
+      }]], null, true);
     }
     if (Object.keys(map).length) listRow(list, t("As they were"), t("Every button back to what it did at first."), [[t("Put back"), async () => { map = {}; await save(); redrawList(); }]]);
   });
 }
 function openButtonConsoles() {
   openList(t("Change buttons"), t("Choose a console. What you change there is for all its games."), list => {
-    for (const s of SYSTEMS) if (cons(s).builtin && G.some(g => g.system === s)) listRow(list, s, cons(s).remap ? t("Changed") : "", [[t("Buttons…"), () => openButtons(s)]]);
+    for (const s of SYSTEMS) if (cons(s).builtin && G.some(g => g.system === s)) listRow(list, s, cons(s).remap ? t("Changed") : "", [[t("Buttons…"), () => openButtons(s)]], null, true);
   });
 }
 
@@ -2636,7 +2671,7 @@ async function openBrowse(dir) {
         toast(t("{n} from that folder are on the shelves.", {n: plural(w.data.games, "game", "games")}));
       }]]);
       listRow(list, t("Back"), d.parent || t("The places to start"), [[t("Open"), () => openBrowse(d.parent || "")]]);
-      for (const f of d.folders) listRow(list, f.name, f.games ? plural(f.games, "game", "games") : "", [[t("Open"), () => openBrowse(f.path)]]);
+      for (const f of d.folders) listRow(list, f.name, f.games ? plural(f.games, "game", "games") : "", [[t("Open"), () => openBrowse(f.path)]], null, true);
       if (!d.folders.length) list.appendChild(el("p", "", t("No folders inside this one.")));
     } else for (const p of d.places) listRow(list, t(p.label), p.path, [[t("Open"), () => openBrowse(p.path)]]);
   }, () => d.dir && d.folders.length ? $$("#lstl .lrow button")[2] : null);
@@ -2654,8 +2689,11 @@ function openList(title, about, fill, first) {
 function closeList() { if (!isOpen("lst")) return; $("#lst").classList.remove("show"); listFill = null; LISTEN = null; backTo(listFrom); light(); beep(330); }
 const redrawList = () => { if (listFill) { const l = $("#lstl"), refocus = keepFocus(l); clear(l); listFill(l); refocus(); } };
 $("#lstok").onclick = closeList;
-function listRow(list, label, sub, buttons, pic) {
+/* a row: its label, a line under it, its buttons. A label that's a name (a game's, a file's, a console's) is marked
+   so it's never translated */
+function listRow(list, label, sub, buttons, pic, name) {
   const r = el("div", "lrow"), s = el("span", "", label);
+  if (name) s.translate = false;
   if (pic) { const im = new Image(); im.alt = ""; im.src = pic; im.onerror = () => im.remove(); r.appendChild(im); }
   if (sub) s.appendChild(el("small", "", sub));
   r.appendChild(s);
@@ -2672,7 +2710,7 @@ async function openUnsure() {
       const a = await api("/api/watch/assign", {src: f.src, system: c});
       if (!a.ok) return toast(a.data.error || t("Couldn't do that."), true);
       files = files.filter(x => x !== f); await refresh(true); redrawList();
-    }]));
+    }]), null, true);
   });
 }
 /* one game's saves: its own save, where you left off, and numbered saves, each to start from or put in the Trash */
@@ -2706,7 +2744,7 @@ function openHidden() {
     if (!hid.length) list.appendChild(el("p", "", t("No hidden games.")));
     for (const g of hid) listRow(list, g.title, [g.system, g.tag].filter(Boolean).join(" · "), [[t("Show again"), async () => {
       await api("/api/game/hide", {id: g.id, hidden: false}); await refresh(true); redrawList();
-    }]]);
+    }]], null, true);
   });
 }
 /* the same game more than once on a console (other regions, revisions, or the same file twice) */
@@ -2721,10 +2759,10 @@ function openDuplicates() {
     if (!groups.length) list.appendChild(el("p", "", t("No copies left: every game is on its shelf once.")));
     for (const gs of groups) {
       list.appendChild(el("h3", "", gs[0].title + " · " + gs[0].system));
-      for (const g of gs) listRow(list, g.file, [g.tag, g.time ? fmtDur(g.time) + " played" : "", g.size ? fmtSize(g.size) : ""].filter(Boolean).join(" · "), [[t("Keep this one"), async () => {
+      for (const g of gs) listRow(list, g.file, [g.tag, g.time ? t("{time} played", {time: fmtDur(g.time)}) : "", g.size ? fmtSize(g.size) : ""].filter(Boolean).join(" · "), [[t("Keep this one"), async () => {
         for (const o of gs) if (o !== g) await api("/api/game/hide", {id: o.id, hidden: true});
         await refresh(true); redrawList();
-      }]]);
+      }]], null, true);
     }
   });
 }
@@ -2830,17 +2868,17 @@ function checkBios() { api("/api/bios", {}).then(r => { if (r.ok) { BIOSST = r.d
 const biosGames = c => c.for === "unknown" ? 0 : G.filter(g => g.system === c.system && (c.for !== "discs" || /\.(cue|chd)$/i.test(g.file || ""))).length;
 function biosLine(c) {
   const has = c.files.filter(f => f.ok).map(f => f.name), wrong = c.files.filter(f => f.found && !f.ok).map(f => f.name);
-  const n = biosGames(c), games = n ? " You have " + plural(n, "game", "games") + " for it." : "";
-  if (c.state === "ok") return "Found " + has[0] + (has.length > 1 ? " and " + (has.length - 1) + " more" : "") + ".";
-  if (c.state === "bad") return wrong.join(", ") + " is the wrong size, so it's probably not a real BIOS. Copy it again from your console.";
-  if (c.state === "partial") return "Has " + has.join(", ") + ". Missing " + c.files.filter(f => !f.found).map(f => f.name).join(", ") + ". " + c.note;
-  return "Missing: " + c.files[0].name + (c.files.length > 1 ? (c.files.length > 3 ? " (or another one of its BIOS files)" : ", " + c.files.slice(1).map(f => f.name).join(", ")) : "") + ". " + c.note + games;
+  const n = biosGames(c), games = n ? " " + t("You have {n} for it.", {n: plural(n, "game", "games")}) : "", note = t(c.note);
+  if (c.state === "ok") return has.length > 1 ? t("Found {file} and {n} more.", {file: has[0], n: has.length - 1}) : t("Found {file}.", {file: has[0]});
+  if (c.state === "bad") return t("{files} is the wrong size, so it's probably not a real BIOS. Copy it again from your console.", {files: wrong.join(", ")});
+  if (c.state === "partial") return t("Has {has}. Missing {missing}.", {has: has.join(", "), missing: c.files.filter(f => !f.found).map(f => f.name).join(", ")}) + " " + note;
+  return (c.files.length > 3 ? t("Missing: {file} (or another one of its BIOS files).", {file: c.files[0].name}) : t("Missing: {files}.", {files: c.files.map(f => f.name).join(", ")})) + " " + note + games;
 }
 function closeSettings() { if (!isOpen("settings")) return; $("#settings").classList.remove("show"); focusById(focusId); light(); beep(330); }
 function updateCoverUI() {
-  const t = $("#ctext"); if (!t) return; const c = STATUS.covers || {};
-  t.textContent = c.running ? "Fetching: " + c.done + " of " + c.total + " checked, " + c.found + " found"
-    : c.error ? c.error : "Idle. Last run found " + (c.found || 0) + " new covers.";
+  const tx = $("#ctext"); if (!tx) return; const c = STATUS.covers || {};
+  tx.textContent = c.running ? t("Fetching: {done} of {total} checked, {found} found", {done: c.done, total: c.total, found: c.found})
+    : c.error ? c.error : t("Idle. Last run found {n} new covers.", {n: c.found || 0});
   const b = $("#cbar i"); if (b) b.style.width = (c.running && c.total ? Math.round(100 * c.done / c.total) : 0) + "%";
 }
 /* where the focus is in a panel that's about to be redrawn, and putting it back on the same control after */
@@ -2928,7 +2966,7 @@ function renderSettings() {
       const r = await api("/api/shelves", {op: "delete", name: sh.name}); if (!r.ok) return toast(r.data.error || "Couldn't delete it.", true); await refresh(true); renderSettings(); toast("Deleted the shelf. Its games are still on their console shelves.");
     };
     bs.appendChild(rn); bs.appendChild(del);
-    R(sh.name, "Your shelf · " + plural(sh.ids.length, "game", "games"), bs);
+    R(sh.name, t("Your shelf · {n}", {n: plural(sh.ids.length, "game", "games")}), bs);
   });
   const chips = el("div", "chips");
   SYSTEMS.forEach(s => { const n = G.filter(g => g.system === s).length; if (!n) return; const hid = UI.hidden.indexOf(s) >= 0; const c = el("button", hid ? "" : "on", s + " " + n);
@@ -2938,10 +2976,10 @@ function renderSettings() {
   if (nHidden || UI.showHidden) {
     const hb = el("div", "btns"), hl = el("button", "btn", t("List")); hl.onclick = openHidden;
     hb.appendChild(hl); hb.appendChild(sw(!!UI.showHidden, v => { UI.showHidden = v; saveUI(); renderShelves(focusId); renderSettings(); }));
-    R("Hidden games", plural(nHidden, "game is", "games are") + " hidden. The switch shows them on the shelves, faded; the list brings them back.", hb);
+    R("Hidden games", (nHidden === 1 ? t("1 game is hidden.") : t("{n} games are hidden.", {n: nHidden})) + " " + t("The switch shows them on the shelves, faded; the list brings them back."), hb);
   }
   const dups = duplicates();
-  if (dups.length) { const db2 = el("button", "btn", t("Look")); db2.onclick = openDuplicates; R(t("The same game twice"), t("{n} on the same console more than once, like two regions or revisions.", {n: plural(dups.length, "game is", "games are")}), db2); }
+  if (dups.length) { const db2 = el("button", "btn", t("Look")); db2.onclick = openDuplicates; R(t("The same game twice"), dups.length === 1 ? t("1 game is on the same console more than once, like two regions or revisions.") : t("{n} games are on the same console more than once, like two regions or revisions.", {n: dups.length}), db2); }
 
   R("Download missing covers", "Looks up box art by title on thumbnails.libretro.com. Nothing else is sent.", sw(UI.autoCovers, v => { UI.autoCovers = v; saveUI(); }));
   const pr = el("div", ""), bar = el("div", "pbar"); bar.id = "cbar"; bar.appendChild(el("i")); pr.appendChild(bar);
@@ -2952,7 +2990,7 @@ function renderSettings() {
   R("Fetch now", "Search again retries games with no match. Your own art always wins: save Game Name.png next to the ROM.", cb);
 
   const rf = field(PATHS.roms_dir, PATHS.roms_ok, "roms");
-  R("Games folder", PATHS.roms_ok ? G.length + " games found." : "Folder not found.", rf);
+  R("Games folder", PATHS.roms_ok ? t("{n} found.", {n: plural(G.length, "game", "games")}) : t("Folder not found."), rf);
   const mv = el("button", "btn", t("Move to another drive…"));
   mv.onclick = async () => { const r = await APP.moveLibrary(); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("The games are in {dir} now.", {dir: r.to})); };
   R(t("Move the games"), t("Copies every game to a folder on another drive, checks each one, then uses them from there. Play history comes along. The old copy goes to the Trash only if you say."), mv);
@@ -2962,7 +3000,7 @@ function renderSettings() {
     const paths = {roms_dir: rf.input.value};
     if (own) Object.assign(paths, {exe: ef.input.value, cores_dir: cf.input.value, args: af.input.value});
     const r = await api("/api/settings", {paths});
-    if (r.ok) PATHS = r.data.paths; await refresh(true); busy(false); renderSettings(); toast("Saved. " + G.length + " games found.");
+    if (r.ok) PATHS = r.data.paths; await refresh(true); busy(false); renderSettings(); toast(t("Saved. {n} found.", {n: plural(G.length, "game", "games")}));
   };
   const rs = el("button", "btn", "Scan for new games"); rs.onclick = rescan;
   const bt = el("div", "btns");
@@ -2970,7 +3008,7 @@ function renderSettings() {
 
 
   if (PATHS.builtin) {
-    H("Playing");
+    H("While you play");
     R("Play fullscreen", "Games fill the screen. Turn off to play in a window.", sw(UI.fullscreen !== false, v => { UI.fullscreen = v; saveUI(); }));
     R(t("Picture"), t("How games look. By console: an old TV's scanlines for home consoles, a handheld's screen for Game Boy and GBA, crisp pixels for the rest."),
       seg([["auto", t("By console")], ["sharp", t("Sharp")], ["smooth", t("Smooth")], ["crt", t("Old TV")], ["lcd", t("Handheld")]], UI.picture || "auto", v => { UI.picture = v; saveUI(); }));
@@ -2986,7 +3024,7 @@ function renderSettings() {
     H("Saves & BIOS");
     const fb = el("div", "btns"), f1 = el("button", "btn", "Saves"), f2 = el("button", "btn", "BIOS");
     f1.onclick = () => APP.openFolder("saves"); f2.onclick = () => APP.openFolder("bios"); fb.appendChild(f1); fb.appendChild(f2);
-    R("Folders", (PATHS.saves_dir ? t("Game saves are kept in {dir}.", {dir: PATHS.saves_dir}) : "Game saves are kept in Documents › The Retro Shelf › Saves.") + " BIOS files are needed for some consoles; Saves & BIOS below shows which.", fb);
+    R("Folders", (PATHS.saves_dir ? t("Game saves are kept in {dir}.", {dir: PATHS.saves_dir}) : t("Game saves are kept in Documents › The Retro Shelf › Saves.")) + " " + t("BIOS files are needed for some consoles; Saves & BIOS below shows which."), fb);
     /* saves shared between computers through a cloud folder */
     const sf = el("div", "btns"), sm = el("button", "btn", PATHS.saves_dir ? t("Move again…") : t("Share them…"));
     sm.onclick = async () => { const r = await APP.moveSaves(false); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("Saves are in {dir} now. The old copy stays where it was.", {dir: r.to})); };
@@ -2995,11 +3033,11 @@ function renderSettings() {
     R(t("Saves on more than one computer"), PATHS.saves_dir ? t("Shared through {dir}. If a game is open on another computer, you're told before playing it here. In iCloud Drive, keep the folder downloaded (right-click it in Finder).", {dir: PATHS.saves_dir})
       : t("Put the saves in a folder in iCloud Drive, Dropbox or OneDrive, and point The Retro Shelf on your other computers at the same folder: your progress follows you."), sf);
     const bb = el("div", "btns"), bk = el("button", "btn", "Back up…"), rs = el("button", "btn", "Restore…");
-    bk.onclick = async () => { const r = await APP.backupSaves(); if (r.ok) toast("Backed up " + plural(r.count, "file", "files") + "."); else if (r.error) toast(r.error, true); };
+    bk.onclick = async () => { const r = await APP.backupSaves(); if (r.ok) toast(t("Backed up {n}.", {n: plural(r.count, "file", "files")})); else if (r.error) toast(r.error, true); };
     rs.onclick = async () => {
       const r = await APP.restoreSaves(); if (!r.ok) { if (r.error) toast(r.error, true); return; }
-      toast("Restored " + plural(r.restored, "save", "saves") + (r.kept ? ". Kept " + r.kept + " newer ones you already had" : "") + "."
-        + (r.failed ? " " + plural(r.failed, "save", "saves") + " couldn't be written: is a game or another app using " + (r.failed > 1 ? "them" : "it") + "?" : ""), !!r.failed); refresh(true);
+      toast(t("Restored {n}.", {n: plural(r.restored, "save", "saves")}) + (r.kept ? " " + t("Kept {n} newer ones you already had.", {n: r.kept}) : "")
+        + (r.failed ? " " + (r.failed === 1 ? t("1 save couldn't be written: is a game or another app using it?") : t("{n} saves couldn't be written: is a game or another app using them?", {n: r.failed})) : ""), !!r.failed); refresh(true);
     };
     bb.appendChild(bk); bb.appendChild(rs);
     R("Back up saves", "Puts all your saves and resume points in one .zip file, or puts them back from one. A save newer than the backup is never replaced.", bb);
@@ -3008,7 +3046,7 @@ function renderSettings() {
     abf.onclick = async () => { const r = await APP.backupFolder(); if (r && r.ok) { await refresh(true); renderSettings(); } };
     ab2.appendChild(abf); ab2.appendChild(sw(!!UI.autoBackup, v => { UI.autoBackup = v; saveUI(); renderSettings(); }));
     R(t("Back up by itself"), t("Every week, a backup of all your saves in {dir}. The last five are kept.", {dir: PATHS.backup_dir || ""}) + (PATHS.last_backup ? " " + t("The last one: {when}.", {when: fmtWhen(PATHS.last_backup)}) : ""), ab2);
-    R("BIOS files", "Copied from your own consoles. Drop them on this window and they go in the right place." + (BIOSST ? "" : " Checking…"), null);
+    R("BIOS files", t("Copied from your own consoles. Drop them on this window and they go in the right place.") + (BIOSST ? "" : " " + t("Checking…")), null);
     if (BIOSST) {
       const bl = el("div", "biosl");
       BIOSST.forEach(c => {
@@ -3019,7 +3057,7 @@ function renderSettings() {
       b.appendChild(bl);
     }
   } else {
-    H("Playing");
+    H("While you play");
   R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); renderHints(); }));
   }
 
@@ -3043,7 +3081,16 @@ function renderSettings() {
   }
 
   H("App");
-  R("TV mode", "For a computer hooked up to a TV: opens fullscreen and bigger, and everything works with a controller. Select opens a game's options.", sw(!!UI.tv, v => { UI.tv = v; saveUI(); applyUI(); APP.tvMode(v); }));
+  /* the language: other than English, drafts made by machine and marked beta, with a way to suggest better words */
+  const lw = el("div", "btns"), ls = document.createElement("select"); ls.className = "lsel"; ls.setAttribute("aria-label", t("Language"));
+  for (const [code, name] of LANGS) { const o = document.createElement("option"); o.value = code; o.textContent = code === "auto" ? t("Automatic") : code === "en" ? name : name + " (beta)"; ls.appendChild(o); }
+  ls.value = UI.lang || "auto";
+  ls.onchange = async () => { UI.lang = ls.value; saveUI(); APP.setLang(UI.lang); await setLang(UI.lang); renderHints(); renderShelves(focusId); renderSettings(); };
+  lw.appendChild(ls);
+  if (LANG !== "en") { const fx = el("button", "btn", t("Suggest better words")); fx.onclick = () => APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new?title=" + encodeURIComponent("Translation (" + LANG + "): ")); lw.appendChild(fx); }
+  R(t("Language"), t("Languages other than English are drafts. If something reads oddly, suggest better words."), lw);
+  R("TV mode", "For a computer hooked up to a TV: opens fullscreen and bigger, and everything works with a controller. Select opens a game's options.", sw(!!UI.tv, v => { UI.tv = v; saveUI(); applyUI(); APP.tvMode(v, UI.textSize); }));
+  R(t("Text size"), t("Everything bigger, for reading from further away."), seg([[100, "100%"], [115, "115%"], [130, "130%"]], UI.textSize || 100, v => { UI.textSize = v; saveUI(); APP.textSize(!!UI.tv, v); }));
   R("Animations", "Choose Reduced or Off on older computers.", seg([["full", "Full"], ["reduced", "Reduced"], ["off", "Off"]], UI.fx, v => { UI.fx = v; applyUI(); saveUI(); }));
   R(t("Screensaver"), t("In TV mode, after a while with nothing pressed: the shelves drift and pictures from your games fade through. Any button wakes it."),
     seg([[0, t("Off")], [5, t("5 min")], [10, t("10 min")], [20, t("20 min")]], UI.saver ?? 5, v => { UI.saver = v; saveUI(); }));
@@ -3068,11 +3115,11 @@ function renderSettings() {
   is.onclick = () => APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new");
   pb.appendChild(cp); pb.appendChild(is);
   const lb = el("button", "btn", "Licenses"); lb.onclick = () => APP.licenses();
-  R("The Retro Shelf " + (APPINFO.version || ""), "Emulation by RetroArch and the libretro cores, free software by their authors. No games are included.", lb);
+  R(t("The Retro Shelf {version}", {version: APPINFO.version || ""}), "Emulation by RetroArch and the libretro cores, free software by their authors. No games are included.", lb);
   R("Something not working?", "Copy info puts your versions, setup and the last game's emulator log on the clipboard for a bug report. Nothing is sent until you paste it somewhere.", pb);
   if (PATHS.builtin) {
     const bi = PATHS.builtin, ok = el("div", "fld"); ok.appendChild(el("i", "dot " + (PATHS.own ? "bad" : "ok")));
-    R("Built-in emulators", "RetroArch " + bi.version + " with emulators for " + bi.systems + " systems, ready to go." + (PATHS.own ? " Not in use: you're using your own RetroArch." : ""), ok);
+    R("Built-in emulators", t("RetroArch {version} with emulators for {n} systems, ready to go.", {version: bi.version, n: bi.systems}) + (PATHS.own ? " " + t("Not in use: you're using your own RetroArch.") : ""), ok);
     R("Use my own RetroArch", "For people who already have RetroArch set up the way they like.", sw(!!UI.ownEmu, v => { UI.ownEmu = v; api("/api/settings", {ui: UI}).then(r => { if (r.ok) PATHS = r.data.paths; renderSettings(); }); }));
   }
   if (own) {
@@ -3097,7 +3144,7 @@ function renderSettings() {
 function playStats(b, R) {
   const played = G.filter(g => g.time > 0), total = played.reduce((t, g) => t + g.time, 0);
   const op = el("button", "btn", "Open"); op.onclick = () => { closeSettings(); openTrophy(); };
-  R("Your trophy shelf", played.length ? fmtDur(total) + " played across " + plural(played.length, "game", "games") + "." : "Play something and your most played games show up here.", op);
+  R("Your trophy shelf", played.length ? t("{time} played across {n}.", {time: fmtDur(total), n: plural(played.length, "game", "games")}) : t("Play something and your most played games show up here."), op);
 }
 function openTrophy() {
   if (LAUNCH.open) return;
@@ -3105,10 +3152,10 @@ function openTrophy() {
   const played = G.filter(g => g.time > 0).sort((x, y) => y.time - x.time), total = played.reduce((t, g) => t + g.time, 0);
   const sum = $("#tsum"), top = $("#ttop"), con = $("#tcon"); clear(sum); clear(top); clear(con);
   if (!played.length) {
-    sum.textContent = "Nothing on the trophy shelf yet. Play something and your most played games will stand here.";
+    sum.textContent = t("Nothing on the trophy shelf yet. Play something and your most played games will stand here.");
   } else {
     sum.appendChild(el("b", "", fmtDur(total)));
-    sum.appendChild(document.createTextNode("played · " + played.length + " of " + G.length + " games · " + plural(G.reduce((t, g) => t + (g.plays || 0), 0), "session", "sessions")));
+    sum.appendChild(document.createTextNode(t("played · {n} of {total} games · {sessions}", {n: played.length, total: G.length, sessions: plural(G.reduce((a, g) => a + (g.plays || 0), 0), "session", "sessions")})));
     /* the five most played, biggest first, a little crooked like boxes put up by hand */
     played.slice(0, 5).forEach((g, i) => {
       const t = el("div", "tro"), art = el("div", "art");
@@ -3147,27 +3194,34 @@ function corkboard(d) {
   const cork = $("#cork"); clear(cork);
   /* pins for consoles or series you don't have stay off the board until you do */
   const st = new Map(d.state.map(x => [x.key, x])), shown = d.pins.filter(p => st.get(p.key).shown), got = shown.filter(p => st.get(p.key).earned).length;
-  const h = el("div", "corkh"), pl = el("span", "tplate", "Pins"); pl.appendChild(el("small", "", got + " of " + shown.length));
+  const h = el("div", "corkh"), pl = el("span", "tplate", t("Pins")); pl.appendChild(el("small", "", t("{n} of {total}", {n: got, total: shown.length})));
   h.appendChild(pl); h.appendChild(el("span", "", "Earned from how you play. Nothing leaves your computer.")); cork.appendChild(h);
   /* in each group: earned first (newest first), then the ones closest to earning */
   const when = k => d.earned[k] === undefined ? -1 : d.earned[k];
   const near = p => { const pr = st.get(p.key).progress; return pr ? pr[0] / pr[1] : 0; };
   for (const [cat, label] of d.cats) {
     const list = shown.filter(p => p.cat === cat); if (!list.length) continue;
-    const n = list.filter(p => st.get(p.key).earned).length, gh = el("h4", "corkg", label); gh.appendChild(el("small", "", n + " of " + list.length));
+    const n = list.filter(p => st.get(p.key).earned).length, gh = el("h4", "corkg", t(label)); gh.appendChild(el("small", "", t("{n} of {total}", {n, total: list.length})));
     cork.appendChild(gh);
     const grid = el("div", "pins");
     list.sort((a, b) => (st.get(b.key).earned - st.get(a.key).earned) || (when(b.key) - when(a.key)) || (near(b) - near(a))).forEach(p => grid.appendChild(pinEl(p, st.get(p.key), d.earned[p.key])));
     cork.appendChild(grid);
   }
 }
+/* a pin's badge, in a wrapper that carries its shadow (silver and gold are cut into shapes) */
+const badge = icon => { const w = el("span", "bw"); w.appendChild(el("div", "badge" + (/^\d+$/.test(icon) ? " num" : ""), icon)); return w; };
+const TIER = {bronze: "Bronze", silver: "Silver", gold: "Gold"};
+/* a pin's words in the chosen language: made from its pattern when it has one (a console's pins, a series') */
+const pinTitle = p => p.key.startsWith("s:") ? p.title : p.tpl ? t(p.tpl.title, p.tpl.v) : t(p.title), pinDesc = p => p.tpl ? t(p.tpl.desc, p.tpl.v) : t(p.desc);
+const pinLabel = p => t("{tier} pin: {title}", {tier: t(TIER[p.tier]), title: pinTitle(p)});
 function pinEl(p, s, at) {
   const secret = p.secret && !s.earned, e = el("div", "pin " + p.tier + (s.earned ? "" : " locked"));
-  e.appendChild(el("div", "badge" + (/^\d+$/.test(p.icon) ? " num" : ""), secret ? "?" : p.icon));
-  e.appendChild(el("b", "", secret ? "Secret" : p.title));
-  e.appendChild(el("small", "", secret ? "Keep playing to find out." : p.desc));
-  if (s.earned) e.appendChild(el("i", "", at ? new Date(at * 1000).toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}) : "Earned earlier"));
-  else if (s.progress && !secret) { const pr = el("div", "prog"), u = el("u"); u.style.width = Math.round(s.progress[0] / s.progress[1] * 100) + "%"; pr.appendChild(u); e.appendChild(pr); e.appendChild(el("i", "", s.progress[0] + " of " + s.progress[1])); }
+  e.appendChild(badge(secret ? "?" : p.icon));
+  e.setAttribute("aria-label", secret ? t("Secret pin, not earned yet") : pinLabel(p) + (s.earned ? "" : ", " + t("not earned yet")));
+  e.appendChild(el("b", "", secret ? t("Secret") : pinTitle(p)));
+  e.appendChild(el("small", "", secret ? t("Keep playing to find out.") : pinDesc(p)));
+  if (s.earned) e.appendChild(el("i", "", at ? new Date(at * 1000).toLocaleDateString(LOCALE, {month: "short", day: "numeric", year: "numeric"}) : "Earned earlier"));
+  else if (s.progress && !secret) { const pr = el("div", "prog"), u = el("u"); u.style.width = Math.round(s.progress[0] / s.progress[1] * 100) + "%"; pr.appendChild(u); e.appendChild(pr); e.appendChild(el("i", "", t("{n} of {total}", {n: s.progress[0], total: s.progress[1]}))); }
   return e;
 }
 /* a pin just earned pops up on the shelf, one after another */
@@ -3183,8 +3237,8 @@ async function showNewPins(keys) {
 function nextPin() {
   const p = pinQueue.shift(), pop = $("#pinpop"); if (!p) { pinShowing = false; return; }
   pinShowing = true; clear(pop);
-  const e = el("div", "pin " + p.tier); e.appendChild(el("div", "badge", p.icon)); pop.appendChild(e);
-  const t = el("p"); t.appendChild(el("b", "", "Pin earned: " + p.title)); t.appendChild(document.createTextNode(p.desc)); pop.appendChild(t);
+  const e = el("div", "pin " + p.tier); e.appendChild(badge(p.icon)); pop.appendChild(e);
+  const tx = el("p"); tx.appendChild(el("b", "", t("Pin earned: {title}", {title: pinTitle(p)}))); tx.appendChild(document.createTextNode(pinDesc(p))); pop.appendChild(tx);
   pop.classList.add("show"); beep(880, .08); setTimeout(() => beep(1175, .1), 110);
   setTimeout(() => { pop.classList.remove("show"); setTimeout(nextPin, 350); }, 4200);
 }
@@ -3193,8 +3247,8 @@ function nextPin() {
 function timeCard(sessions, nowS) {
   const card = $("#tcard"); clear(card);
   const now = new Date(nowS * 1000), day = t => { const d = new Date(t * 1000); return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate(); };
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const head = el("div", "tch"); head.appendChild(el("span", "", "Time card · The Retro Shelf")); head.appendChild(el("span", "", MONTHS[now.getMonth()] + " " + now.getFullYear()));
+  const MONTHS = Array.from({length: 12}, (_, m) => new Date(2000, m, 1).toLocaleDateString(LOCALE, {month: "short"}));
+  const head = el("div", "tch"); head.appendChild(el("span", "", t("Time card · The Retro Shelf"))); head.appendChild(el("span", "", now.toLocaleDateString(LOCALE, {month: "short", year: "numeric"})));
   card.appendChild(head);
   const perDay = new Map(); let month = 0, monthN = 0, longest = 0;
   for (const [, start, dur] of sessions) {
@@ -3212,14 +3266,15 @@ function timeCard(sessions, nowS) {
   const st = el("div", "tcs");
   st.appendChild(stat(month ? fmtDur(month) : "—", "This month"));
   st.appendChild(stat(String(monthN), monthN === 1 ? "Session this month" : "Sessions this month"));
-  st.appendChild(stat(plural(streak, "day", "days"), "In a row · best " + best));
+  st.appendChild(stat(plural(streak, "day", "days"), t("In a row · best {n}", {n: best})));
   st.appendChild(stat(longest ? fmtDur(longest) : "—", "Longest sitting"));
   card.appendChild(st);
   /* twelve weeks, Monday to Sunday down each column, today in the last one */
   const g = el("div", "tgrid"), first = new Date(now); first.setHours(0, 0, 0, 0); first.setDate(first.getDate() - ((first.getDay() + 6) % 7) - 77);
   g.appendChild(el("span", "m", ""));
   for (let w = 0; w < 12; w++) { const d = new Date(first); d.setDate(d.getDate() + w * 7); const prev = new Date(d); prev.setDate(prev.getDate() - 7); g.appendChild(el("span", "m", !w || prev.getMonth() !== d.getMonth() ? MONTHS[d.getMonth()] : "")); }
-  ["Mon", "", "Wed", "", "Fri", "", "Sun"].forEach((label, r) => {
+  /* Monday, Wednesday, Friday and Sunday down the side (January 1, 2024 was a Monday) */
+  [0, 1, 2, 3, 4, 5, 6].map(r => r % 2 ? "" : new Date(2024, 0, 1 + r).toLocaleDateString(LOCALE, {weekday: "short"})).forEach((label, r) => {
     g.appendChild(el("span", "w", label));
     for (let w = 0; w < 12; w++) {
       const d = new Date(first); d.setDate(d.getDate() + w * 7 + r);
@@ -3407,7 +3462,8 @@ function renderHints() {
   const nm = PAD_NAMES[padStyle()], nin = padStyle() === "nintendo";
   const items = padOn ? [["D-pad", "browse"], [nm[nin ? 2 : 3], "turn over"], [nm[nin ? 1 : 0], "play"], [nm[nin ? 3 : 2], "favorite"], [nm[4] + " " + nm[5], "shelves"], [nm[8], "options"], [nm[9], "settings"]]
     : [["← → ↑ ↓", "browse"], ["Space", "turn over"], ["Enter", "play"], ["F", "favorite"], ["Q E", "shelves"], ["/", "search"], ["O", "options"], ["S", "settings"]];
-  items.forEach(it => { const s = el("span"); s.appendChild(el("kbd", "", it[0])); s.appendChild(document.createTextNode(it[1])); h.appendChild(s); });
+  /* a controller's buttons keep the names printed on them; keyboard keys (Space) are translated */
+  items.forEach(it => { const s = el("span"), kb = el("kbd", "", it[0]); if (padOn) kb.translate = false; s.appendChild(kb); s.appendChild(document.createTextNode(it[1])); h.appendChild(s); });
 }
 window.addEventListener("gamepadconnected", () => { padOn = true; renderHints(); showHintsBriefly(); });
 setInterval(() => {
@@ -3480,11 +3536,66 @@ $("#lhint").textContent = "Hold Start or press Esc to come back here.";
 /* ---------- words ----------
    Text the app shows goes through t("English text", {name: value}), so it can be translated: WORDS holds each
    language's table, keyed by the English, and English is the text itself */
-const WORDS = {};
-let LANG = "en";
 function t(text, vars) {
+  if (HARVEST) HARVEST.add(text);
   const out = (WORDS[LANG] && WORDS[LANG][text]) || text;
   return vars ? out.replace(/\{(\w+)\}/g, (m, k) => k in vars ? String(vars[k]) : m) : out;
+}
+
+/* ---------- other languages ----------
+   Text is translated as it appears: t() for sentences with blanks to fill, and for the rest, any piece of text that is
+   exactly an English entry in the language's list. Each piece keeps its English, so switching again starts from it.
+   The shelves' own text (game names, console plates) is the games', and stays as it is */
+const LANGS = [["auto", "Automatic"], ["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["pt", "Português"], ["ja", "日本語"]];
+const LOCALES = {es: "es", fr: "fr", de: "de", pt: "pt-BR", ja: "ja"};
+const T_ATTRS = ["aria-label", "title", "placeholder"], T_SKIP = "#shelves,script,style,.card,.ci,.tro,#saver,#nlist,[translate=no]";
+let langObs = null, HARVEST = null;
+function trText(n) {
+  if (n.__en !== undefined && n.nodeValue !== n.__tr) n.__en = undefined;   // the app wrote new text into it since
+  const en = n.__en !== undefined ? n.__en : n.nodeValue, k = en.trim();
+  if (!k || !/[A-Za-z]/.test(k)) return;
+  if (HARVEST) HARVEST.add(k);
+  const w = WORDS[LANG] && WORDS[LANG][k];
+  if (n.__en === undefined) { if (!w) return; n.__en = en; }
+  /* Japanese runs on without spaces: none before words that follow bold text */
+  const out = w ? (LANG === "ja" && /^[\u3000-\u9fff\uff00-\uffef]/.test(w) ? en.replace(/^\s+/, "") : en).replace(k, w) : en;
+  n.__tr = out; if (n.nodeValue !== out) n.nodeValue = out;
+}
+function trAttrs(e) {
+  for (const a of T_ATTRS) {
+    if (!e.hasAttribute(a)) continue;
+    const ens = e.__enA || (e.__enA = {}), cur = e.getAttribute(a);
+    if (ens[a] !== undefined && cur !== (e.__trA || {})[a]) ens[a] = undefined;
+    const en = ens[a] !== undefined ? ens[a] : cur;
+    if (HARVEST && /[A-Za-z]/.test(en)) HARVEST.add(en.trim());
+    const w = WORDS[LANG] && WORDS[LANG][en.trim()], out = w || en;
+    if (w) ens[a] = en;
+    (e.__trA || (e.__trA = {}))[a] = out; if (cur !== out) e.setAttribute(a, out);
+  }
+}
+function trTree(root) {
+  if (!root) return;
+  if (root.nodeType === 3) { if (!(root.parentElement && root.parentElement.closest(T_SKIP))) trText(root); return; }
+  if (root.nodeType !== 1 || root.closest(T_SKIP)) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {acceptNode: x => x.nodeType === 1 && x.matches(T_SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT});
+  for (let x = root; x; x = w.nextNode()) { if (x.nodeType === 3) trText(x); else trAttrs(x); }
+}
+/* the language: as chosen in Settings, or the computer's own when there's a list for it */
+async function setLang(code) {
+  const want = code && code !== "auto" ? code : (navigator.language || "en").slice(0, 2).toLowerCase();
+  const lang = LOCALES[want] || want === "xx" ? want : "en";
+  if (lang !== "en" && lang !== "xx" && !WORDS[lang]) { try { const r = await fetch("/words/" + lang + ".json"); if (r.ok) WORDS[lang] = await r.json(); } catch (e) {} }
+  LANG = WORDS[lang] || lang === "xx" ? lang : "en";
+  /* English keeps the computer's own way of writing dates when it's an English one (US, UK, …) */
+  LOCALE = LOCALES[LANG] || (/^en/i.test(navigator.language || "") ? navigator.language : "en");
+  HTML.lang = LANG === "xx" ? "en" : LANG;
+  /* while English with nothing translated, nothing needs watching */
+  if (LANG !== "en" && !langObs) {
+    langObs = new MutationObserver(ms => { for (const m of ms) { if (m.type === "attributes") { if (!m.target.closest(T_SKIP)) trAttrs(m.target); } else m.addedNodes.forEach(trTree); } });
+    langObs.observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: T_ATTRS});
+  }
+  trTree(document.body);
+  if (LANG === "en" && langObs) { langObs.disconnect(); langObs = null; }
 }
 
 /* ---------- boot ---------- */
@@ -3496,7 +3607,8 @@ function hideSplash() { const s = $("#splash"); s.classList.add("out"); setTimeo
   const fonts = document.fonts ? Promise.all(["600 12px", "400 12px"].map(f => document.fonts.load(f + ' "Plex Cond"'))).catch(() => {}) : null;
   let r = await api("/api/library");
   while (!r.ok) { $("#smsg").textContent = r.data.error || "Waiting for the launcher…"; await new Promise(s => setTimeout(s, 1500)); r = await api("/api/library"); }
-  ingest(r.data); $("#smsg").textContent = G.length ? G.length + " games" : "Ready";
+  ingest(r.data); await setLang(UI.lang); renderHints();
+  $("#smsg").textContent = G.length ? plural(G.length, "game", "games") : t("Ready");
   const min = fxMode() === "full" ? 700 : 150;
   await new Promise(s => setTimeout(s, Math.max(0, min - (Date.now() - t0))));
   await fonts;
