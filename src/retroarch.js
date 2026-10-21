@@ -48,7 +48,8 @@ function neededDirs(dirs) {
   return [dirs.saves, dirs.states, dirs.screenshots, dirs.system, ...Object.values(PRIVATE_DIRS).map(sub => path.join(dirs.private, sub))];
 }
 
-const q = v => '"' + String(v).replace(/"/g, "") + '"';
+// a value as RetroArch's settings file holds it: in quotes, so without quotes or line breaks of its own
+const q = v => '"' + String(v).replace(/["\r\n]/g, "") + '"';
 
 /**
  * Settings the app insists on every launch. Everything else in retroarch.cfg is left alone, so changes
@@ -58,6 +59,10 @@ function enforced(ra, dirs, opts) {
   const hardcore = !!(opts.cheevos && opts.hardcore);
   return {
     video_fullscreen: opts.fullscreen ? "true" : "false",
+    // saves where the app looks for them (Saves/<emulator>/, Saves/States/<emulator>/): Continue, the saves list,
+    // export and backups all read them there, so RetroArch's own menu can't move them
+    sort_savefiles_enable: "true", sort_savestates_enable: "true", sort_savefiles_by_content_enable: "false",
+    sort_savestates_by_content_enable: "false", savefiles_in_content_dir: "false", savestates_in_content_dir: "false",
     // Linux's usual driver can't run the old-TV and handheld looks (slang shaders); glcore can
     ...(process.platform === "linux" ? { video_driver: "glcore" } : {}),
     // Hold Start (or press Esc) to come back to the shelf; hold Select for RetroArch's menu.
@@ -178,13 +183,16 @@ function writeConfig(file, keys) {
   while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
   for (const [k, v] of left) lines.push(`${k} = ${q(v)}`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, lines.join("\n") + "\n");
+  // whole or not at all: a crash halfway would otherwise lose someone's RetroArch settings
+  fs.writeFileSync(file + ".tmp", lines.join("\n") + "\n");
+  fs.renameSync(file + ".tmp", file);
 }
 
 /**
  * Data folders some cores read from the BIOS folder, pointed at the bundled copies: Dolphin's Sys folder
  * (<system>/dolphin-emu/Sys) and PPSSPP's fonts and dialogs (<system>/PPSSPP).
  */
+const COPY_MARK = ".the-retro-shelf-copy";
 function linkSystemData(ra, systemDir, core) {
   if (!ra) return;
   const want = {
@@ -194,15 +202,27 @@ function linkSystemData(ra, systemDir, core) {
   }[core] || [];
   for (const [from, link] of want) {
     if (!fs.existsSync(from)) continue;
-    try {
-      if (fs.realpathSync(link) === fs.realpathSync(from)) continue;
-    } catch {}
+    let st = null;
+    try { st = fs.lstatSync(link); } catch {}
+    if (st) {
+      try { if (fs.realpathSync(link) === fs.realpathSync(from)) continue; } catch {}
+      // only what the app put there is replaced: its link, or its own copy (marked), or an empty folder. A folder
+      // someone filled themselves (their MSX machines, GameCube files) is left as it is
+      const mark = path.join(link, COPY_MARK);
+      let copy = "";
+      try { copy = fs.readFileSync(mark, "utf8"); } catch {}
+      if (copy === from) continue;
+      if (st.isSymbolicLink()) { try { fs.unlinkSync(link); } catch { fs.rmdirSync(link); } }
+      else if (copy || (st.isDirectory() && !fs.readdirSync(link).length)) fs.rmSync(link, { recursive: true, force: true });
+      else continue;
+    }
     fs.mkdirSync(path.dirname(link), { recursive: true });
-    fs.rmSync(link, { recursive: true, force: true });
     try {
       fs.symlinkSync(from, link, process.platform === "win32" ? "junction" : "dir");
     } catch {
+      // where links can't be made (a FAT-formatted USB stick), a copy, marked as the app's own
       fs.cpSync(from, link, { recursive: true });
+      try { fs.writeFileSync(path.join(link, COPY_MARK), from); } catch {}
     }
   }
 }
