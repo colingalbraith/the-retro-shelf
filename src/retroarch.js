@@ -51,6 +51,9 @@ function neededDirs(dirs) {
 // a value as RetroArch's settings file holds it: in quotes, so without quotes or line breaks of its own
 const q = v => '"' + String(v).replace(/["\r\n]/g, "") + '"';
 
+/** fast-forward's speed as chosen: 2, 3 or 4 times, or 0 for as fast as it goes; 3 otherwise */
+const ffSpeed = v => [0, 2, 3, 4].includes(v) ? v : 3;
+
 /**
  * Settings the app insists on every launch. Everything else in retroarch.cfg is left alone, so changes
  * people make in RetroArch's own menu stick.
@@ -92,7 +95,11 @@ function enforced(ra, dirs, opts) {
     input_rewind: "r", input_rewind_btn: "nul", input_rewind_axis: "nul",
     input_hold_fast_forward: "l", input_hold_fast_forward_btn: "nul", input_hold_fast_forward_axis: "nul",
     input_toggle_fast_forward: "space",
-    fastforward_ratio: "3.0",
+    // how fast: 2, 3 or 4 times (opts.ffSpeed), or 0, as fast as the computer can. The sound speeds up with it rather
+    // than breaking up, and goes quiet at the fastest, where sped up it would only be noise
+    fastforward_ratio: ffSpeed(opts.ffSpeed) + ".0",
+    audio_fastforward_speedup: ffSpeed(opts.ffSpeed) ? "true" : "false",
+    audio_fastforward_mute: ffSpeed(opts.ffSpeed) ? "false" : "true",
     run_ahead_enabled: opts.light && opts.lessLag !== false ? "true" : "false",
     run_ahead_frames: "1",
     run_ahead_secondary_instance: "false",

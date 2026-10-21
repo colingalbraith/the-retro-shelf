@@ -32,7 +32,7 @@ const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
                      fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false, rewind: true, lessLag: true, hardcore: false,
-                     picture: "auto", sort: "title", buttons: "auto", arrange: "console", wood: "walnut", wall: "dark", saver: 5, music: false, musicVol: "medium", textSize: 100, lang: "auto" };
+                     picture: "auto", sort: "title", buttons: "auto", arrange: "console", wood: "walnut", wall: "dark", saver: 5, music: false, musicVol: "medium", textSize: 100, lang: "auto", ffSpeed: 3 };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -116,6 +116,7 @@ function cleanUi(d) {
   if (["dark", "light"].includes(d.wall)) out.wall = d.wall;
   if ([0, 5, 10, 20].includes(d.saver)) out.saver = d.saver;
   if ([100, 115, 130].includes(d.textSize)) out.textSize = d.textSize;
+  if ([0, 2, 3, 4].includes(d.ffSpeed)) out.ffSpeed = d.ffSpeed;
   if (["auto", "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"].includes(d.lang)) out.lang = d.lang;
   if (["quiet", "medium", "loud"].includes(d.musicVol)) out.musicVol = d.musicVol;
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;

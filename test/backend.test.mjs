@@ -589,6 +589,17 @@ test("display settings are kept as chosen: sort by rating, the shelves' wood and
   assert.deepEqual([back.sort, back.wood, back.saver], ["title", "walnut", 5]);
 });
 
+test("fast-forward's speed is kept as chosen, as fast as it goes included", async () => {
+  assert.equal(be.ui.ffSpeed, 3);
+  await be.route("POST", "/api/settings", { ui: { ffSpeed: 0 } });
+  assert.equal(be.ui.ffSpeed, 0);
+  assert.equal(be.playOpts({ system: "SNES", id: "x" }).ffSpeed, 0, "a game plays at it");
+  await be.route("POST", "/api/settings", { ui: { ffSpeed: 9 } });
+  assert.equal(be.ui.ffSpeed, 3);
+  await be.route("POST", "/api/settings", { ui: { ffSpeed: 4 } });
+  assert.equal(be.ui.ffSpeed, 4);
+});
+
 test("the menu music: every track in the list is there, CC0 and credited, and served", async () => {
   const tracks = JSON.parse(fs.readFileSync(path.join(APP, "music", "tracks.json"), "utf8"));
   assert.ok(tracks.length >= 3);
