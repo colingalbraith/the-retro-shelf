@@ -108,6 +108,7 @@ const pathKey = p => process.platform === "linux" ? path.resolve(p) : path.resol
 function gid(p) { return crypto.createHash("sha1").update(p).digest("hex").slice(0, 12); }
 /** what scanning skips: hidden folders, and the files macOS leaves around (._Game.iso, .DS_Store). A game whose name
     starts with a dot (.hack//Infection) still counts */
+const recapKey = (year, month) => month === null || month === undefined ? String(year) : `${year}-${String(month + 1).padStart(2, "0")}`;
 const hiddenEntry = e => e.name.startsWith("._") || e.name === ".DS_Store" || (e.isDirectory() && e.name.startsWith("."));
 // "Legend of Zelda, The - A Link to the Past (USA)" -> "The Legend of Zelda: A Link to the Past"
 function cleanTitle(stem) {
@@ -181,7 +182,7 @@ class Backend extends EventEmitter {
     this.state = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
     // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}]]) if (!this.state[k]) this.state[k] = v;
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}], ["notCounted", {}]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -1338,16 +1339,65 @@ class Backend extends EventEmitter {
     const series = [];
     for (const [name, games] of Object.entries(this.franchises)) {
       if (!games.some(([sys, look]) => own.has(sys + "|" + norm(look)))) continue;
-      const items = games.filter(([sys]) => this.cfg.systems[sys]).map(item);
-      series.push({ name, have: items.filter(i => i.id).length, items });
+      // a game marked as not counting (an odd regional release) stays in the series but out of finishing it
+      const skip = new Set(this.state.notCounted[name] || []);
+      const items = games.filter(([sys]) => this.cfg.systems[sys]).map(item).map(i => skip.has(i.system + "|" + norm(i.look)) ? { ...i, counts: false } : i);
+      const counted = items.filter(i => i.counts !== false);
+      series.push({ name, have: counted.filter(i => i.id).length, total: counted.length, items });
     }
-    series.sort((a, b) => b.have - a.have || b.have / b.items.length - a.have / a.items.length || a.name.localeCompare(b.name));
+    series.sort((a, b) => b.have - a.have || b.have / (b.total || 1) - a.have / (a.total || 1) || a.name.localeCompare(b.name));
     const mine = this.state.shelves.map(sh => {
       const ids = sh.ids.filter(id => this.games.has(id)), items = ids.map(id => { const g = this.games.get(id); return { system: g.system, look: g.look, title: this.state.names[id] || g.title, id }; });
       for (const w of sh.wanted || []) { const it = item(w); if (!it.id || !ids.includes(it.id)) items.push(it); }
       return { name: sh.name, have: items.filter(i => i.id).length, items };
     });
     return [200, { series, mine }];
+  }
+  /** a game in a series marked as counting or not toward having them all */
+  setCounts(series, system, look, counts) {
+    const games = (this.franchises || (this.collections(), this.franchises))[series];
+    if (!games || !games.some(([s, l]) => s === system && l === look)) return [404, { error: "That game isn't in that series." }];
+    const key = system + "|" + norm(look), list = new Set(this.state.notCounted[series] || []);
+    if (counts) list.delete(key); else list.add(key);
+    if (list.size) this.state.notCounted[series] = [...list]; else delete this.state.notCounted[series];
+    this.saveState(); this.checkPins();
+    return [200, { ok: true }];
+  }
+  // ---------------------------------------------------------------- recaps
+  /**
+   * A month (0-11) or, with month null, a whole year of play: time, sittings, days, games (and how many were new), the
+   * most played, the longest sitting, the busiest day and the pins earned. Sittings count where they started, in the
+   * computer's own days.
+   */
+  recap(year, month) {
+    const from = new Date(year, month ?? 0, 1).getTime() / 1000, to = (month == null ? new Date(year + 1, 0, 1) : new Date(year, month + 1, 1)).getTime() / 1000;
+    const all = this.state.sessions, firstOf = new Map();
+    for (const [id, start] of all) if (!firstOf.has(id) || start < firstOf.get(id)) firstOf.set(id, start);
+    const ses = all.filter(s => s[1] >= from && s[1] < to), perGame = new Map(), perDay = new Map();
+    let total = 0, longest = null;
+    for (const [id, start, dur] of ses) {
+      total += dur; perGame.set(id, (perGame.get(id) || 0) + dur);
+      const d = new Date(start * 1000), day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000;
+      perDay.set(day, (perDay.get(day) || 0) + dur);
+      if (this.games.has(id) && (!longest || dur > longest.time)) longest = { id, time: dur, at: start };
+    }
+    const busy = [...perDay].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+    return {
+      year, month, from, to, total, sittings: ses.length, days: perDay.size, games: perGame.size,
+      newGames: [...perGame.keys()].filter(id => firstOf.get(id) >= from).length,
+      top: [...perGame].filter(([id]) => this.games.has(id)).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, time]) => ({ id, time })),
+      longest, busiest: busy ? { day: busy[0], time: busy[1] } : null,
+      pins: Object.entries(this.state.pins || {}).filter(([, t]) => t >= from && t < to).sort((a, b) => a[1] - b[1]).map(([k]) => k),
+      first: all.length ? Math.min(...all.map(s => s[1])) : null,
+    };
+  }
+  /** last month's recap the first time the app opens in a new month (January: the whole last year), if there was play */
+  recapDue() {
+    const d = new Date(now() * 1000), jan = d.getMonth() === 0;
+    const year = jan ? d.getFullYear() - 1 : d.getFullYear(), month = jan ? null : d.getMonth() - 1;
+    if (this.state.recapSeen === recapKey(year, month)) return null;
+    const r = this.recap(year, month);
+    return r.sittings ? r : null;
   }
   /** games in the metadata lists (every console's, ~38,000) whose names have all the words, for adding to a collection */
   gameSearch(q) {
@@ -1831,6 +1881,14 @@ class Backend extends EventEmitter {
       case "/api/cheevos/signin": return j(this.cheevosSignIn(d.user, d.pass));
       case "/api/cheevos/signout": return j(this.cheevosSignOut());
       case "/api/cheats/set": return j(this.setCheats(String(d.id || ""), d.on));
+      case "/api/recap": {
+        const y = parseInt(d.year, 10), m = d.month === null || d.month === undefined ? null : parseInt(d.month, 10);
+        if (!(y > 1970 && y < 3000) || (m !== null && !(m >= 0 && m <= 11))) return j([400, { error: "Choose a month or a year." }]);
+        return j([200, this.recap(y, m)]);
+      }
+      case "/api/recap/due": return j([200, { recap: this.recapDue() }]);
+      case "/api/recap/seen": { const y = parseInt(d.year, 10), m = d.month === null || d.month === undefined ? null : parseInt(d.month, 10); this.state.recapSeen = recapKey(y, m); this.saveState(); return j([200, { ok: true }]); }
+      case "/api/collections/count": return j(this.setCounts(String(d.series || ""), String(d.system || ""), String(d.look || ""), d.counts !== false));
       case "/api/whatsnew/seen": this.state.seenVersion = this.dirs.version; this.saveState(); return j([200, { ok: true }]);
       case "/api/pins/seen": { const seen = new Set(Array.isArray(d.keys) ? d.keys : []); this.newPins = (this.newPins || []).filter(k => !seen.has(k)); return j([200, { ok: true }]); }
       case "/api/rescan":

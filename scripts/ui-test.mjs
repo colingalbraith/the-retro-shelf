@@ -135,6 +135,13 @@ const SCREENS = [
   ["controller-test", "openCtest()", "closeCtest()"],
   ["buttons", "openButtons(G.find(g => cons(g.system).buttons && cons(g.system).builtin).system)", "closeList()"],
   ["choose-folder", "openBrowse()", "closeList()"],
+  // a month's recap filled in, with the longest titles in the library as its most played
+  ["recap", `(() => { const long = G.slice().sort((a, b) => b.title.length - a.title.length).slice(0, 3), now = Date.now() / 1000;
+    RC = {year: 2026, month: 9, from: 0, to: 0, total: 98000, sittings: 41, days: 27, games: 6, newGames: 3, top: long.map((g, i) => ({id: g.id, time: 30000 - i * 5000})),
+      longest: {id: long[0].id, time: 8000, at: now}, busiest: {day: now, time: 12000}, first: 1,
+      pins: ["first", "sampler", "hours10", "multi", "onemore", "streak3", "weekend", "lunch", "friday", "sunday", "quick", "sessions25"]};
+    renderRecap(RC).then(() => $("#recap").classList.add("show")); })()`, "closeRecap()"],
+  ["what-counts", "openColls('series'); setTimeout(() => openCounts(COLL.series[0].name), 700)", "closeList(); closeColls()"],
 ];
 
 // --- run ---------------------------------------------------------------------------------------------------------

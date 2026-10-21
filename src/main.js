@@ -15,7 +15,7 @@ protocol.registerSchemesAsPrivileged([
 // ARCADE_HOME keeps everything (settings, games, saves) in one folder: handy for testing. Set before the
 // single-instance lock, which lives in the data folder, so a test copy can run next to the real one.
 const HOME = process.env.ARCADE_HOME;
-if (HOME) app.setPath("userData", path.join(HOME, "data"));
+if (HOME) { app.setPath("userData", path.join(HOME, "data")); app.setPath("pictures", path.join(HOME, "Pictures")); }
 const DOCS = HOME ? path.join(HOME, "The Retro Shelf") : path.join(app.getPath("documents"), "The Retro Shelf");
 // The app used to be called Arcade: the first time, move its settings and games folders to the new name
 // (before the single-instance lock below creates the new settings folder)
@@ -263,6 +263,29 @@ function ipc() {
     return { ok: true, ...res, trashed: a.response === 0 };
   });
   // one game's saves, in one .zip
+  // a picture of part of the window (a recap, the time card), saved where you choose; with a controller, straight into
+  // Pictures/The Retro Shelf. Nothing leaves the computer
+  ipcMain.handle("save-picture", async (_, rect, name, quick) => {
+    const z = win.webContents.getZoomFactor(), [W, H] = win.getContentSize(), n = v => Number.isFinite(v) ? v : 0;
+    const x = Math.max(0, Math.floor(n(rect && rect.x) * z)), y = Math.max(0, Math.floor(n(rect && rect.y) * z));
+    const r = { x, y, width: Math.min(W - x, Math.ceil(n(rect && rect.width) * z)), height: Math.min(H - y, Math.ceil(n(rect && rect.height) * z)) };
+    if (!(r.width > 0 && r.height > 0)) return { ok: false, error: "There's nothing to save." };
+    const img = await win.webContents.capturePage(r);
+    const safe = name.replace(/[\\/:*?"<>|\x00-\x1f]/g, "").trim().slice(0, 80) || "The Retro Shelf";
+    let file;
+    if (quick) {
+      const dir = path.join(app.getPath("pictures"), "The Retro Shelf");
+      fs.mkdirSync(dir, { recursive: true });
+      file = path.join(dir, safe + ".png");
+      for (let i = 2; fs.existsSync(file); i++) file = path.join(dir, `${safe} ${i}.png`);
+    } else {
+      const out = await dialog.showSaveDialog(win, { title: "Save as a picture", defaultPath: path.join(app.getPath("pictures"), safe + ".png"), filters: [{ name: "PNG picture", extensions: ["png"] }] });
+      if (out.canceled || !out.filePath) return { ok: false };
+      file = out.filePath;
+    }
+    try { fs.writeFileSync(file, img.toPNG()); } catch (e) { return { ok: false, error: "Couldn't save the picture: " + e.message }; }
+    return { ok: true, file };
+  });
   ipcMain.handle("export-saves", async (_, id) => {
     const g = backend.games.get(String(id));
     if (!g) return { ok: false, error: "Unknown game." };
