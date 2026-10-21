@@ -10,6 +10,11 @@
 @font-face{font-family:"Plex Cond";src:url(/fonts/plex-cond-600.woff2) format("woff2");font-weight:600;font-display:swap}
 @font-face{font-family:"Plex Cond";src:url(/fonts/plex-cond-700.woff2) format("woff2");font-weight:700;font-display:swap}
 @font-face{font-family:"Plex Mono";src:url(/fonts/plex-mono-400.woff2) format("woff2");font-weight:400;font-display:swap}
+/* the letters of Polish, Czech and other Central European languages (ą ł ś ě ř), only loaded when the text has them */
+@font-face{font-family:"Plex Cond";src:url(/fonts/plex-cond-400-ext.woff2) format("woff2");font-weight:400;font-display:swap;unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:"Plex Cond";src:url(/fonts/plex-cond-600-ext.woff2) format("woff2");font-weight:600;font-display:swap;unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:"Plex Cond";src:url(/fonts/plex-cond-700-ext.woff2) format("woff2");font-weight:700;font-display:swap;unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:"Plex Mono";src:url(/fonts/plex-mono-400-ext.woff2) format("woff2");font-weight:400;font-display:swap;unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF}
 @property --lx{syntax:"<length>";inherits:true;initial-value:0px}
 @property --ly{syntax:"<length>";inherits:true;initial-value:0px}
 :root{
@@ -3675,9 +3680,11 @@ function t(text, vars) {
    Text is translated as it appears: t() for sentences with blanks to fill, and for the rest, any piece of text that is
    exactly an English entry in the language's list. Each piece keeps its English, so switching again starts from it.
    The shelves' own text (game names, console plates) is the games', and stays as it is */
-const LANGS = [["auto", "Automatic"], ["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["it", "Italiano"], ["pt", "Português"],
-  ["ru", "Русский"], ["ja", "日本語"], ["ko", "한국어"], ["zh", "简体中文"]];
-const LOCALES = {es: "es", fr: "fr", de: "de", it: "it", pt: "pt-BR", ru: "ru", ja: "ja", ko: "ko", zh: "zh-CN"};
+const LANGS = [["auto", "Automatic"], ["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["it", "Italiano"], ["pl", "Polski"],
+  ["pt", "Português"], ["ru", "Русский"], ["ja", "日本語"], ["ko", "한국어"], ["zh", "简体中文"], ["zh-Hant", "繁體中文"]];
+const LOCALES = {es: "es", fr: "fr", de: "de", it: "it", pl: "pl", pt: "pt-BR", ru: "ru", ja: "ja", ko: "ko", zh: "zh-CN", "zh-Hant": "zh-TW"};
+/* Japanese and Chinese run on without spaces between words */
+const noSpaces = () => LANG === "ja" || LANG === "zh" || LANG === "zh-Hant";
 const T_ATTRS = ["aria-label", "title", "placeholder"], T_SKIP = "#shelves,script,style,.card,.ci,.tro,.lslot,#saver,#nlist,#oskv,[translate=no]";
 let langObs = null, HARVEST = null;
 function trText(n) {
@@ -3687,8 +3694,8 @@ function trText(n) {
   if (HARVEST) HARVEST.add(k);
   const w = WORDS[LANG] && WORDS[LANG][k];
   if (n.__en === undefined) { if (!w) return; n.__en = en; }
-  /* Japanese and Chinese run on without spaces: none before words that follow bold text */
-  const out = w ? ((LANG === "ja" || LANG === "zh") && /^[\u3000-\u9fff\uff00-\uffef]/.test(w) ? en.replace(/^\s+/, "") : en).replace(k, w) : en;
+  /* no space before words that follow bold text, in the languages that have none */
+  const out = w ? (noSpaces() && /^[\u3000-\u9fff\uff00-\uffef]/.test(w) ? en.replace(/^\s+/, "") : en).replace(k, w) : en;
   n.__tr = out; if (n.nodeValue !== out) n.nodeValue = out;
 }
 function trAttrs(e) {
@@ -3712,9 +3719,8 @@ function trTree(root) {
 }
 /* the language: as chosen in Settings, or the computer's own when there's a list for it */
 async function setLang(code) {
-  /* the Chinese list is Simplified: a computer set to Traditional Chinese (Taiwan, Hong Kong) stays in English unless
-     it's chosen */
-  const nav = navigator.language || "en", want = code && code !== "auto" ? code : /^zh-(hant|tw|hk|mo)/i.test(nav) ? "en" : nav.slice(0, 2).toLowerCase();
+  /* Chinese comes in two: Traditional for computers set to it (Taiwan, Hong Kong, Macau), Simplified for the rest */
+  const nav = navigator.language || "en", want = code && code !== "auto" ? code : /^zh-(hant|tw|hk|mo)/i.test(nav) ? "zh-Hant" : nav.slice(0, 2).toLowerCase();
   const lang = LOCALES[want] || want === "xx" ? want : "en";
   if (lang !== "en" && lang !== "xx" && !WORDS[lang]) { try { const r = await fetch("/words/" + lang + ".json"); if (r.ok) WORDS[lang] = await r.json(); } catch (e) {} }
   LANG = WORDS[lang] || lang === "xx" ? lang : "en";

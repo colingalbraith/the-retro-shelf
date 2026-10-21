@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1
+
+- **Two more languages (beta):** Polski and 繁體中文 (Traditional Chinese). Computers set to Traditional Chinese
+  (Taiwan, Hong Kong, Macau) now get it by themselves instead of English. Polish letters like ą, ł and ś show in the
+  app's own font.
+- **Help with translations:** docs/translating.md says how to fix the words in any language, straight on GitHub.
+
 ## 0.4.0
 
 - **Linux and Steam Deck:** an AppImage for 64-bit Linux with every emulator built in, that updates itself. On a

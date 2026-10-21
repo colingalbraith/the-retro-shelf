@@ -9,12 +9,12 @@ import { fileURLToPath } from "node:url";
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "words");
 const keys = JSON.parse(fs.readFileSync(path.join(DIR, "keys.json"), "utf8"));
 const blanks = s => (s.match(/\{\w+\}/g) || []).sort().join();
-const LANGS = ["es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"];
+const LANGS = ["es", "fr", "de", "it", "pl", "pt", "ru", "ja", "ko", "zh", "zh-Hant"];
 // the words that follow a number, as plural(n, "game", "games") writes them: a language with more forms than English's
 // two lists the others as "games|few" and the like
 const page = fs.readFileSync(path.join(DIR, "..", "index.html"), "utf8");
 const counted = [...new Set([...page.matchAll(/plural\([^;]*?, "([^"]+)", "([^"]+)"\)/g)].map(m => m[2]))];
-const FORMS = { ru: ["few"] };
+const FORMS = { ru: ["few"], pl: ["few"] };
 
 for (const lang of LANGS) {
   test(`${lang}: every piece of English has words, with the same blanks to fill`, () => {
@@ -36,8 +36,8 @@ test("the counted words are found", () => { assert.ok(counted.includes("games") 
 test("the main process, the page and the backend have the same languages", () => {
   const src = path.join(DIR, "..");
   const main = fs.readFileSync(path.join(src, "main.js"), "utf8"), backend = fs.readFileSync(path.join(src, "backend.js"), "utf8");
-  const served = (/words\\\/\(([a-z|]+)\)/.exec(backend) || [])[1] || "", kept = (/\[("auto", "en"[^\]]*)\]\.includes\(d\.lang\)/.exec(backend) || [])[1] || "";
+  const served = (/words\\\/\(([a-zA-Z|-]+)\)/.exec(backend) || [])[1] || "", kept = (/\[("auto", "en"[^\]]*)\]\.includes\(d\.lang\)/.exec(backend) || [])[1] || "";
   assert.deepEqual(served.split("|").sort(), [...LANGS].sort(), "the word files the backend serves");
   for (const lang of LANGS) assert.match(kept, new RegExp(`"${lang}"`), "a language the settings keep");
-  for (const lang of LANGS) { assert.match(main, new RegExp(`"${lang}"`)); assert.match(page, new RegExp(`${lang}: "`)); }
+  for (const lang of LANGS) { assert.match(main, new RegExp(`"${lang}"`)); assert.match(page, new RegExp(`[{ ]"?${lang}"?: "`)); }
 });

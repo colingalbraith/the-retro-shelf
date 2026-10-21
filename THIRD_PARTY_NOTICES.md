@@ -112,7 +112,8 @@ https://creativecommons.org/publicdomain/zero/1.0/). Credited with thanks, thoug
 
 ## IBM Plex
 
-IBM Plex Sans Condensed and IBM Plex Mono, SIL Open Font License 1.1 (`src/fonts/OFL.txt`).
+IBM Plex Sans Condensed and IBM Plex Mono, SIL Open Font License 1.1 (`src/fonts/OFL.txt`). The files with the
+Central European letters (`*-ext.woff2`) are Google Fonts' copies of the same fonts.
 
 ## GPL source availability
 

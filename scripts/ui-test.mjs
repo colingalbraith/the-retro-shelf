@@ -259,9 +259,9 @@ try {
   await p.ev(`(UI.tv = false, applyTv(), 1)`);
   console.log("· Steam Deck (TV mode) done");
 
-  // German and Russian, the longest words (Russian in the computer's own font, which is wider): every screen still fits
+  // German, Russian and Polish, the longest words (Russian in the computer's own font, which is wider): every screen still fits
   // at the smallest window (and the language comes back)
-  for (const [code, lname] of [["de", "German"], ["ru", "Russian"]]) {
+  for (const [code, lname] of [["de", "German"], ["ru", "Russian"], ["pl", "Polish"]]) {
   if (!harvest && fs.existsSync(path.join(ROOT, "src", "words", code + ".json"))) {
     await p.ev(`(async () => { await setLang("${code}"); renderHints(); renderShelves(focusId); return 1; })()`); await sleep(800);
     await p.send("Emulation.setDeviceMetricsOverride", { width: 720, height: 520, deviceScaleFactor: 1, mobile: false }); await sleep(600);
