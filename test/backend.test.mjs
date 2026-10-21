@@ -640,3 +640,30 @@ test("a game's saves and pictures are its own, not a sequel's whose name starts 
   for (const f of ["Super Mario Bros.srm", "Super Mario Bros. 3.srm"]) fs.writeFileSync(path.join(be.folders.saves, "FCEUmm", f), "s");
   assert.deepEqual(be.gameSaves(smb).map(s => path.basename(s.file)), ["Super Mario Bros.srm"]);
 });
+
+test("cheats: a cheat file made in RetroArch's menu is left alone, and a download that isn't a zip isn't kept", async () => {
+  const { zipFiles } = createRequire(import.meta.url)("../src/zip.js");
+  put("snes/Super Mario World (USA).sfc"); be.scan();
+  const g = byTitle("Super Mario World");
+  be.resumeAt = () => 0; be._coreNames = { snes9x_libretro: "Snes9x" };
+  const target = path.join(path.dirname(be.files.raCfg), "cheats", "Snes9x", "Super Mario World (USA).cht");
+  // a Wi-Fi sign-in page instead of the zip: refused, so the next try downloads again
+  be.fetchUrl = async () => Buffer.from("<html>Sign in to the Wi-Fi</html>");
+  assert.equal((await be.cheatList(g.id))[0], 502);
+  assert.ok(!fs.existsSync(path.join(be.dirs.data, "cheats.zip")));
+  // the real one
+  const src = path.join(home, "smw.cht"), z = path.join(home, "cheats.zip");
+  fs.writeFileSync(src, 'cheats = 1\n\ncheat0_desc = "Infinite lives"\ncheat0_code = "7E0DBE:63"\ncheat0_enable = false\n');
+  await zipFiles([{ name: "Nintendo - Super Nintendo Entertainment System/Super Mario World (USA).cht", full: src }], z);
+  be.fetchUrl = async () => fs.readFileSync(z);
+  const [code, list] = await be.cheatList(g.id);
+  assert.equal(code, 200); assert.ok(list.cheats.length >= 1);
+  // someone's own file from RetroArch's menu, and no cheats chosen here: untouched
+  fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, "cheats = 0\n# mine\n");
+  assert.equal(await be.writeCheats(g), false);
+  assert.equal(fs.readFileSync(target, "utf8"), "cheats = 0\n# mine\n");
+  // cheats chosen here: the app's own file, marked
+  be.state.cheats[g.id] = [list.cheats[0].key];
+  assert.equal(await be.writeCheats(g), true);
+  assert.match(fs.readFileSync(target, "utf8"), /^# Cheats chosen in The Retro Shelf/);
+});

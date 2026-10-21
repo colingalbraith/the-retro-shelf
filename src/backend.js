@@ -89,6 +89,7 @@ function jsave(p, obj) {
 }
 // RetroArch's names for the RetroPad's buttons, by number (remap files say input_player1_btn_<name>)
 const RETROPAD = ["b", "y", "select", "start", "up", "down", "left", "right", "a", "x", "l", "r", "l2", "r2", "l3", "r3"];
+const CHEAT_MARK = "# Cheats chosen in The Retro Shelf (a game's options → Cheats)";
 const REMAP_MARK = "# Buttons changed in The Retro Shelf (Settings → Playing → Buttons)";
 
 // how far you are with a game (setGameInfo): not started yet, playing it, beaten, or done everything there is (100%)
@@ -1038,17 +1039,18 @@ class Backend extends EventEmitter {
   // ---------------------------------------------------------------- cheats
   /** libretro's cheat collection: downloaded the first time it's wanted (37 MB), then its index kept in memory */
   async cheatIndex() {
-    const file = path.join(this.dirs.data, "cheats.zip");
-    if (!fs.existsSync(file)) {
-      if (!this._cheatGet) this._cheatGet = (async () => {
-        const data = await this.fetchUrl("https://buildbot.libretro.com/assets/frontend/cheats.zip", 300000);
-        fs.writeFileSync(file + ".part", data);
-        fs.renameSync(file + ".part", file);
-      })().finally(() => { this._cheatGet = null; });
-      await this._cheatGet;
-    }
-    if (!this._cheats) this._cheats = { file, entries: new Map((await zip.entries(file)).map(e => [e.name, e])) };
-    return this._cheats;
+    const file = path.join(this.dirs.data, "cheats.zip"), read = async f => new Map((await zip.entries(f)).map(e => [e.name, e]));
+    if (this._cheats) return this._cheats;
+    // a copy that isn't a zip (a Wi-Fi sign-in page saved in its place) is fetched again
+    if (fs.existsSync(file)) { try { return (this._cheats = { file, entries: await read(file) }); } catch { fs.rmSync(file, { force: true }); } }
+    if (!this._cheatGet) this._cheatGet = (async () => {
+      const data = await this.fetchUrl("https://buildbot.libretro.com/assets/frontend/cheats.zip", 300000);
+      fs.writeFileSync(file + ".part", data);
+      try { await read(file + ".part"); } catch (e) { fs.rmSync(file + ".part", { force: true }); throw e; }
+      fs.renameSync(file + ".part", file);
+    })().finally(() => { this._cheatGet = null; });
+    await this._cheatGet;
+    return (this._cheats = { file, entries: await read(file) });
   }
   /** a game's cheats: [{key, desc, src, on}], from its files in the collection; key is "file#number" */
   async cheatList(id) {
@@ -1089,9 +1091,14 @@ class Backend extends EventEmitter {
         for (const [f, nums] of byFile) { const list = cheatFiles.parse((await zip.readEntry(idx.file, idx.entries.get(f))).toString("utf8")); for (const n of nums) if (list[n]) chosen.push(list[n]); }
       } catch { chosen = []; }
     }
+    // the app's own file says so on its first line; one made in RetroArch's menu is left as it is
+    // (one from before the mark, for a game with cheats chosen here, is the app's too)
+    let mine = true;
+    try { mine = fs.readFileSync(target, "utf8").startsWith(CHEAT_MARK) || keys.length > 0; } catch {}
+    if (!mine) return false;
     if (!chosen.length) { fs.rmSync(target, { force: true }); return false; }
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, cheatFiles.write(chosen));
+    fs.writeFileSync(target, CHEAT_MARK + "\n" + cheatFiles.write(chosen));
     return true;
   }
 
