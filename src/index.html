@@ -479,7 +479,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 #trophy .thead .btns{display:flex;gap:12px;align-items:center}
 /* a series' game that doesn't count toward having them all */
 .ci.skip .art{opacity:.28;filter:grayscale(1)}
-.ci.skip::after{content:"Doesn't count";position:absolute;left:0;right:0;bottom:8px;font:700 9px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--chalk);text-align:center}
+.ci.skip::after{content:attr(data-skip);position:absolute;left:0;right:0;bottom:8px;font:700 9px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--chalk);text-align:center}
 /* the controller test: a drawing that lights up */
 #ctpad{display:block;width:100%;max-width:440px;margin:8px auto 4px}
 #ctpad rect,#ctpad circle{fill:var(--paper-hi);stroke:var(--ink);stroke-width:1.5}
@@ -2019,6 +2019,7 @@ async function openColls(tab) {
 function closeColls() { if (!isOpen("colls")) return; $("#colls").classList.remove("show"); if (collIO) collIO.disconnect(); focusById(focusId); light(); beep(330); }
 function collItem(it, list) {
   const b = el("button", "ci" + (it.id ? "" : " ghost") + (it.counts === false ? " skip" : "")), art = el("span", "art"), g = it.id && byId.get(it.id);
+  if (it.counts === false) b.dataset.skip = t("Doesn't count");
   b.title = it.title + " · " + it.system + (it.id ? "" : " · not in your library");
   if (g && g.cv) { const im = new Image(); im.alt = ""; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); }
   else if (!it.id) {
