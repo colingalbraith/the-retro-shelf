@@ -89,6 +89,10 @@ function enforced(ra, dirs, opts) {
     run_ahead_frames: "1",
     run_ahead_secondary_instance: "false",
     run_ahead_hide_warnings: "true",
+    // a game on several discs (opts.discs): E opens and closes the tray, D picks the next disc (RetroArch only
+    // changes discs with the tray open)
+    input_disk_eject_toggle: opts.discs ? "e" : "nul",
+    input_disk_next: opts.discs ? "d" : "nul",
     // the cheats chosen for this game (written to its file in the cheats folder), switched on as it starts; never
     // with hardcore achievements
     apply_cheats_after_load: opts.cheats && !hardcore ? "true" : "false",

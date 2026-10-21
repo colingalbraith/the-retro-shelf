@@ -1522,7 +1522,8 @@ function showLaunch(g) {
   L.classList.add("starting"); $("#lstat").textContent = MEDIA_VERB[media(g)] + "…"; $("#lhint").style.visibility = "hidden";
   /* what this console's games can do besides */
   const c2 = cons(g.system), rw = c2.light && UI.rewind !== false;
-  $("#lhint2").textContent = !c2.light ? "" : c2.freeTriggers ? (rw ? t("Hold the left trigger (or R) to rewind, the right one (or L) to fast-forward.") : t("Hold the right trigger (or L) to fast-forward."))
+  $("#lhint2").textContent = /\.m3u$/i.test(g.file || "") ? t("Asked for another disc? On a keyboard, E opens the tray, D picks the next disc, E closes it. With a controller, hold Select, then Disc Control.")
+    : !c2.light ? "" : c2.freeTriggers ? (rw ? t("Hold the left trigger (or R) to rewind, the right one (or L) to fast-forward.") : t("Hold the right trigger (or L) to fast-forward."))
     : (rw ? t("Hold R to rewind, L to fast-forward.") : t("Hold L to fast-forward."));
   $("#lhint2").style.visibility = "hidden";
   L.classList.add("show"); updatePill(); light();

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0-beta.2
+
+- **Handheld screen look:** Settings → Playing → Picture → By console gives home consoles an old TV's scanlines and
+  Game Boy and GBA a handheld's screen. New installs start on it; your current choice stays.
+- **Picture and screen shape for one game:** in its options or right-click menu (4:3, pixel-perfect, stretch).
+- **Rewind and fast-forward:** hold the left trigger (or R) to go back a few seconds, the right trigger (or L) to
+  speed up, on 8- and 16-bit consoles and Game Boy.
+- **Less lag** on the same consoles: games answer the controller a frame sooner.
+- **Cheats:** libretro's cheat lists for each game, ticked on from its options. The lists download the first time.
+- **RetroAchievements:** sign in under Settings → Your play, with a hardcore switch.
+- **Games on several discs** get a disc list: one box, one memory card, and the discs can be changed while playing.
+
 ## 0.4.0-beta.1
 
 - **The first test version of 0.4.0.** Nothing new to see yet: it checks that test versions reach you, and lays the

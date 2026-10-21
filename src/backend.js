@@ -358,10 +358,87 @@ class Backend extends EventEmitter {
     return c ? m[pick(c, look)] : null;
   }
 
+  /**
+   * Multi-disc games without a disc list get one: "Final Fantasy VII (USA).m3u" next to its "(Disc 1)…(Disc 3)", so
+   * they're one box, share one memory card, and the emulator can change discs. Returns the lists made now:
+   * [{m3u, discs}]. A folder that can't be written to keeps its discs as they are.
+   */
+  makeDiscLists(dir) {
+    const made = [], DISC = /\s*\((?:Disc|Disk|CD) ?(\d+)(?: of \d+)?\)/i, KINDS = [".chd", ".cue", ".gdi", ".cdi", ".iso", ".pbp"];
+    // discs any list already has, wherever the list sits (one in a parent folder can list discs in a subfolder)
+    const listed = new Set(), lists = (d, depth) => {
+      let ents;
+      try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const e of ents) {
+        if (e.name.startsWith(".")) continue;
+        if (e.isDirectory()) { if (depth < 8) lists(path.join(d, e.name), depth + 1); }
+        else if (e.name.toLowerCase().endsWith(".m3u")) for (const f of sheetFiles(path.join(d, e.name))) listed.add(pathKey(f));
+      }
+    };
+    lists(dir, 0);
+    const walk = (d, depth) => {
+      let ents;
+      try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+      const groups = new Map();
+      for (const e of ents) {
+        if (e.name.startsWith(".")) continue;
+        if (e.isDirectory()) { if (depth < 8) walk(path.join(d, e.name), depth + 1); continue; }
+        const ext = path.extname(e.name).toLowerCase(), m = DISC.exec(e.name);
+        if (!e.isFile() || !KINDS.includes(ext) || !m || listed.has(pathKey(path.join(d, e.name)))) continue;
+        const base = path.parse(e.name).name.replace(DISC, "").trim(), discs = groups.get(base) || groups.set(base, new Map()).get(base);
+        // the same disc as both .chd and .cue: one is enough, the first kind in KINDS
+        const cur = discs.get(+m[1]);
+        if (!cur || KINDS.indexOf(ext) < KINDS.indexOf(cur.ext)) discs.set(+m[1], { name: e.name, ext });
+      }
+      for (const [base, discs] of groups) {
+        if (discs.size < 2) continue;
+        const m3u = path.join(d, base + ".m3u");
+        if (fs.existsSync(m3u)) continue;
+        const list = [...discs].sort((a, b) => a[0] - b[0]).map(([, x]) => x.name);
+        try { fs.writeFileSync(m3u, list.join("\n") + "\n"); made.push({ m3u, discs: list.map(n => path.join(d, n)) }); } catch {}
+      }
+    };
+    walk(dir, 0);
+    return made;
+  }
+  /**
+   * A new disc list takes over its discs' boxes: their play history goes to it (time and plays added up), and the
+   * first disc's saves are copied to the list's name, which the emulator saves under from now on.
+   */
+  adoptDiscs(system, m3u, discs) {
+    const st = this.state, to = gid(m3u), from = discs.map(gid);
+    for (const id of from) {
+      if (id === from[0]) { this.moveStats(id, to); continue; }
+      st.time[to] = (st.time[to] || 0) + (st.time[id] || 0); st.plays[to] = (st.plays[to] || 0) + (st.plays[id] || 0);
+      if ((st.last[id] || 0) > (st.last[to] || 0)) st.last[to] = st.last[id];
+      for (const k of ["time", "plays", "last", "names", "gameOpts", "cheats"]) delete st[k][id];
+      for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(id); if (i >= 0) { st[k].splice(i, 1); if (!st[k].includes(to)) st[k].push(to); } }
+      for (const sh of st.shelves) { const i = sh.ids.indexOf(id); if (i >= 0) { sh.ids.splice(i, 1); if (!sh.ids.includes(to)) sh.ids.push(to); } }
+      for (const ses of st.sessions) if (ses[0] === id) ses[0] = to;
+    }
+    for (const sh of st.shelves) sh.ids = [...new Set(sh.ids)];
+    for (const k of ["fav", "hidden"]) st[k] = [...new Set(st[k])];
+    const core = this.cfg.systems[system].core;
+    this.resumeAt({ system, path: discs[0] });          // looks up the emulator's name, which names its save folders
+    const cn = core && this._coreNames && this._coreNames[core];
+    if (cn) {
+      const a = path.parse(discs[0]).name, b = path.parse(m3u).name;
+      for (const dir of [path.join(this.folders.saves, cn), path.join(this.folders.states, cn)]) {
+        let files = [];
+        try { files = fs.readdirSync(dir); } catch {}
+        for (const f of files) if (f.startsWith(a + ".")) {
+          const dest = path.join(dir, b + f.slice(a.length));
+          if (!fs.existsSync(dest)) try { fs.copyFileSync(path.join(dir, f), dest); } catch {}
+        }
+      }
+    }
+  }
+
   scan() {
-    const found = new Map(), root = this.romsRoot();
+    const found = new Map(), root = this.romsRoot(), adopt = [];
     for (const [name, s] of Object.entries(this.cfg.systems)) {
       const exts = (s.exts || []).map(e => e.toLowerCase()), folder = s.folder || name;
+      if (s.discLists) for (const x of this.makeDiscLists(path.join(root, folder))) adopt.push([name, x]);
       // discs listed in an .m3u show up once, as the .m3u, wherever they sit and however their names are written
       const listed = new Set(), ids = [];
       const walk = (dir, depth) => {
@@ -392,6 +469,7 @@ class Backend extends EventEmitter {
       for (const id of ids) if (listed.has(pathKey(found.get(id).path))) found.delete(id);
     }
     this.games = found;
+    if (adopt.length) { for (const [system, x] of adopt) this.adoptDiscs(system, x.m3u, x.discs); this.saveState(); }
   }
 
   // ---------------------------------------------------------------- launching
@@ -424,7 +502,7 @@ class Backend extends EventEmitter {
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
       const play = this.playOpts(g);
       const cheevos = this.raPending || (this.state.cheevos.user ? { user: this.state.cheevos.user } : null);
-      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, load: !(opts.fresh || slot !== null) }));
+      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null) }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");

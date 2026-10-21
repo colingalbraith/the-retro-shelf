@@ -178,6 +178,7 @@
       "thumbs": "NEC - PC Engine - TurboGrafx 16",
       "media": "card",
       "picture": "crt",
+      "discLists": true,
       "light": true,
       "freeTriggers": true,
       "abbr": "PCE",
@@ -267,6 +268,7 @@
       "thumbs": "Sony - PlayStation",
       "media": "cd",
       "picture": "crt",
+      "discLists": true,
       "abbr": "PS1",
       "look": [
         "ps1",
@@ -323,6 +325,7 @@
       "thumbs": "Sega - Dreamcast",
       "media": "cd",
       "picture": "sharp",
+      "discLists": true,
       "abbr": "DC",
       "look": [
         "dc",

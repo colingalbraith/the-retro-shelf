@@ -297,3 +297,31 @@ test("RetroAchievements: the password stays in memory until RetroArch has a toke
   assert.deepEqual(be.settingsJson().cheevos, { user: "", pending: "", failed: true });
   assert.ok(!fs.readFileSync(be.files.raCfg, "utf8").includes("wrong"));
 });
+
+test("a game on several discs gets a disc list: one box, its history added up, the first disc's saves under its name", async () => {
+  const { createHash } = await import("node:crypto");
+  const id = rel => createHash("sha1").update(path.join(games, rel)).digest("hex").slice(0, 12);
+  put("ps1/Final Fantasy VII (USA) (Disc 1).cue", cue(["Final Fantasy VII (USA) (Disc 1).bin"])); put("ps1/Final Fantasy VII (USA) (Disc 1).bin");
+  put("ps1/Final Fantasy VII (USA) (Disc 2).cue", cue(["Final Fantasy VII (USA) (Disc 2).bin"])); put("ps1/Final Fantasy VII (USA) (Disc 2).bin");
+  put("ps1/Final Fantasy VII (USA) (Disc 3).chd");
+  put("ps1/Crash (USA).cue", cue(["Crash (USA).bin"])); put("ps1/Crash (USA).bin");
+  // from before there was a list: play history on two discs' boxes, and a save from the first
+  const d1 = id("ps1/Final Fantasy VII (USA) (Disc 1).cue"), d2 = id("ps1/Final Fantasy VII (USA) (Disc 2).cue");
+  Object.assign(be.state.time, { [d1]: 3600, [d2]: 600 }); Object.assign(be.state.plays, { [d1]: 3, [d2]: 1 }); be.state.fav.push(d2);
+  be.resumeAt = () => 0; be._coreNames = { pcsx_rearmed_libretro: "PCSX-ReARMed" };
+  fs.mkdirSync(path.join(be.folders.saves, "PCSX-ReARMed"), { recursive: true });
+  fs.writeFileSync(path.join(be.folders.saves, "PCSX-ReARMed", "Final Fantasy VII (USA) (Disc 1).srm"), "memory card");
+  be.scan();
+  const ff = [...be.games.values()].filter(g => g.title === "Final Fantasy VII");
+  assert.equal(ff.length, 1);
+  assert.ok(ff[0].path.endsWith("Final Fantasy VII (USA).m3u"));
+  assert.deepEqual(fs.readFileSync(ff[0].path, "utf8").trim().split("\n"), ["Final Fantasy VII (USA) (Disc 1).cue", "Final Fantasy VII (USA) (Disc 2).cue", "Final Fantasy VII (USA) (Disc 3).chd"]);
+  assert.equal(be.state.time[ff[0].id], 4200);
+  assert.equal(be.state.plays[ff[0].id], 4);
+  assert.ok(be.state.fav.includes(ff[0].id) && !be.state.fav.includes(d2));
+  assert.equal(fs.readFileSync(path.join(be.folders.saves, "PCSX-ReARMed", "Final Fantasy VII (USA).srm"), "utf8"), "memory card");
+  assert.ok(byTitle("Crash"));                                                       // one disc: left as it is
+  be.scan();                                                                          // and the next scan changes nothing
+  assert.equal([...be.games.values()].filter(g => g.title === "Final Fantasy VII").length, 1);
+  assert.equal(be.state.time[ff[0].id], 4200);
+});
