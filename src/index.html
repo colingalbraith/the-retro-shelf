@@ -3094,6 +3094,8 @@ function renderSettings() {
       seg([["auto", t("By console")], ["sharp", t("Sharp")], ["smooth", t("Smooth")], ["crt", t("Old TV")], ["lcd", t("Handheld")]], UI.picture || "auto", v => { UI.picture = v; saveUI(); }));
     R("Pick up where you left off", "Saves your spot when you leave a game and starts there next time.", sw(UI.resume !== false, v => { UI.resume = v; saveUI(); }));
     R(t("Rewind"), t("Hold the left trigger, or R on a keyboard, to go back a few seconds. The right trigger, or L, fast-forwards. On 8- and 16-bit consoles and Game Boy."), sw(UI.rewind !== false, v => { UI.rewind = v; saveUI(); }));
+    R(t("Fast-forward speed"), t("How fast a game goes while you hold the right trigger (on the same consoles) or L, or after pressing Space. The sound speeds up with it, and is off at Fastest."),
+      seg([[2, "2×"], [3, "3×"], [4, "4×"], [0, t("Fastest")]], UI.ffSpeed ?? 3, v => { UI.ffSpeed = v; saveUI(); }));
     R(t("Less lag"), t("Games answer the controller a frame sooner, on the same consoles. Turn it off if a game's sound crackles."), sw(UI.lessLag !== false, v => { UI.lessLag = v; saveUI(); }));
   R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); renderHints(); }));
     const cb = el("div", "btns"), ct = el("button", "btn", t("Test…")), cr = el("button", "btn", t("Change buttons…"));

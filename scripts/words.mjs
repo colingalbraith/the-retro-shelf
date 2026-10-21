@@ -82,10 +82,10 @@ for (const f of fs.readdirSync(path.join(ROOT, "src", "data", "meta"))) {
 }
 // never words, even where the code writes them: languages go by their own names, and the app's, the consoles' and
 // other makers' names stay as they are
-const fixed = new Set(["English", "Español", "Français", "Deutsch", "Português", "日本語", "The Retro Shelf", "THE RETRO SHELF", "English text",
+const fixed = new Set(["English", "Español", "Français", "Deutsch", "Italiano", "Português", "Русский", "日本語", "한국어", "简体中文", "The Retro Shelf", "THE RETRO SHELF", "English text",
   "PlayStation", "PlayStation 2", "RetroAchievements", "RetroArch", "Limited Run Games", "PDRoms", "GOG", "Evercade", "itch.io", "Retrode",
   "GB Operator", "Homebrew Hub", "CleanRip (Wii)", "Xbox", "Nintendo", ...Object.keys(cfg.systems)]);
-for (const n of ["Español", "Français", "Deutsch", "Português", "日本語"]) fixed.add(n + " (beta)");
+for (const n of ["Español", "Français", "Deutsch", "Italiano", "Português", "Русский", "日本語", "한국어", "简体中文"]) fixed.add(n + " (beta)");
 for (const s of Object.values(cfg.systems)) if (s.bios && s.bios.label) fixed.add(s.bios.label);
 // a famous series' pin is a nickname, the same in every language
 for (const p of require(path.join(ROOT, "src", "pins.js")).build([])) if (p.key.startsWith("s:")) fixed.add(p.title);

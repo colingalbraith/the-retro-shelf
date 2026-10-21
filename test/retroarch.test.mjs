@@ -79,6 +79,17 @@ test("rewind, fast-forward and less lag: on light consoles, the triggers only wh
   assert.deepEqual([x.input_rewind, x.input_hold_fast_forward, x.input_toggle_fast_forward], ["r", "l", "space"]);
 });
 
+test("fast-forward goes at the chosen speed, the sound sped up with it, and quiet at the fastest", () => {
+  const dirs = { saves: "s", states: "t", screenshots: "p", system: "b", private: "x" };
+  const emu = { cores: "c", info: "i", assets: "a", autoconfig: "j" };
+  const ff = v => { const x = ra.enforced(emu, dirs, { ffSpeed: v }); return [x.fastforward_ratio, x.audio_fastforward_speedup, x.audio_fastforward_mute]; };
+  assert.deepEqual(ff(2), ["2.0", "true", "false"]);
+  assert.deepEqual(ff(4), ["4.0", "true", "false"]);
+  assert.deepEqual(ff(0), ["0.0", "false", "true"]);          // as fast as the computer can
+  assert.deepEqual(ff(undefined), ["3.0", "true", "false"]);  // not chosen: 3 times, as before
+  assert.deepEqual(ff(17), ["3.0", "true", "false"]);
+});
+
 test("each controller's own triggers rewind and fast-forward, whatever they are on it", () => {
   const on = text => Object.fromEntries([...ra.withTriggers(text).matchAll(/^input_(rewind|hold_fast_forward)_(btn|axis) = "([^"]*)"$/gm)].map(m => [m[1] + "_" + m[2], m[3]]));
   // Linux (udev), an Xbox pad and the Steam Deck's: the left trigger is axis 2, and axis 4 is the right stick
