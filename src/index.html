@@ -1084,7 +1084,7 @@ function ingest(d) {
 const vis = () => G.filter(g => UI.hidden.indexOf(g.system) < 0 && (!g.hidden || UI.showHidden));
 function sections() {
   const v = vis(), out = [];
-  const match = g => !q || (g.title + " " + g.system).toLowerCase().indexOf(q) >= 0;
+  const words = q ? searchWords(q) : [], match = g => !words.length || words.every(w => wordFits(g, w));
   if (!q) {
     const rec = v.filter(g => g.last).sort((a, b) => b.last - a.last).slice(0, 8);
     if (rec.length) out.push({key: "recent", name: "Recently played", face: true, games: rec});
@@ -1560,6 +1560,43 @@ function paintQ() {
   t.hidden = !q && !active; clear(t);
   t.appendChild(document.createTextNode(q ? $("#q").value : "search"));
   if (active) t.appendChild(el("i", "caret"));
+}
+/* ---------- search: every word has to fit the game. In its title, or nearly (one letter off in a short word, two in a
+   long one: "zelad" finds Zelda), or its console ("snes", "psx"), year or decade ("1994", "90s"), genre ("rpg"), or
+   how far you are with it ("backlog") ---------- */
+const fold = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const searchWords = s => fold(s).split(/\s+/).filter(Boolean);
+const CONSOLE_WORDS = {psx: "PS1", playstation: "PS1", megadrive: "Genesis", "mega-drive": "Genesis", gamecube: "GameCube/Wii", gc: "GameCube/Wii", wii: "GameCube/Wii",
+  gbc: "Game Boy", turbografx: "PC Engine", tg16: "PC Engine", "mega-cd": "Sega CD", megacd: "Sega CD", nds: "DS", "32x": "32X", famicom: "NES", "super famicom": "SNES"};
+/* one word within max edits (letters added, dropped, changed or swapped) of another */
+function near(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return false;
+  let prev2 = null, prev = Array.from({length: b.length + 1}, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+      cur.push(v); best = Math.min(best, v);
+    }
+    if (best > max) return false;
+    prev2 = prev; prev = cur;
+  }
+  return prev[b.length] <= max;
+}
+const TITLE_WORDS = new Map();
+const titleWords = g => { const k = g.id + "|" + g.title; if (!TITLE_WORDS.has(k)) TITLE_WORDS.set(k, fold(g.title).split(/[^a-z0-9]+/).filter(Boolean)); return TITLE_WORDS.get(k); };
+function wordFits(g, w) {
+  if (fold(g.title).includes(w)) return true;
+  const sys = g.system.toLowerCase(), ab = (cons(g.system).abbr || "").toLowerCase();
+  if (sys === w || sys.split(/[^a-z0-9]+/).includes(w) || ab === w || CONSOLE_WORDS[w] === g.system) return true;
+  if (/^\d{4}$/.test(w)) return g.year === w;
+  const dec = /^(19|20)?(\d)0s$/.exec(w);
+  if (dec) { const y = parseInt(g.year, 10), c = dec[1] || (dec[2] === "0" || dec[2] === "1" ? "20" : "19"); return !!y && Math.floor(y / 10) === +(c + dec[2]); }
+  if (w.length >= 3 && ((g.genre || "").toLowerCase().includes(w) || (g.gg || "").toLowerCase().includes(w))) return true;
+  if (g.progress && fold(PROGRESS[g.progress]) === w) return true;
+  if (w.length >= 4) { const max = w.length >= 7 ? 2 : 1; return titleWords(g).some(t => t.length >= 3 && near(t, w, max)); }
+  return false;
 }
 function setQ(v) { $("#q").value = v; q = v.trim().toLowerCase(); renderShelves(null); paintQ(); }
 
