@@ -106,6 +106,13 @@ test("each controller's own triggers rewind and fast-forward, whatever they are 
   assert.equal(ra.withTriggers(own), own);
 });
 
+test("RetroArch's menu and messages are in the app's language", () => {
+  const lang = l => ra.enforced({ autoconfig: "j" }, { saves: "s", states: "t", screenshots: "p", system: "b", private: "x" }, { lang: l }).user_language;
+  assert.deepEqual([lang("en"), lang("ja"), lang("de"), lang("pt"), lang("ru"), lang("ko"), lang("zh"), lang("zh-Hant"), lang("pl")], ["0", "1", "4", "7", "9", "10", "12", "11", "14"]);
+  assert.equal(lang("xx"), "0", "any other: English");
+  assert.equal(lang(undefined), "0");
+});
+
 test("the trigger can switch fast-forward on and off instead, from its own copy of the profiles", () => {
   const on = text => Object.fromEntries([...text.matchAll(/^input_(rewind|hold_fast_forward|toggle_fast_forward)_(btn|axis) = "([^"]*)"$/gm)].map(m => [m[1] + "_" + m[2], m[3]]));
   assert.deepEqual(on(ra.withTriggers('input_l2_axis = "+2"\ninput_r2_axis = "+5"\n', true)), { rewind_axis: "+2", toggle_fast_forward_axis: "+5" });

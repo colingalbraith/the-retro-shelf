@@ -918,8 +918,10 @@ class Backend extends EventEmitter {
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
       const play = this.playOpts(g);
       const cheevos = this.raPending || (this.state.cheevos.user ? { user: this.state.cheevos.user } : null);
+      // RetroArch's menu and messages in the app's language: the one chosen, or the computer's
+      const loc = this.dirs.locale || "", lang = this.ui.lang && this.ui.lang !== "auto" ? this.ui.lang : /^zh-(hant|tw|hk|mo)/i.test(loc) ? "zh-Hant" : loc.slice(0, 2).toLowerCase();
       const triggers = play.freeTriggers ? ra.triggerProfiles(this.ra, dirs.private, play.ffTrigger === "toggle") : null;
-      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null), pads: opts.pads, triggers }));
+      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null), pads: opts.pads, triggers, lang }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.3
+
+- **Four more tunes for the menu music:** Bittersweet Story, Rainy Streets, Airship and Pavane by Aureolus_Omicron,
+  given to the public domain (CC0). Nine in all, at the same loudness.
+- **RetroArch speaks your language:** the menu you open during a game (hold Select, or F1) and its messages ("Saved
+  state") follow the app's language. Emulators that have a language of their own, like the PSP's or the Dreamcast's,
+  get it too.
+
 ## 0.4.2
 
 - **Fast-forward your way:** a speed for one game of its own, in its options or right-click menu, and Settings →

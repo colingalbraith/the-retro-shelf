@@ -51,6 +51,10 @@ function neededDirs(dirs) {
 // a value as RetroArch's settings file holds it: in quotes, so without quotes or line breaks of its own
 const q = v => '"' + String(v).replace(/["\r\n]/g, "") + '"';
 
+/** the app's languages as RetroArch numbers them (libretro.h's RETRO_LANGUAGE_*); any other is English. RetroArch has a
+    font for each in its menu, and hands the language to the emulators too (a PSP or Dreamcast's own language) */
+const RA_LANGUAGES = { en: 0, ja: 1, fr: 2, es: 3, de: 4, it: 5, pt: 7, ru: 9, ko: 10, "zh-Hant": 11, zh: 12, pl: 14 };
+
 /** fast-forward's speed as chosen: 2, 3 or 4 times, or 0 for as fast as it goes; 3 otherwise */
 const ffSpeed = v => [0, 2, 3, 4].includes(v) ? v : 3;
 
@@ -62,6 +66,7 @@ function enforced(ra, dirs, opts) {
   const hardcore = !!(opts.cheevos && opts.hardcore);
   return {
     video_fullscreen: opts.fullscreen ? "true" : "false",
+    user_language: String(RA_LANGUAGES[opts.lang] ?? 0),
     // saves where the app looks for them (Saves/<emulator>/, Saves/States/<emulator>/): Continue, the saves list,
     // export and backups all read them there, so RetroArch's own menu can't move them
     sort_savefiles_enable: "true", sort_savestates_enable: "true", sort_savefiles_by_content_enable: "false",

@@ -425,7 +425,7 @@ app.on("web-contents-created", (_, wc) => {
 
 app.whenReady().then(() => {
   if (!app.isPackaged && process.platform === "darwin") app.dock.setIcon(DEV_ICON);
-  backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion(), watch: true }, fetchUrl);
+  backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion(), watch: true, locale: app.getLocale() }, fetchUrl);
   backend.trash = p => shell.trashItem(p);
   // backups by themselves: weekly, when that's on, never while a game is open; the last five kept, older ones to the Trash
   const autoBackup = async () => {

@@ -109,6 +109,10 @@ https://creativecommons.org/publicdomain/zero/1.0/). Credited with thanks, thoug
 - “forgotten path” by johndekale: https://opengameart.org/content/forgotten-path
 - “Title Screen” by Aureolus_Omicron, from 15 Melodic RPG Chiptunes: https://opengameart.org/content/15-melodic-rpg-chiptunes
 - “Town” by Aureolus_Omicron, from 15 Melodic RPG Chiptunes: https://opengameart.org/content/15-melodic-rpg-chiptunes
+- “Bittersweet Story” by Aureolus_Omicron, from 15 Melodic RPG Chiptunes: https://opengameart.org/content/15-melodic-rpg-chiptunes
+- “Rainy Streets” by Aureolus_Omicron, from 15 Melodic RPG Chiptunes: https://opengameart.org/content/15-melodic-rpg-chiptunes
+- “Airship” by Aureolus_Omicron, from 15 Melodic RPG Chiptunes: https://opengameart.org/content/15-melodic-rpg-chiptunes
+- “Pavane” by Aureolus_Omicron, from 15 Melodic RPG Chiptunes: https://opengameart.org/content/15-melodic-rpg-chiptunes
 
 ## IBM Plex
 
