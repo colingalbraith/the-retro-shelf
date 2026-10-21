@@ -153,6 +153,11 @@ jobs:
 
           **Windows** (10 and 11): download and run the `Setup .exe`. If SmartScreen appears, click
           **More info → Run anyway**.
+          For a USB stick, take `portable-win.zip` instead: unzip it anywhere and open The Retro Shelf inside.
+          Games, saves and settings stay in its Data folder.
+
+          **Linux** (64-bit, Steam Deck too): download the `.AppImage`, make it executable (right-click →
+          Properties → Allow executing, or `chmod +x`) and open it. Steam Deck: see docs/steam-deck.md.
 
           After this, The Retro Shelf updates itself. No games are included. See the README for where to get games legally.
           NOTES
