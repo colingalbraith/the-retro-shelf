@@ -46,6 +46,18 @@ jobs:
       - name: Fetch RetroArch and cores
         run: node scripts/fetch-emulators.mjs ${{ matrix.target }}
 
+      # which libraries the Linux RetroArch and cores need from the system (a plain Ubuntu machine has most, not all)
+      - name: Libraries RetroArch needs
+        if: matrix.target == 'linux'
+        run: |
+          RA=vendor/linux/RetroArch
+          echo "--- bundled in usr/lib:"; ls $RA/usr/lib | tr '\n' ' '; echo
+          echo "--- RUNPATH:"; readelf -d $RA/usr/bin/retroarch | grep -E "RPATH|RUNPATH" || true
+          echo "--- NEEDED:"; readelf -d $RA/usr/bin/retroarch | grep NEEDED | sed 's/.*\[\(.*\)\]/\1/' | tr '\n' ' '; echo
+          echo "--- not found on this machine:"; ldd $RA/usr/bin/retroarch | grep "not found" || echo "(none)"
+          echo "--- jack symbols used:"; nm -D --undefined-only $RA/usr/bin/retroarch | grep -i jack || true
+          echo "--- cores missing libraries:"; for c in vendor/linux/cores/*.so; do m=$(ldd $c | grep "not found" || true); [ -n "$m" ] && echo "$c: $m"; done; echo done
+
       - name: Build
         run: npx electron-builder --${{ matrix.target }} --publish never
         env:
