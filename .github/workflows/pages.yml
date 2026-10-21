@@ -1,0 +1,42 @@
+name: Website
+
+# The download page on GitHub Pages (colingalbraith.github.io/the-retro-shelf): site/index.html with the README's
+# pictures and the latest release's downloads (scripts/site.mjs). Published again when the page or its pictures
+# change, and when a release comes out, so its button always offers the newest version.
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "docs/images/**", "scripts/site.mjs", ".github/workflows/pages.yml"]
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Put the site together
+        run: node scripts/site.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/site
+      - id: deploy
+        uses: actions/deploy-pages@v4
