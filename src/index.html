@@ -2097,6 +2097,19 @@ function listRow(list, label, sub, buttons) {
   for (const [text, fn] of buttons) { const b = el("button", "btn", text); b.onclick = fn; r.appendChild(b); }
   list.appendChild(r);
 }
+/* watched files whose console couldn't be told: you choose */
+async function openUnsure() {
+  const r = await api("/api/watch/unsure", {}); if (!r.ok) return;
+  let files = r.data.files;
+  openList(t("Which console?"), t("These files could be for more than one console, and what's in them doesn't say. Choose for each."), list => {
+    if (!files.length) list.appendChild(el("p", "", t("All sorted.")));
+    for (const f of files) listRow(list, f.name, "", f.choices.map(c => [c, async () => {
+      const a = await api("/api/watch/assign", {src: f.src, system: c});
+      if (!a.ok) return toast(a.data.error || t("Couldn't do that."), true);
+      files = files.filter(x => x !== f); await refresh(true); redrawList();
+    }]));
+  });
+}
 /* hidden games, to bring back */
 function openHidden() {
   openList(t("Hidden games"), t("Games you've hidden from the shelves. Show one again to put it back."), list => {
@@ -2279,6 +2292,22 @@ function renderSettings() {
   a1.onclick = () => { closeSettings(); addGames(); }; a2.onclick = () => APP.openFolder("games");
   ab.appendChild(a2); ab.appendChild(a1);
   R("Add games", "Or drag game files onto the window. They're copied into the games folder, sorted by system.", ab);
+  /* folders of games shown where they are */
+  for (const w of PATHS.watch || []) {
+    const wb = el("div", "btns"), stop = el("button", "btn", t("Stop watching"));
+    stop.onclick = async () => { await api("/api/watch/remove", {dir: w.dir}); await refresh(true); renderSettings(); };
+    if (w.unsure) { const ch = el("button", "btn", t("Choose consoles…")); ch.onclick = openUnsure; wb.appendChild(ch); }
+    wb.appendChild(stop);
+    R(w.dir.split(/[\\/]/).filter(Boolean).pop() || w.dir, w.dir + " · " + plural(w.games, "game", "games") + (w.unsure ? " · " + t("{n} not sure which console", {n: w.unsure}) : ""), wb);
+  }
+  const wf = el("button", "btn", t("Watch a folder…"));
+  wf.onclick = async () => {
+    const r = await APP.watchFolder();
+    if (!r || (!r.ok && !r.error)) return;
+    if (!r.ok) return toast(r.error, true);
+    await refresh(true); renderSettings(); toast(t("{n} from that folder are on the shelves.", {n: plural(r.games, "game", "games")}));
+  };
+  R(t("Watch a folder"), t("Games in a folder of yours show on the shelves where they are, without being copied. New ones appear by themselves."), wf);
   const gg = el("button", "btn", "Open"); gg.onclick = openGetGames;
   R("Where to get games", "Copying games you own, free homebrew, and official re-releases.", gg);
   const co = el("button", "btn", "Open"); co.onclick = () => openColls();

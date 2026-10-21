@@ -362,3 +362,30 @@ test("progress, rating and a note for a game: set, cleared, kept when it moves",
   be.moveStats(g.id, "moved");
   assert.equal(be.state.progress.moved, "beaten"); assert.equal(be.state.notes.moved, "Found every missile");
 });
+
+test("a watched folder's games show where they are, each on its console's shelf, and go when it's unwatched", () => {
+  const dir = path.join(home, "My Games");
+  const at = (rel, data = "") => { const p = path.join(dir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, data); return p; };
+  at("Super Mario World (USA).sfc");
+  at("Discs/Crash Bandicoot (USA).cue", cue(["Crash Bandicoot (USA).bin"])); at("Discs/Crash Bandicoot (USA).bin");
+  const md = Buffer.alloc(0x200); md.write("SEGA MEGA DRIVE", 0x100); at("Sonic 2 (World).bin", md);
+  at("readme.txt", "hi"); at("._Super Mario World (USA).sfc");
+  assert.equal(be.addWatch(path.join(games, "snes"))[0], 400);                     // the games folder's own
+  const [code, res] = be.addWatch(dir);
+  assert.equal(code, 200);
+  const mine = [...be.games.values()].filter(g => g.watched === dir).map(g => [g.title, g.system]).sort();
+  assert.deepEqual(mine, [["Sonic 2", "Genesis"], ["Super Mario World", "SNES"]]);
+  assert.equal(res.games, 2);
+  // an empty disc says nothing about its console: it waits for you to choose, and then it's on that shelf
+  const w = be.settingsJson().paths.watch[0];
+  assert.deepEqual([w.games, w.unsure], [2, 1]);
+  const unsure = be.watchUnsure();
+  assert.equal(unsure.length, 1); assert.ok(unsure[0].choices.includes("PS1"));
+  assert.equal(be.assignWatched(unsure[0].src, "N64")[0], 400);                  // not a console that file can be
+  assert.equal(be.assignWatched(unsure[0].src, "PS1")[0], 200);
+  assert.ok([...be.games.values()].some(g => g.title === "Crash Bandicoot" && g.system === "PS1" && g.watched === dir));
+  assert.equal(be.addWatch(path.join(dir, "Discs"))[0], 409);                     // inside one that's watched
+  assert.equal(be.state.watchSys[path.join(dir, "Sonic 2 (World).bin")], "Genesis"); // remembered, not read again
+  be.removeWatch(dir);
+  assert.equal([...be.games.values()].filter(g => g.watched).length, 0);
+});

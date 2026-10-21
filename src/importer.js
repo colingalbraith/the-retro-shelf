@@ -168,7 +168,8 @@ class Importer {
   }
 
   /** Walk dropped files/folders and classify everything that looks like a game. */
-  inspect(paths) {
+  /** hints: a file's console, already known (from an earlier look), so it isn't read again */
+  inspect(paths, hints = null) {
     const files = [], seen = new Set();
     const add = p => { if (!seen.has(p) && files.length < MAX_FILES) { seen.add(p); files.push(p); } };
     const walk = (p, depth) => {
@@ -211,6 +212,7 @@ class Importer {
       try { size = fs.statSync(f).size; } catch {}
       const it = { id: crypto.createHash("sha1").update(f).digest("hex").slice(0, 12), src: f, name, ext, size, system: null, choices: cands, extras: [], makeCue: false };
       if (cands.length === 1) it.system = cands[0];
+      else if (hints && hints[f] && cands.includes(hints[f])) it.system = hints[f];
       else {
         let r = null;
         try { r = this.sniff(f, ext, cands); } catch {}

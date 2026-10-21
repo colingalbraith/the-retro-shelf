@@ -233,6 +233,13 @@ function ipc() {
   ipcMain.handle("reveal-game", (_, id) => { const g = backend.games.get(String(id)); if (g) shell.showItemInFolder(g.path); });
   ipcMain.handle("game-menu", (_, id) => gameMenu(String(id)));
   ipcMain.handle("open-url", (_, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
+  // a folder of games to show where it is, without copying
+  ipcMain.handle("watch-folder", async () => {
+    const r = await dialog.showOpenDialog(win, { title: "Watch a folder of games", buttonLabel: "Watch", properties: ["openDirectory"] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    const [code, res] = backend.addWatch(r.filePaths[0]);
+    return code === 200 ? { ok: true, games: res.games } : { ok: false, error: res.error };
+  });
   ipcMain.handle("backup-saves", async () => {
     const saves = backend.folders.saves;
     // folders RetroArch makes on the first launch don't count: only actual save files
@@ -277,6 +284,8 @@ app.whenReady().then(() => {
   backend.init();
   if (OLD_GAMES) backend.remapIds(OLD_GAMES);
   backend.on("exit", () => setTimeout(focusApp, 150));
+  // games appeared or went (a watched folder, or the games folder): the shelf looks again
+  backend.on("changed", () => { if (win && !win.isDestroyed()) win.webContents.send("menu", { cmd: "refresh" }); });
   protocol.handle("arcade", req => {
     const u = new URL(req.url);
     if (u.host !== "app") return new Response("not found", { status: 404 });

@@ -442,8 +442,100 @@ class Backend extends EventEmitter {
     }
   }
 
+  /** what the shelf knows about one game file: its title, region, year, maker, genre, and pictures */
+  gameRecord(p, system, root) {
+    const s = this.cfg.systems[system], folder = s.folder || system, stem = path.parse(p).name, id = gid(p);
+    // arcade files are short codes ("sf2"); the full name is the title and what art is looked up by
+    let full = s.names && (this.names[s.names] || {})[stem.toLowerCase()], year = "", pub = "", dev = "", genre = "";
+    if (Array.isArray(full)) [full, year, pub] = full;
+    const look = full || stem;
+    if (!full) { const md = this.metaFor(folder, look); if (md) [year, pub, dev, genre] = md; }
+    let added = 0, size = 0;
+    try { const st = fs.statSync(p); added = Math.floor((st.birthtimeMs || st.mtimeMs) / 1000); size = st.size; } catch {}
+    return { id, title: cleanTitle(full ? full.split(" / ")[0] : stem), tag: regionTag(look), system, path: p, look, year, pub, dev, genre, added, size,
+             cover: this.findCover(p, root, folder), logo: this.findLogo(p, folder), snap: this.findExtra(p, folder, "snap") };
+  }
+
+  // ---------------------------------------------------------------- watched folders
+  /**
+   * Folders whose games show on the shelves where they are, without being copied (paths.watch). Each is gone through
+   * the way dropped files are (a file's console from its extension, or from what's in it), once, and again when
+   * something in it changes. The console decided for a file is remembered (state.watchSys), so it isn't read twice.
+   */
+  watchedDirs() { return (this.paths.watch || []).filter(d => typeof d === "string" && fs.existsSync(d)); }
+  watchedItems(dir) {
+    this._watched = this._watched || new Map();
+    let c = this._watched.get(dir);
+    if (!c || c.dirty) {
+      const hints = this.state.watchSys = this.state.watchSys || {};
+      const { items } = this.importer.inspect([dir], hints);
+      for (const it of items) if (it.system) hints[it.src] = it.system;
+      c = { items: items.filter(it => it.system), unsure: items.filter(it => !it.system).map(it => ({ src: it.src, name: it.name, choices: it.choices })), dirty: false };
+      this._watched.set(dir, c);
+      this.watchDir(dir);
+    }
+    return c;
+  }
+  /** after files change in a folder (a watched one, or the games folder): look again, a moment after the last change */
+  watchDir(dir) {
+    this._watchers = this._watchers || new Map();
+    if (this._watchers.has(dir)) return;
+    try {
+      const w = fs.watch(dir, { recursive: true }, (ev, name) => {
+        if (name && /(^|[\\/])\.|\.(part|tmp)$/i.test(String(name))) return;
+        const c = this._watched && this._watched.get(dir);
+        if (c) c.dirty = true;
+        clearTimeout(this._watchT);
+        this._watchT = setTimeout(() => { try { this.scan(); this.emit("changed"); } catch {} }, 1500);
+        if (this._watchT.unref) this._watchT.unref();
+      });
+      // watching doesn't keep the app (or a test) running on its own
+      w.unref();
+      w.on("error", () => {});
+      this._watchers.set(dir, w);
+    } catch {}
+  }
+  addWatch(dir) {
+    dir = path.resolve(String(dir || ""));
+    let st;
+    try { st = fs.statSync(dir); } catch { return [404, { error: "That folder isn't there." }]; }
+    if (!st.isDirectory()) return [400, { error: "Choose a folder." }];
+    const root = path.resolve(this.romsRoot()), inside = (a, b) => !path.relative(b, a).startsWith("..") && !path.isAbsolute(path.relative(b, a));
+    if (inside(dir, root) || inside(root, dir)) return [400, { error: "That's the games folder, or part of it: its games are on the shelves already." }];
+    const list = this.paths.watch || [];
+    if (list.some(d => inside(dir, d) || inside(d, dir))) return [409, { error: "That folder, or one around it, is watched already." }];
+    this.paths.watch = [...list, dir]; this.saveSettings();
+    this.scan();
+    return [200, { ok: true, games: this.watchedItems(dir).items.length }];
+  }
+  /** watched files whose console couldn't be told from what's in them: [{src, name, choices}] */
+  watchUnsure() { return this.watchedDirs().flatMap(d => this.watchedItems(d).unsure); }
+  /** your choice of console for one of them */
+  assignWatched(src, system) {
+    const it = this.watchUnsure().find(x => x.src === src);
+    if (!it) return [404, { error: "That file isn't waiting for a console." }];
+    if (!it.choices.includes(system)) return [400, { error: `${path.basename(src)} can't be a ${system} game.` }];
+    (this.state.watchSys = this.state.watchSys || {})[src] = system;
+    for (const c of this._watched.values()) c.dirty = true;
+    this.saveState(); this.scan();
+    return [200, { ok: true }];
+  }
+  removeWatch(dir) {
+    const list = this.paths.watch || [];
+    if (!list.includes(dir)) return [404, { error: "That folder isn't watched." }];
+    this.paths.watch = list.filter(d => d !== dir); this.saveSettings();
+    const w = this._watchers && this._watchers.get(dir); if (w) { try { w.close(); } catch {} this._watchers.delete(dir); }
+    if (this._watched) this._watched.delete(dir);
+    // the consoles remembered for its files go; play history stays, for if the folder comes back
+    const hints = this.state.watchSys || {};
+    for (const f of Object.keys(hints)) if (!path.relative(dir, f).startsWith("..")) delete hints[f];
+    this.saveState(); this.scan();
+    return [200, { ok: true }];
+  }
+
   scan() {
     const found = new Map(), root = this.romsRoot(), adopt = [];
+    this.watchDir(root);
     for (const [name, s] of Object.entries(this.cfg.systems)) {
       const exts = (s.exts || []).map(e => e.toLowerCase()), folder = s.folder || name;
       if (s.discLists) for (const x of this.makeDiscLists(path.join(root, folder))) adopt.push([name, x]);
@@ -460,21 +552,17 @@ class Backend extends EventEmitter {
           if (e.isDirectory()) { if (depth < 8) walk(p, depth + 1); continue; }
           const lower = e.name.toLowerCase();
           if (!exts.some(x => lower.endsWith(x)) || biosDest(lower, this.cfg.systems)) continue;
-          const stem = path.parse(e.name).name, id = gid(p);
-          // arcade files are short codes ("sf2"); the full name is the title and what art is looked up by
-          let full = s.names && (this.names[s.names] || {})[stem.toLowerCase()], year = "", pub = "", dev = "", genre = "";
-          if (Array.isArray(full)) [full, year, pub] = full;
-          const look = full || stem;
-          if (!full) { const md = this.metaFor(folder, look); if (md) [year, pub, dev, genre] = md; }
-          let added = 0, size = 0;
-          try { const st = fs.statSync(p); added = Math.floor((st.birthtimeMs || st.mtimeMs) / 1000); size = st.size; } catch {}
-          ids.push(id);
-          found.set(id, { id, title: cleanTitle(full ? full.split(" / ")[0] : stem), tag: regionTag(look), system: name, path: p, look, year, pub, dev, genre, added, size,
-                          cover: this.findCover(p, root, folder), logo: this.findLogo(p, folder), snap: this.findExtra(p, folder, "snap") });
+          const g = this.gameRecord(p, name, root);
+          ids.push(g.id); found.set(g.id, g);
         }
       };
       walk(path.join(root, folder), 0);
       for (const id of ids) if (listed.has(pathKey(found.get(id).path))) found.delete(id);
+    }
+    // games in watched folders, where they are
+    for (const dir of this.watchedDirs()) for (const it of this.watchedItems(dir).items) {
+      const id = gid(it.src);
+      if (!found.has(id) && this.cfg.systems[it.system]) found.set(id, { ...this.gameRecord(it.src, it.system, root), watched: dir });
     }
     this.games = found;
     if (adopt.length) { for (const [system, x] of adopt) this.adoptDiscs(system, x.m3u, x.discs); this.saveState(); }
@@ -1270,6 +1358,7 @@ class Backend extends EventEmitter {
       roms_ok: fs.existsSync(root), exe_ok: this.exeOk(), cores_ok: this.coresOk(),
       builtin: this.ra ? { version: this.ra.version, systems } : null, own: this.ownEmu(),
       folders: { games: root, saves: this.folders.saves, bios: this.folders.bios },
+      watch: this.watchedDirs().map(dir => { const c = this.watchedItems(dir); return { dir, games: c.items.length, unsure: c.unsure.length }; }),
     }, app: { version: this.dirs.version || "" },
     cheevos: { user: this.state.cheevos.user || "", pending: this.raPending ? this.raPending.user : "", failed: !!this.raFailed } };
   }
@@ -1465,6 +1554,10 @@ class Backend extends EventEmitter {
       case "/api/games/search": return j(this.gameSearch(d.q));
       case "/api/game/opts": return j(this.setGameOpts(String(d.id || ""), d.opts));
       case "/api/game/info": return j(this.setGameInfo(String(d.id || ""), d));
+      case "/api/watch/add": return j(this.addWatch(String(d.dir || "")));
+      case "/api/watch/remove": return j(this.removeWatch(String(d.dir || "")));
+      case "/api/watch/unsure": return j([200, { files: this.watchUnsure() }]);
+      case "/api/watch/assign": return j(this.assignWatched(String(d.src || ""), String(d.system || "")));
       case "/api/cheats": return j(await this.cheatList(String(d.id || "")));
       case "/api/cheevos/signin": return j(this.cheevosSignIn(d.user, d.pass));
       case "/api/cheevos/signout": return j(this.cheevosSignOut());
