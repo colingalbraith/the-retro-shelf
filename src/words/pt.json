@@ -45,7 +45,6 @@
  "A dark wall like a den, or a light one like a living room.": "Uma parede escura como uma toca, ou clara como uma sala de estar.",
  "A game is already running.": "Já tem um jogo aberto.",
  "A line or two for yourself, like where you're stuck. It goes on the back of the box.": "Uma ou duas linhas para você mesmo, como onde você travou. Fica no verso da caixa.",
- "A new tune.": "Uma música nova.",
  "A rating goes from 1 to 5.": "A nota vai de 1 a 5.",
  "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.": "Uma estante para cada console, ou jogos agrupados por gênero, por década ou pelo seu progresso neles.",
  "A types · X deletes · Y space · B done": "A digita · X apaga · Y espaço · B pronto",
@@ -78,7 +77,6 @@
  "Already adding games.": "Os jogos já estão sendo adicionados.",
  "Always show controls": "Sempre mostrar os comandos",
  "Animations": "Animações",
- "Another tune": "Outra música",
  "Any game for these consoles, yours or not. The ones you don't have yet stand faded.": "Qualquer jogo destes consoles, seu ou não. Os que você ainda não tem ficam desbotados.",
  "App": "App",
  "Apply": "Aplicar",
@@ -392,7 +390,6 @@
  "Lifer": "De carteirinha",
  "Light": "Clara",
  "List": "Lista",
- "Little chiptunes on the shelves, made up by the app as it plays them. They stop while you play.": "Musiquinhas chiptune nas estantes, inventadas pelo app enquanto toca. Elas param enquanto você joga.",
  "Living Room Legend": "Lenda da sala",
  "Loading your shelves": "Carregando suas estantes",
  "Long List": "Lista comprida",
@@ -896,5 +893,8 @@
  "Your trophy shelf": "Sua estante de troféus",
  "yours": "seu",
  "Yours": "Suas",
- "Zip archive": "Arquivo zip"
+ "Zip archive": "Arquivo zip",
+ "Next track": "Próxima faixa",
+ "Chiptunes on the shelves, free for anyone to use. They stop while you play.": "Músicas chiptune nas estantes, livres para qualquer pessoa usar. Elas param enquanto você joga.",
+ "Now: {title} by {by}.": "Tocando: {title}, de {by}."
 }

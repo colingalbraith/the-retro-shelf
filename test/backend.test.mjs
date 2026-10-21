@@ -577,3 +577,15 @@ test("display settings are kept as chosen: sort by rating, the shelves' wood and
   const back = be.ui;
   assert.deepEqual([back.sort, back.wood, back.saver], ["title", "walnut", 5]);
 });
+
+test("the menu music: every track in the list is there, CC0 and credited, and served", async () => {
+  const tracks = JSON.parse(fs.readFileSync(path.join(APP, "music", "tracks.json"), "utf8"));
+  assert.ok(tracks.length >= 3);
+  for (const t of tracks) {
+    assert.ok(fs.existsSync(path.join(APP, "music", t.file)), t.file);
+    assert.equal(t.license, "CC0"); assert.ok(t.by && t.title && /^https:\/\/opengameart\.org\//.test(t.url));
+  }
+  const r = await be.route("GET", "/music/" + tracks[0].file);
+  assert.equal(r.code ?? 200, 200);
+  assert.equal((await be.route("GET", "/music/../config.json")).code ?? 404, 404);
+});

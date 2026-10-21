@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0-beta.12
+
+- **Menu music, for real:** five chiptunes by Juhani Junkala, Aureolus_Omicron and johndekale, which their makers
+  gave to the public domain (CC0), in place of the tunes the app made up. Shuffled, each looping for a minute or so
+  and fading into the next, all at the same loudness. Settings → App → Menu music, with "Next track"; still off at
+  first. The Licenses page credits each one.
+
 ## 0.4.0-beta.11
 
 - **Linux:** an AppImage for 64-bit Linux, with RetroArch and every console's emulator built in, that updates itself

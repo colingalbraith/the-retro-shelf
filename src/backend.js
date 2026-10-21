@@ -1817,6 +1817,9 @@ class Backend extends EventEmitter {
     if (method === "GET") {
       if (pathname === "/" || pathname === "/index.html") return this.file(path.join(this.dirs.app, "index.html"), "text/html; charset=utf-8");
       if (pathname === "/licenses.html") return this.file(path.join(this.dirs.app, "licenses.html"), "text/html; charset=utf-8");
+      // the menu music and its list (src/music)
+      const music = /^\/music\/([\w-]+)\.(ogg|wav|json)$/.exec(pathname);
+      if (music) return this.file(path.join(this.dirs.app, "music", music[1] + "." + music[2]), { ogg: "audio/ogg", wav: "audio/wav", json: "application/json; charset=utf-8" }[music[2]], music[2] === "json" ? undefined : "public, max-age=31536000, immutable");
       const words = /^\/words\/(es|fr|de|pt|ja)\.json$/.exec(pathname);
       if (words) return this.file(path.join(this.dirs.app, "words", words[1] + ".json"), "application/json; charset=utf-8");
       if (pathname === "/api/library") return { code: 200, body: this.libraryJson() };

@@ -43,6 +43,10 @@ td.m{font:12.5px var(--mono)}
 <h2>Electron and Chromium</h2>
 <p>The app window. Electron is MIT licensed; Chromium's licenses are listed in LICENSES.chromium.html inside the app.</p>
 
+<h2>Menu music</h2>
+<p>Chiptunes from <a href="https://opengameart.org">OpenGameArt</a>, given to the public domain by their makers (CC0): free for anyone to use. Thank you to them.</p>
+<ul id="music"></ul>
+
 <h2>IBM Plex</h2>
 <p>IBM Plex Sans Condensed and IBM Plex Mono, SIL Open Font License 1.1.</p>
 
@@ -78,6 +82,10 @@ fetch("/api/licenses").then(r => r.json()).then(d => {
     tb.append(tr); seen.add(c.core);
   }
 });
+fetch("/music/tracks.json").then(r => r.json()).then(list => {
+  const ul = document.getElementById("music");
+  for (const t of list) { const li = document.createElement("li"), a = document.createElement("a"); a.href = t.url; a.textContent = t.title; li.append(a, " by " + t.by + (t.from && t.from !== t.title ? ", from " + t.from : "") + " (" + t.license + ")"); ul.append(li); }
+}).catch(() => {});
 document.addEventListener("click", e => { const a = e.target.closest("a[href^='https://']"); if (a) { e.preventDefault(); window.open(a.href); } });
 </script>
 </body>
