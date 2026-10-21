@@ -187,7 +187,18 @@ async function retroarchLinux() {
   sh(img, ["--appimage-extract"], { cwd: tmp });
   const base = path.join(OUT, "RetroArch");
   fs.cpSync(path.join(tmp, "squashfs-root"), base, { recursive: true, verbatimSymlinks: true });
-  fs.writeFileSync(path.join(base, "retroarch"), '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/AppRun" "$@"\n', { mode: 0o755 });
+  // RetroArch is linked against JACK's library even when it plays sound through PulseAudio or ALSA: where JACK isn't
+  // installed, it gets a stand-in that does nothing (scripts/linux/jack-stub.c)
+  mkdir(path.join(base, "fallback"));
+  sh("cc", ["-shared", "-fPIC", "-O2", "-Wl,-soname,libjack.so.0", "-o", path.join(base, "fallback", "libjack.so.0"), path.join(ROOT, "scripts", "linux", "jack-stub.c")]);
+  fs.writeFileSync(path.join(base, "retroarch"), [
+    "#!/bin/sh",
+    "# RetroArch, from its unpacked AppImage. Without JACK installed, it gets The Retro Shelf's stand-in for JACK's library",
+    'HERE="$(dirname "$(readlink -f "$0")")"',
+    "if ! { /sbin/ldconfig -p 2>/dev/null || ldconfig -p 2>/dev/null; } | grep -q 'libjack\\.so\\.0 '; then",
+    '  export LD_LIBRARY_PATH="$HERE/fallback${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
+    "fi",
+    'exec "$HERE/AppRun" "$@"', ""].join("\n"), { mode: 0o755 });
   const home = path.join(top, "RetroArch-Linux-x86_64.AppImage.home", ".config", "retroarch");
   for (const k of KEEP_ASSETS) if (fs.existsSync(path.join(home, "assets", k))) fs.cpSync(path.join(home, "assets", k), path.join(OUT, "assets", k), { recursive: true });
   fs.cpSync(path.join(home, "autoconfig"), path.join(OUT, "autoconfig"), { recursive: true });

@@ -221,6 +221,9 @@ function explain(logFile, exit = {}) {
     const name = (/([\w-]+\.(?:bin|rom|img|zip|pce|BIN|ROM))\b/.exec(errs.split("\n").filter(l => /bios|firmware/i.test(l)).join("\n")) || [])[1];
     return "This game needs a BIOS file from the original console" + (name ? " (" + name + ")" : "") + ". Drop it on this window and it goes in the right place. Settings → Saves & BIOS shows what each console has.";
   }
+  // Linux: an emulator built for a newer system than this one (Dolphin, for GameCube and Wii, wants Ubuntu 24.04's)
+  if (/GLIBCXX_[\d.]+'? not found|GLIBC_[\d.]+'? not found/.test(log))
+    return "This console's emulator needs a newer Linux than this one (like Ubuntu 24.04 or SteamOS). The other consoles work as they are.";
   if (/Failed to open libretro core|Failed to load core|dylib.*not|could not load library/i.test(errs))
     return "The emulator for this system didn't load. Reinstalling The Retro Shelf should fix it.";
   if (/(video driver|graphics).*(fail|could not|cannot)|failed to initialize video/i.test(errs))
