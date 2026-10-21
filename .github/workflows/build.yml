@@ -73,6 +73,12 @@ jobs:
       - name: Open the app and play a game
         if: matrix.target != 'linux'
         run: node scripts/smoke.mjs
+      # the bundled RetroArch starts at all on its own (on Linux it's an unpacked AppImage, started through a script)
+      - name: RetroArch runs
+        if: matrix.target == 'linux'
+        run: |
+          ls -la dist/linux-unpacked/resources/emulators/RetroArch | head -20
+          dist/linux-unpacked/resources/emulators/RetroArch/retroarch --version
       - name: Open the app and play a game (on a virtual screen)
         if: matrix.target == 'linux'
         run: xvfb-run -a --server-args="-screen 0 1920x1080x24" node scripts/smoke.mjs

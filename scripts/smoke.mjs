@@ -202,7 +202,7 @@ try {
       played = "loads them";
       continue;
     }
-    if (!st.running) throw new Error(`${system}: the game closed by itself` + (st.exit && st.exit.error ? ": " + st.exit.error : ""));
+    if (!st.running) throw new Error(`${system}: the game closed by itself` + (st.exit && st.exit.error ? ": " + st.exit.error : "") + (st.exit ? ` (exit code ${st.exit.code}${st.exit.signal ? ", " + st.exit.signal : ""})` : ""));
     const look = PICTURE[system] === "lcd" ? "handheld" : PICTURE[system] === "crt" ? "old-TV" : "sharp", shader = { handheld: "zfast_lcd", "old-TV": "zfast_crt" }[look];
     if (shader && !new RegExp(`\\[Slang\\] Compiling shader: "[^"]*${shader}`).test(ra)) throw new Error(`${system}: the game runs, but without the ${look} picture (see its retroarch log)`);
     await page.evaluate(`api("/api/stop", {})`);
