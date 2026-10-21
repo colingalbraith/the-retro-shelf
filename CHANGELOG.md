@@ -38,6 +38,8 @@
 - **Fast-forward speed:** Settings → While you play → Fast-forward speed: 2×, 3× (as before), 4× or Fastest, as fast
   as your computer can go. It's kept for every game. The sound now speeds up smoothly with the game instead of
   breaking up, and is off at Fastest.
+- An Xbox Wireless Controller (Xbox Series and One, over Bluetooth) shows A B X Y in hints again, not PlayStation's
+  ✕ ○ □ △.
 
 ## 0.4.0-beta.14
 

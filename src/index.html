@@ -3558,6 +3558,8 @@ function padStyle(gp) {
   gp = gp || connectedPads()[0];
   const id = gp ? gp.id : "";
   if (UI.buttons === "nintendo" || (UI.buttons !== "xbox" && /nintendo|pro controller|joy-?con|057e/i.test(id))) return "nintendo";
+  /* Xbox first: a PlayStation 4 controller can be just "Wireless Controller", and so is half an Xbox one's name */
+  if (/xbox|xinput|045e/i.test(id)) return "xbox";
   if (/054c|dualsense|dualshock|playstation|wireless controller/i.test(id)) return "playstation";
   return "xbox";
 }

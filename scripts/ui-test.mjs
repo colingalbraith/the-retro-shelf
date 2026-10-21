@@ -285,6 +285,13 @@ try {
   await p.ev(`(() => { document.hasFocus = () => true;
     window.FAKEPAD = {id: "Xbox Wireless Controller (STANDARD GAMEPAD)", connected: true, axes: [0, 0, 0, 0], buttons: Array.from({length: 17}, () => ({pressed: false}))};
     navigator.getGamepads = () => [FAKEPAD]; return 1; })()`);
+  // each controller's own button names: told apart by name
+  for (const [id, style] of [["Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)", "xbox"], ["Xbox 360 Controller (XInput STANDARD GAMEPAD)", "xbox"],
+    ["Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)", "playstation"], ["DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)", "playstation"],
+    ["Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)", "nintendo"]]) {
+    const got = await p.ev(`padStyle({id: ${JSON.stringify(id)}})`);
+    if (got !== style) problems.push(`controller names: "${id}" is taken for ${got}, not ${style}`);
+  }
   const B = { a: 0, b: 1, y: 3, rb: 5, sel: 8, st: 9, u: 12, d: 13, r: 15 };
   const tap = async k => { await p.ev(`FAKEPAD.buttons[${B[k]}] = {pressed: true}, 1`); await sleep(140); await p.ev(`FAKEPAD.buttons[${B[k]}] = {pressed: false}, 1`); await sleep(180); };
   const top = () => p.ev(`(topPanel() || [""])[0]`);
