@@ -67,11 +67,59 @@ test("the picture setting picks sharp pixels, smoothing, or the old-TV or handhe
 test("rewind, fast-forward and less lag: on light consoles, the triggers only where controllers had none", () => {
   const dirs = { saves: "s", states: "t", screenshots: "p", system: "b", private: "x" };
   const emu = { cores: "c", info: "i", assets: "a", autoconfig: "j" };
-  const e = o => { const x = ra.enforced(emu, dirs, o); return [x.rewind_enable, x.input_rewind_axis, x.input_hold_fast_forward_axis, x.run_ahead_enabled]; };
-  assert.deepEqual(e({ light: true, freeTriggers: true }), ["true", "+4", "+5", "true"]);             // SNES
-  assert.deepEqual(e({ light: true }), ["true", "nul", "nul", "true"]);                               // Atari 2600: its triggers are switches
-  assert.deepEqual(e({}), ["false", "nul", "nul", "false"]);                                          // PS1: R2 is a button there
-  assert.deepEqual(e({ light: true, freeTriggers: true, rewind: false, lessLag: false }), ["false", "nul", "+5", "false"]);
+  const e = o => { const x = ra.enforced(emu, dirs, { triggers: "j-triggers", ...o }); return [x.rewind_enable, x.joypad_autoconfig_dir, x.run_ahead_enabled]; };
+  assert.deepEqual(e({ light: true, freeTriggers: true }), ["true", "j-triggers", "true"]);          // SNES: the profiles with the triggers
+  assert.deepEqual(e({ light: true }), ["true", "j", "true"]);                                       // Atari 2600: its triggers are switches
+  assert.deepEqual(e({}), ["false", "j", "false"]);                                                  // PS1: R2 is a button there
+  assert.deepEqual(e({ light: true, freeTriggers: true, rewind: false, lessLag: false }), ["false", "j-triggers", "false"]);
+  assert.equal(e({ light: true, freeTriggers: true, triggers: null })[1], "j", "no copy made: RetroArch's own profiles");
+  // nothing bound in the settings themselves, so each profile's own binding counts (a setting would win over it)
+  const x = ra.enforced(emu, dirs, { light: true, freeTriggers: true, triggers: "j-triggers" });
+  assert.deepEqual([x.input_rewind_btn, x.input_rewind_axis, x.input_hold_fast_forward_btn, x.input_hold_fast_forward_axis], ["nul", "nul", "nul", "nul"]);
+  assert.deepEqual([x.input_rewind, x.input_hold_fast_forward, x.input_toggle_fast_forward], ["r", "l", "space"]);
+});
+
+test("each controller's own triggers rewind and fast-forward, whatever they are on it", () => {
+  const on = text => Object.fromEntries([...ra.withTriggers(text).matchAll(/^input_(rewind|hold_fast_forward)_(btn|axis) = "([^"]*)"$/gm)].map(m => [m[1] + "_" + m[2], m[3]]));
+  // Linux (udev), an Xbox pad and the Steam Deck's: the left trigger is axis 2, and axis 4 is the right stick
+  assert.deepEqual(on('input_device = "Microsoft X-Box 360 pad"\ninput_l2_axis = "+2"\ninput_r2_axis = "+5"\ninput_r_y_plus_axis = "+4"\n'),
+    { rewind_axis: "+2", hold_fast_forward_axis: "+5" });
+  // Mac (mFi): axes 4 and 5
+  assert.deepEqual(on('input_l2_axis = "+4"\ninput_r2_axis = "+5"\ninput_l2_axis_label = "Left Trigger"\n'), { rewind_axis: "+4", hold_fast_forward_axis: "+5" });
+  // Windows, a PlayStation pad without Steam (DirectInput): buttons 6 and 7, not axes
+  assert.deepEqual(on('input_l2_btn = "6"\ninput_r2_btn = "7"\ninput_r_y_plus_axis = "+5"\ninput_l2_btn_label = "L2"\n'), { rewind_btn: "6", hold_fast_forward_btn: "7" });
+  // a pad without triggers, and one that binds them itself, are left as they are
+  const plain = 'input_device = "SNES pad"\ninput_l_btn = "4"\n';
+  assert.equal(ra.withTriggers(plain), plain);
+  const own = 'input_l2_axis = "+2"\ninput_r2_axis = "+5"\ninput_hold_fast_forward_btn = "9"\n';
+  assert.equal(ra.withTriggers(own), own);
+});
+
+test("the copy of the controller profiles is made once, again when they change, and never half", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-pads-"));
+  try {
+    const src = path.join(dir, "autoconfig"), priv = path.join(dir, "private");
+    fs.mkdirSync(path.join(src, "udev"), { recursive: true });
+    fs.writeFileSync(path.join(src, "udev", "Pad.cfg"), 'input_l2_axis = "+2"\ninput_r2_axis = "+5"\n');
+    fs.writeFileSync(path.join(src, "udev", "NoTriggers.cfg"), 'input_a_btn = "0"\n');
+    const emu = { autoconfig: src, version: "1.22.2" };
+    const out = ra.triggerProfiles(emu, priv);
+    assert.equal(out, path.join(priv, "autoconfig-triggers"));
+    assert.match(fs.readFileSync(path.join(out, "udev", "Pad.cfg"), "utf8"), /^input_rewind_axis = "\+2"$/m);
+    assert.equal(fs.readFileSync(path.join(out, "udev", "NoTriggers.cfg"), "utf8"), 'input_a_btn = "0"\n');
+    // the same profiles: the copy stays (a mark left in it survives)
+    fs.writeFileSync(path.join(out, "mark"), "");
+    assert.equal(ra.triggerProfiles(emu, priv), out);
+    assert.ok(fs.existsSync(path.join(out, "mark")));
+    // changed profiles: made again
+    fs.writeFileSync(path.join(src, "udev", "New.cfg"), 'input_l2_btn = "6"\ninput_r2_btn = "7"\n');
+    assert.equal(ra.triggerProfiles(emu, priv), out);
+    assert.ok(!fs.existsSync(path.join(out, "mark")));
+    assert.match(fs.readFileSync(path.join(out, "udev", "New.cfg"), "utf8"), /^input_hold_fast_forward_btn = "7"$/m);
+    assert.ok(!fs.existsSync(out + ".part"));
+    // no profiles to copy: none
+    assert.equal(ra.triggerProfiles({ autoconfig: path.join(dir, "missing") }, priv), null);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("achievements: signing in hands RetroArch the password once; hardcore turns off rewind, cheats and starting from a save", () => {

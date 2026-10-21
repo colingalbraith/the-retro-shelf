@@ -7,6 +7,9 @@
   there says what reads oddly. Counting follows each language's own rules (in Russian, 1 игра, 2 игры, 5 игр).
 - **Linux:** the AppImage opens on Ubuntu 22.04 and later and other systems that don't come with the old libfuse2 it
   used to need: it now carries that part itself.
+- **Rewind and fast-forward on the triggers, with every controller:** each controller's own triggers are used,
+  whatever they are on it. On Linux and the Steam Deck the left trigger now rewinds (pushing the right stick down did),
+  and a PlayStation controller on Windows gets its triggers right.
 
 ## 0.4.0-beta.13
 

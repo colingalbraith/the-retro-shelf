@@ -83,14 +83,14 @@ function enforced(ra, dirs, opts) {
     aspect_ratio_index: String({ "4:3": 0, stretch: 24 }[opts.shape] ?? 22),
     video_scale_integer: opts.shape === "pixel" ? "true" : "false",
     // rewind (hold the left trigger, or R) and fast-forward (hold the right trigger, or L; Space keeps it on), and a
-    // frame less lag (run-ahead): on light consoles (opts.light), where they cost little. The triggers only on
-    // consoles whose controllers had none (opts.freeTriggers); in RetroArch's own controller profiles for Macs and
-    // Xbox-style pads they're axes +4 and +5
+    // frame less lag (run-ahead): rewind and run-ahead on light consoles (opts.light), where they cost little. The
+    // triggers only on consoles whose controllers had none (opts.freeTriggers). Each controller's triggers are a
+    // different axis or button (and differ between Mac, Windows and Linux), so they're bound in the copy of
+    // RetroArch's controller profiles triggerProfiles makes (opts.triggers), which RetroArch reads for those
+    // consoles; nothing's bound here, so the profile's binding is the one used
     rewind_enable: opts.light && opts.rewind !== false && !hardcore ? "true" : "false",
-    input_rewind: "r",
-    input_rewind_axis: opts.light && opts.freeTriggers && opts.rewind !== false ? "+4" : "nul",
-    input_hold_fast_forward: "l",
-    input_hold_fast_forward_axis: opts.freeTriggers ? "+5" : "nul",
+    input_rewind: "r", input_rewind_btn: "nul", input_rewind_axis: "nul",
+    input_hold_fast_forward: "l", input_hold_fast_forward_btn: "nul", input_hold_fast_forward_axis: "nul",
     input_toggle_fast_forward: "space",
     fastforward_ratio: "3.0",
     run_ahead_enabled: opts.light && opts.lessLag !== false ? "true" : "false",
@@ -127,7 +127,7 @@ function enforced(ra, dirs, opts) {
     libretro_directory: ra.cores,
     libretro_info_path: ra.info,
     assets_directory: ra.assets,
-    joypad_autoconfig_dir: ra.autoconfig,
+    joypad_autoconfig_dir: opts.freeTriggers && opts.triggers ? opts.triggers : ra.autoconfig,
     bundle_assets_extract_enable: "false",
     menu_driver: "ozone",
     // nothing in a game needs these, and the microphone would trigger a permission prompt
@@ -186,6 +186,57 @@ function writeConfig(file, keys) {
   // whole or not at all: a crash halfway would otherwise lose someone's RetroArch settings
   fs.writeFileSync(file + ".tmp", lines.join("\n") + "\n");
   fs.renameSync(file + ".tmp", file);
+}
+
+/** a controller profile with rewind on its left trigger and fast-forward on its right one, whatever they are on that
+    controller (an axis, or a button on some): its own L2 and R2. Unchanged if it has neither, or binds them itself */
+function withTriggers(text) {
+  const bound = key => (new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*"?([^"\\r\\n]*)"?`, "m").exec(text) || [])[1];
+  const lines = [];
+  for (const [hotkey, trigger] of [["rewind", "l2"], ["hold_fast_forward", "r2"]]) for (const kind of ["btn", "axis"]) {
+    const v = (bound(`input_${trigger}_${kind}`) || "").trim();
+    if (v && v !== "nul") lines.push(`input_${hotkey}_${kind} = "${v}"`);
+  }
+  if (!lines.length || /^[ \t]*input_(rewind|hold_fast_forward)_(btn|axis)[ \t]*=/m.test(text)) return text;
+  return text.replace(/\s*$/, "\n") + "# The Retro Shelf: the triggers rewind and fast-forward\n" + lines.join("\n") + "\n";
+}
+
+/**
+ * RetroArch's controller profiles with the triggers on rewind and fast-forward (withTriggers), for consoles whose
+ * controllers had no triggers. Made in the app's own RetroArch folder the first time, and again when the bundled
+ * profiles change. Null if it can't be made: then the triggers do nothing in those games, and the keys still work.
+ */
+const TRIGGERS_MADE = 1;
+function triggerProfiles(ra, privateDir) {
+  if (!ra || !ra.autoconfig || !privateDir) return null;
+  const out = path.join(privateDir, "autoconfig-triggers"), made = path.join(out, ".made-from"), files = [];
+  let size = 0;
+  try {
+    const walk = rel => {
+      for (const e of fs.readdirSync(path.join(ra.autoconfig, rel), { withFileTypes: true })) {
+        const r = path.join(rel, e.name);
+        if (e.isDirectory()) walk(r);
+        else if (e.isFile()) { files.push(r); size += fs.statSync(path.join(ra.autoconfig, r)).size; }
+      }
+    };
+    walk("");
+    if (!files.length) return null;
+    const from = [TRIGGERS_MADE, ra.autoconfig, ra.version || "", files.length, size].join("\n");
+    try { if (fs.readFileSync(made, "utf8") === from) return out; } catch {}
+    // made beside it and swapped in whole, so a launch never sees half a folder
+    const tmp = out + ".part";
+    fs.rmSync(tmp, { recursive: true, force: true });
+    for (const r of files) {
+      const to = path.join(tmp, r), src = path.join(ra.autoconfig, r);
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      if (r.endsWith(".cfg")) fs.writeFileSync(to, withTriggers(fs.readFileSync(src, "utf8")));
+      else fs.copyFileSync(src, to);
+    }
+    fs.writeFileSync(path.join(tmp, ".made-from"), from);
+    fs.rmSync(out, { recursive: true, force: true });
+    fs.renameSync(tmp, out);
+    return out;
+  } catch { return null; }
 }
 
 /**
@@ -258,4 +309,4 @@ function explain(logFile, exit = {}) {
   return "";
 }
 
-module.exports = { bundled, corePath, enforced, players, neededDirs, writeConfig, readConfigKey, linkSystemData, explain, CORE_EXT };
+module.exports = { bundled, corePath, enforced, players, neededDirs, writeConfig, readConfigKey, linkSystemData, explain, withTriggers, triggerProfiles, CORE_EXT };

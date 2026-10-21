@@ -894,7 +894,8 @@ class Backend extends EventEmitter {
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
       const play = this.playOpts(g);
       const cheevos = this.raPending || (this.state.cheevos.user ? { user: this.state.cheevos.user } : null);
-      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null), pads: opts.pads }));
+      const triggers = play.freeTriggers ? ra.triggerProfiles(this.ra, dirs.private) : null;
+      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null), pads: opts.pads, triggers }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
