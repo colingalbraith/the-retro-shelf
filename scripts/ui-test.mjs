@@ -76,7 +76,10 @@ const BACKS = `(async () => {
     list.sort((a, b) => b[1].title.length - a[1].title.length);
     for (const [c, g] of list.slice(0, 3)) {
       if (!c.isConnected) continue;   // the shelf was drawn again (a resize) after the list was made
-      select(c); await wait(300); flip(true); await wait(650);
+      select(c); await wait(300); flip(true);
+      // turned over and filled in: a moment on a fast computer, longer where drawing is slow
+      for (let i = 0; i < 30 && !c.querySelector(".bk .in"); i++) await wait(100);
+      await wait(650);
       const inn = c.querySelector(".bk .in");
       if (!inn) { if (!c.closest(".lslot")) out.push(m + " box, " + g.title + ": didn't turn over"); continue; }
       const kids = [...inn.children].filter(e => e.offsetHeight && getComputedStyle(e).display !== "none"), bad = [];
