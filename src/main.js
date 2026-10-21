@@ -320,18 +320,19 @@ function ipc() {
     try { fs.writeFileSync(file, img.toPNG()); } catch (e) { return { ok: false, error: "Couldn't save the picture: " + e.message }; }
     return { ok: true, file };
   });
-  ipcMain.handle("export-saves", async (_, id) => {
+  ipcMain.handle("export-saves", async (_, id, quick) => {
     const g = backend.games.get(String(id));
     if (!g) return { ok: false, error: "Unknown game." };
     const files = backend.gameSaves(g);
     if (!files.length) return { ok: false, error: "This game has no saves yet." };
-    const r = await dialog.showSaveDialog(win, { title: tm("Export saves"), buttonLabel: tm("Export"),
-      defaultPath: path.join(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
+    const r = quick ? { filePath: freeName(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves`) }
+      : await dialog.showSaveDialog(win, { title: tm("Export saves"), buttonLabel: tm("Export"),
+        defaultPath: path.join(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
     // laid out like a backup (Saves/<emulator>/…, Saves/States/…), so Restore can put it back
     const list = files.flatMap(s => [s.file, ...(s.pic ? [s.file + ".png"] : [])])
       .map(f => ({ name: "Saves/" + path.relative(backend.folders.saves, f).split(path.sep).join("/"), full: f }));
-    try { return { ok: true, count: await zipFiles(list, r.filePath) }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
+    try { return { ok: true, count: await zipFiles(list, r.filePath), path: r.filePath }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
   });
   // a folder of games to show where it is, without copying
   ipcMain.handle("watch-folder", async () => {
@@ -340,13 +341,18 @@ function ipc() {
     const [code, res] = backend.addWatch(r.filePaths[0]);
     return code === 200 ? { ok: true, games: res.games } : { ok: false, error: res.error };
   });
-  ipcMain.handle("backup-saves", async () => {
+  /** a file name in dir that isn't taken yet: "name.zip", then "name 2.zip"… */
+  const freeName = (dir, name) => { let f = path.join(dir, name + ".zip"); for (let i = 2; fs.existsSync(f); i++) f = path.join(dir, `${name} ${i}.zip`); return f; };
+  // quick: from a controller, which can't work the save window: straight into the backups folder
+  ipcMain.handle("backup-saves", async (_, quick) => {
     const saves = backend.folders.saves;
     // folders RetroArch makes on the first launch don't count: only actual save files
     let any = false;
     try { any = filesIn(saves).length > 0; } catch {}
     if (!any) return { ok: false, error: "There are no saves to back up yet." };
-    const r = await dialog.showSaveDialog(win, { title: tm("Back up saves"), buttonLabel: tm("Back Up"),
+    let r;
+    if (quick) { fs.mkdirSync(backend.backupDir(), { recursive: true }); r = { filePath: freeName(backend.backupDir(), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}`) }; }
+    else r = await dialog.showSaveDialog(win, { title: tm("Back up saves"), buttonLabel: tm("Back Up"),
       defaultPath: path.join(app.getPath("documents"), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
     try { const count = await zipFolder(saves, r.filePath); backend.event("backup"); return { ok: true, count, path: r.filePath }; }

@@ -45,6 +45,7 @@ for (const m of markup.matchAll(/(?:aria-label|title|placeholder)="([^"]*[A-Za-z
 const main = read("src/main.js");
 for (const m of main.matchAll(new RegExp(`(?:label: |tm\\()${str}`, "g"))) add(unq(m[1]));
 for (const m of main.matchAll(/\[\s*"[^"]*", "([A-Z][^"]*)"\]/g)) add(m[1]);
+for (const m of main.matchAll(new RegExp(`error: ${str}`, "g"))) add(unq(m[1]));
 
 // the backend's messages (the ones without blanks filled in by code)
 const backend = read("src/backend.js");
@@ -56,6 +57,13 @@ for (const list of Object.values(GAME_CHOICES)) for (const [, name] of list) add
 const pins = require(path.join(ROOT, "src", "pins.js"));
 for (const p of pins.build(["NES"])) { if (p.tpl) { add(p.tpl.desc); if (p.key.startsWith("c")) add(p.tpl.title); } else { add(p.title); add(p.desc); } }
 for (const [, label] of pins.CATS) add(label);
+// the shelves' group names when arranged by genre or progress (shown with t() from data, not written in a t() call)
+for (const [, name] of pins.GENRES) add(name);
+for (const m of page.matchAll(/const PLAYED = \[([^\]]*)\]/g)) for (const x of m[1].matchAll(/"([^"]+)"/g)) add(x[1]);
+for (const n of ["Other", "Year unknown"]) add(n);
+// the launch screen's words while a game starts ("Inserting cartridge…")
+for (const m of page.matchAll(/const MEDIA_VERB = \{([^}]*)\}/g)) for (const x of m[1].matchAll(/"([^"]+)"/g)) add(x[1] + "…");
+add("Starting…");
 const cfg = JSON.parse(read("src/config.json"));
 for (const s of Object.values(cfg.systems)) if (s.bios) { add(s.bios.note); }
 

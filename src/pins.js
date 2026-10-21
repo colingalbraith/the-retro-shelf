@@ -241,4 +241,4 @@ function evaluate(ctx, systems) {
 const catalog = systems => build(systems).map(({ test, show, ...p }) => p);
 
 const PINS = STATIC;
-module.exports = { PINS, CATS, build, context, evaluate, catalog, genreGroup };
+module.exports = { PINS, CATS, build, context, evaluate, catalog, genreGroup, GENRES };
