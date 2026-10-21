@@ -419,6 +419,13 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .cmore button{border:0;background:none;padding:0;color:var(--chalk);font:inherit;text-decoration:underline;text-underline-offset:3px}
 .slip.wide{width:560px;max-width:86vw}
 #waddr{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15)}
+/* a game's cheats: a box to tick for each */
+#cheatl{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15);scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
+#cheatl button{display:flex;width:100%;gap:12px;align-items:baseline;padding:9px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.1);background:none;text-align:left;color:var(--ink);font:500 15px var(--disp)}
+#cheatl button::before{content:"";flex:none;width:13px;height:13px;border:1.5px solid var(--ink);transform:translateY(2px)}
+#cheatl button.on::before{background:var(--ink);box-shadow:inset 0 0 0 2.5px var(--paper)}
+#cheatl button span{margin-left:auto;padding-left:12px;color:var(--ink2);font-size:13px;white-space:nowrap}
+#cheatl button:hover,#cheatl button:focus-visible{background:rgba(28,25,22,.06);outline:none}
 #waddr button{display:flex;width:100%;justify-content:space-between;gap:12px;padding:9px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.1);background:none;text-align:left;color:var(--ink);font:500 15px var(--disp)}
 #waddr button span{color:var(--ink2);font-size:13px;white-space:nowrap}
 #waddr button:hover,#waddr button:focus-visible{background:rgba(28,25,22,.06);outline:none}
@@ -658,6 +665,11 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     <div id="clist"></div>
   </div>
 </div>
+
+<div id="cheat" class="over"><div class="slip wide"><h2 id="cheatt">Cheats</h2><p id="cheatm"></p>
+  <input type="text" id="cheatq" spellcheck="false" autocomplete="off" placeholder="Search cheats" hidden>
+  <div id="cheatl"></div>
+  <div class="btns"><button class="btn primary" id="cheatok">Done</button><button class="btn" id="cheatnone">Turn all off</button></div></div></div>
 
 <div id="wadd" class="over"><div class="slip wide"><h2 id="waddt">Add a game</h2><p>Any game for these consoles, yours or not. The ones you don't have yet stand faded.</p>
   <input type="text" id="waddq" spellcheck="false" autocomplete="off" placeholder="Search by name">
@@ -1280,7 +1292,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
@@ -1397,7 +1409,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1623,7 +1635,7 @@ async function loadLibrary(force) {
 /* ---------- a controller (or TV remote setup) reaches everything ----------
    In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
    On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
-const PANELS = [["osk", () => closeOsk()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
+const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
 const topPanel = () => PANELS.find(([id]) => isOpen(id));
@@ -1692,6 +1704,7 @@ function openOpts(sub) {
       item("Put on a shelf…", () => setTimeout(() => openOpts("shelf"), 30));
       item(t("Picture…"), () => setTimeout(() => openOpts("picture"), 30));
       item(t("Screen shape…"), () => setTimeout(() => openOpts("shape"), 30));
+      if (cons(g.system).builtin && !PATHS.own) item(g.cheats ? t("Cheats ({n} on)…", {n: g.cheats}) : t("Cheats…"), () => openCheats(g.id));
       item("Find cover…", () => openPicker(g.id));
       item("Rename…", () => openRename(g.id));
       item(g.hidden ? "Show on shelves" : "Hide from shelves", async () => { await api("/api/game/hide", {id: g.id, hidden: !g.hidden}); refresh(true); });
@@ -1948,6 +1961,51 @@ function closeNews() { if (!isOpen("news")) return; $("#news").classList.remove(
 function leaveScreens(keep) {
   for (const id of ["settings", "getg", "colls", "trophy"]) if (id !== keep && isOpen(id)) { $("#" + id).classList.remove("show"); if (id === "colls" && collIO) collIO.disconnect(); }
 }
+
+/* ---------- cheats: libretro's cheat lists for a game, ticked on; RetroArch switches them on as the game starts ---------- */
+let CHEAT = null;
+async function openCheats(id) {
+  const g = byId.get(id); if (!g || LAUNCH.open) return;
+  CHEAT = {id, list: [], on: new Set()};
+  $("#cheatt").textContent = t("Cheats for {title}", {title: g.title});
+  $("#cheatm").textContent = t("Getting the cheat lists… The first time, that's a 37 MB download."); $("#cheatq").value = ""; $("#cheatq").hidden = true; clear($("#cheatl"));
+  blurActive(); $("#cheat").classList.add("show"); light(); beep(520);
+  const r = await api("/api/cheats", {id});
+  if (!isOpen("cheat") || !CHEAT || CHEAT.id !== id) return;
+  if (!r.ok) { $("#cheatm").textContent = r.data.error || t("Couldn't get the cheat lists."); return; }
+  /* the ones already on come first */
+  CHEAT.list = r.data.cheats.slice().sort((a, b) => b.on - a.on); CHEAT.on = new Set(CHEAT.list.filter(c => c.on).map(c => c.key));
+  $("#cheatm").textContent = !CHEAT.list.length ? t("The cheat lists have nothing for this game.")
+    : UI.hardcore ? t("Cheats stay off while hardcore achievements are on.")
+    : t("The ones you tick are on from when the game starts. Some only work with an \"enable code\" cheat ticked too.");
+  $("#cheatq").hidden = CHEAT.list.length < 15;
+  renderCheats();
+  setTimeout(() => { const f = $("#cheatl button"); if (f) f.focus({preventScroll: true}); }, 30);
+}
+function renderCheats() {
+  const l = $("#cheatl"), q = $("#cheatq").value.trim().toLowerCase(), refocus = keepFocus(l); clear(l);
+  for (const c of CHEAT.list) {
+    if (q && !c.desc.toLowerCase().includes(q)) continue;
+    const b = el("button", CHEAT.on.has(c.key) ? "on" : "");
+    b.appendChild(document.createTextNode(c.desc)); if (c.src) b.appendChild(el("span", "", c.src));
+    b.onclick = () => { if (CHEAT.on.has(c.key)) CHEAT.on.delete(c.key); else CHEAT.on.add(c.key); b.classList.toggle("on"); beep(600, .02, .015); };
+    l.appendChild(b);
+  }
+  refocus();
+}
+async function closeCheats() {
+  if (!isOpen("cheat")) return;
+  $("#cheat").classList.remove("show");
+  const c = CHEAT; CHEAT = null; focusById(focusId); light(); beep(330);
+  if (!c || !c.list.length) return;
+  const r = await api("/api/cheats/set", {id: c.id, on: [...c.on]});
+  if (!r.ok) return toast(r.data.error || t("Couldn't save the cheats."), true);
+  await refresh(true); focusById(c.id);
+  toast(r.data.count ? t("{n} on, from the next time you play.", {n: plural(r.data.count, "cheat", "cheats")}) : t("Cheats off."));
+}
+$("#cheatok").onclick = () => closeCheats();
+$("#cheatnone").onclick = () => { if (CHEAT) { CHEAT.on.clear(); renderCheats(); } };
+$("#cheatq").addEventListener("input", () => { if (CHEAT) renderCheats(); });
 
 /* ---------- getting games ---------- */
 function openGetGames() { if (LAUNCH.open) return; leaveScreens("getg"); blurActive(); $("#getg").classList.add("show"); light(); beep(520); }
@@ -2388,6 +2446,7 @@ document.addEventListener("keydown", e => {
   }
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
   if (isOpen("opts")) { if (k === "Escape") closeOpts(); else if (arrow) { e.preventDefault(); padNav($("#opts"), arrow); } return; }
+  if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
   if (isOpen("ren")) { if (k === "Escape") closeRename(); else if (k === "Enter") saveRename(); return; }
@@ -2486,6 +2545,7 @@ APP.onMenu(w => {
   else if (w === "collections") { closeSettings(); openColls(); }
   else if (w && w.cmd === "rename") openRename(w.id);
   else if (w && w.cmd === "find-cover") openPicker(w.id);
+  else if (w && w.cmd === "cheats") openCheats(w.id);
   else if (w && w.cmd === "new-shelf") openShelfSlip({id: w.id});
   else if (w && w.cmd === "play") play(byId.get(w.id), {fresh: w.fresh});
 });

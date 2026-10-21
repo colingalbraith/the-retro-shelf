@@ -168,6 +168,7 @@ function gameMenu(id) {
       ...GAME_CHOICES[k].map(([v, name]) => ({ label: name, type: "radio", checked: (backend.state.gameOpts[g.id] || {})[k] === v,
         click: () => { backend.setGameOpts(g.id, { [k]: v }); send({ cmd: "refresh", focus: g.id }); } })),
     ] })),
+    ...(!sys[g.system].emulator && !backend.ownEmu() ? [{ label: "Cheats…", click: () => send({ cmd: "cheats", id: g.id }) }] : []),
     { label: "Rename…", click: () => send({ cmd: "rename", id: g.id }) },
     { label: "Find Cover…", click: () => send({ cmd: "find-cover", id: g.id }) },
     { label: "Use My Own Cover…", click: () => pickPicture("cover") },

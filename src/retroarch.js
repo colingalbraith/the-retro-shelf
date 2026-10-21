@@ -88,6 +88,8 @@ function enforced(ra, dirs, opts) {
     run_ahead_frames: "1",
     run_ahead_secondary_instance: "false",
     run_ahead_hide_warnings: "true",
+    // the cheats chosen for this game (written to its file in the cheats folder), switched on as it starts
+    apply_cheats_after_load: opts.cheats ? "true" : "false",
     // a picture with every save, shown on the back of the box
     savestate_thumbnail_enable: "true",
     autosave_interval: "10",

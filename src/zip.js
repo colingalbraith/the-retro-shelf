@@ -127,4 +127,37 @@ async function unzipInto(file, dir) {
   return res;
 }
 
-module.exports = { zipFolder, unzipInto, filesIn };
+/** a zip file's entries (not folders), read from its index: [{name, method, csize, crc, local}] */
+async function entries(file) {
+  const fh = await fsp.open(file, "r");
+  const read = async (pos, len) => { const b = Buffer.alloc(len); const { bytesRead } = await fh.read(b, 0, len, pos); return b.subarray(0, bytesRead); };
+  try {
+    const size = (await fh.stat()).size, tail = await read(Math.max(0, size - 65557), Math.min(size, 65557));
+    let e = -1;
+    for (let i = tail.length - 22; i >= 0; i--) if (tail.readUInt32LE(i) === 0x06054b50) { e = i; break; }
+    if (e < 0) throw new Error("that isn't a zip file");
+    const count = tail.readUInt16LE(e + 10), cd = await read(tail.readUInt32LE(e + 16), tail.readUInt32LE(e + 12)), out = [];
+    let at = 0;
+    for (let k = 0; k < count && at + 46 <= cd.length && cd.readUInt32LE(at) === 0x02014b50; k++) {
+      const nlen = cd.readUInt16LE(at + 28), name = cd.toString("utf8", at + 46, at + 46 + nlen);
+      if (!name.endsWith("/")) out.push({ name, method: cd.readUInt16LE(at + 10), crc: cd.readUInt32LE(at + 16), csize: cd.readUInt32LE(at + 20), local: cd.readUInt32LE(at + 42) });
+      at += 46 + nlen + cd.readUInt16LE(at + 30) + cd.readUInt16LE(at + 32);
+    }
+    return out;
+  } finally { await fh.close(); }
+}
+
+/** one entry's contents (from entries()), checked against its checksum */
+async function readEntry(file, entry) {
+  const fh = await fsp.open(file, "r");
+  try {
+    const lh = Buffer.alloc(30); await fh.read(lh, 0, 30, entry.local);
+    if (lh.readUInt32LE(0) !== 0x04034b50) throw new Error("damaged zip file");
+    const body = Buffer.alloc(entry.csize); await fh.read(body, 0, entry.csize, entry.local + 30 + lh.readUInt16LE(26) + lh.readUInt16LE(28));
+    const data = entry.method === 8 ? await inflate(body) : entry.method === 0 ? body : null;
+    if (!data || zlib.crc32(data) !== entry.crc) throw new Error("damaged zip file");
+    return data;
+  } finally { await fh.close(); }
+}
+
+module.exports = { zipFolder, unzipInto, filesIn, entries, readEntry };

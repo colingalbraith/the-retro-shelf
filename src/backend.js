@@ -13,6 +13,8 @@ const { Importer, sheetFiles } = require("./importer");
 const { biosDest, biosStatus } = require("./bios");
 const pins = require("./pins");
 const { compare, isTest } = require("./version");
+const cheatFiles = require("./cheats");
+const zip = require("./zip");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
 const SHEETS = [".cue", ".gdi", ".m3u"];
@@ -166,7 +168,7 @@ class Backend extends EventEmitter {
     this.state = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
     // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}]]) if (!this.state[k]) this.state[k] = v;
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -421,7 +423,7 @@ class Backend extends EventEmitter {
       for (const d of ra.neededDirs(dirs)) fs.mkdirSync(d, { recursive: true });
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
       const play = this.playOpts(g);
-      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, load: !(opts.fresh || slot !== null) }));
+      ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, load: !(opts.fresh || slot !== null) }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
@@ -440,7 +442,9 @@ class Backend extends EventEmitter {
     if (!g) return [404, { error: "Unknown game. Rescan the library." }];
     if (this.running && this.running.alive) return [409, { error: "A game is already running." }];
     let built;
-    try { built = this.buildCmd(g, opts); } catch (e) { return [400, { error: e.message }]; }
+    // chosen cheats, written for the built-in RetroArch to switch on as the game starts
+    const cheats = !this.ownEmu() && !this.cfg.systems[g.system].emulator ? await this.writeCheats(g).catch(() => false) : false;
+    try { built = this.buildCmd(g, { ...opts, cheats }); } catch (e) { return [400, { error: e.message }]; }
     const [exe, ...args] = built.cmd;
     const cwd = path.isAbsolute(exe) && fs.existsSync(path.dirname(exe)) ? path.dirname(exe) : undefined;
     let proc;
@@ -500,7 +504,7 @@ class Backend extends EventEmitter {
   /** stats belong to a game's id (its path); when the file moves they move with it */
   moveStats(from, to) {
     const st = this.state;
-    for (const k of ["last", "plays", "time", "names", "gameOpts"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
+    for (const k of ["last", "plays", "time", "names", "gameOpts", "cheats"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
     for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(from); if (i >= 0) st[k][i] = to; }
     for (const sh of st.shelves) { const i = sh.ids.indexOf(from); if (i >= 0) sh.ids[i] = to; }
     for (const ses of st.sessions) if (ses[0] === from) ses[0] = to;
@@ -523,6 +527,66 @@ class Backend extends EventEmitter {
     this.saveState();
     return [200, { ok: true, opts: cur }];
   }
+  // ---------------------------------------------------------------- cheats
+  /** libretro's cheat collection: downloaded the first time it's wanted (37 MB), then its index kept in memory */
+  async cheatIndex() {
+    const file = path.join(this.dirs.data, "cheats.zip");
+    if (!fs.existsSync(file)) {
+      if (!this._cheatGet) this._cheatGet = (async () => {
+        const data = await this.fetchUrl("https://buildbot.libretro.com/assets/frontend/cheats.zip", 300000);
+        fs.writeFileSync(file + ".part", data);
+        fs.renameSync(file + ".part", file);
+      })().finally(() => { this._cheatGet = null; });
+      await this._cheatGet;
+    }
+    if (!this._cheats) this._cheats = { file, entries: new Map((await zip.entries(file)).map(e => [e.name, e])) };
+    return this._cheats;
+  }
+  /** a game's cheats: [{key, desc, src, on}], from its files in the collection; key is "file#number" */
+  async cheatList(id) {
+    const g = this.games.get(id);
+    if (!g) return [404, { error: "Unknown game." }];
+    let idx;
+    try { idx = await this.cheatIndex(); } catch { return [502, { error: "Couldn't get the cheat lists. Check your internet connection." }]; }
+    const on = new Set(this.state.cheats[id] || []), out = [];
+    for (const f of cheatFiles.gameFiles([...idx.entries.keys()], asList(this.cfg.systems[g.system].thumbs), path.parse(g.path).name, norm)) {
+      const list = cheatFiles.parse((await zip.readEntry(idx.file, idx.entries.get(f.name))).toString("utf8"));
+      list.forEach((c, i) => { const key = f.name + "#" + i; out.push({ key, desc: cheatFiles.unquote(c.get("desc")) || "Cheat " + (i + 1), src: f.label, on: on.has(key) }); });
+    }
+    return [200, { cheats: out }];
+  }
+  setCheats(id, keys) {
+    if (!this.games.has(id)) return [404, { error: "Unknown game." }];
+    const list = (Array.isArray(keys) ? keys : []).filter(k => typeof k === "string" && /^[^#]+\.cht#\d+$/i.test(k)).slice(0, 200);
+    if (list.length) this.state.cheats[id] = list; else delete this.state.cheats[id];
+    this.saveState();
+    return [200, { ok: true, count: list.length }];
+  }
+  /**
+   * Before a game starts: its chosen cheats go where RetroArch finds them (cheats/<emulator>/<game>.cht), switched
+   * on; with none chosen that file goes. True when there are cheats to turn on.
+   */
+  async writeCheats(g) {
+    const core = this.cfg.systems[g.system].core;
+    this.resumeAt(g);                                    // looks up the emulator's name, which names its cheats folder
+    const cn = core && this._coreNames && this._coreNames[core];
+    if (!cn) return false;
+    const target = path.join(path.dirname(this.files.raCfg), "cheats", cn, path.parse(g.path).name + ".cht");
+    const keys = this.state.cheats[g.id] || [];
+    let chosen = [];
+    if (keys.length && !this.ui.hardcore) {
+      try {
+        const idx = await this.cheatIndex(), byFile = new Map();
+        for (const k of keys) { const i = k.lastIndexOf("#"), f = k.slice(0, i); if (idx.entries.has(f)) (byFile.get(f) || byFile.set(f, []).get(f)).push(+k.slice(i + 1)); }
+        for (const [f, nums] of byFile) { const list = cheatFiles.parse((await zip.readEntry(idx.file, idx.entries.get(f))).toString("utf8")); for (const n of nums) if (list[n]) chosen.push(list[n]); }
+      } catch { chosen = []; }
+    }
+    if (!chosen.length) { fs.rmSync(target, { force: true }); return false; }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, cheatFiles.write(chosen));
+    return true;
+  }
+
   /** the settings a game plays with: the app's, then its own. "By console" pictures become that console's own */
   playOpts(g) {
     const o = { ...this.ui, ...(this.state.gameOpts[g.id] || {}) };
@@ -1140,12 +1204,12 @@ class Backend extends EventEmitter {
       games: [...this.games.values()].map(g => ({ id: g.id, title: g.title, tag: g.tag, system: g.system, cv: this.artVer(g.cover), lv: this.artVer(g.logo),
         plays: st.plays[g.id] || 0, time: st.time[g.id] || 0, last: st.last[g.id] || 0,
         added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "", gg: pins.genreGroup(g.genre),
-        sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null,
+        sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null, cheats: (st.cheats[g.id] || []).length,
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES,
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
       // how each console's games look on the shelf: the kind of box, its short name, packaging and the color of its pile
-      consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null, light: !!v.light, freeTriggers: !!v.freeTriggers }])),
+      consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null, light: !!v.light, freeTriggers: !!v.freeTriggers, builtin: !v.emulator }])),
       settings: this.settingsJson(), status: this.statusJson(),
     };
   }
@@ -1231,6 +1295,8 @@ class Backend extends EventEmitter {
       case "/api/shelves": return j(this.shelfOp(d));
       case "/api/games/search": return j(this.gameSearch(d.q));
       case "/api/game/opts": return j(this.setGameOpts(String(d.id || ""), d.opts));
+      case "/api/cheats": return j(await this.cheatList(String(d.id || "")));
+      case "/api/cheats/set": return j(this.setCheats(String(d.id || ""), d.on));
       case "/api/whatsnew/seen": this.state.seenVersion = this.dirs.version; this.saveState(); return j([200, { ok: true }]);
       case "/api/pins/seen": { const seen = new Set(Array.isArray(d.keys) ? d.keys : []); this.newPins = (this.newPins || []).filter(k => !seen.has(k)); return j([200, { ok: true }]); }
       case "/api/rescan":
