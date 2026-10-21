@@ -376,7 +376,7 @@ test("progress, rating and a note for a game: set, cleared, kept when it moves",
 
 test("a watched folder's games show where they are, each on its console's shelf, and go when it's unwatched", () => {
   const dir = path.join(home, "My Games");
-  const at = (rel, data = "") => { const p = path.join(dir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, data); return p; };
+  const at = (rel, data = "x") => { const p = path.join(dir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, data); return p; };
   at("Super Mario World (USA).sfc");
   at("Discs/Crash Bandicoot (USA).cue", cue(["Crash Bandicoot (USA).bin"])); at("Discs/Crash Bandicoot (USA).bin");
   const md = Buffer.alloc(0x200); md.write("SEGA MEGA DRIVE", 0x100); at("Sonic 2 (World).bin", md);
@@ -404,8 +404,8 @@ test("a watched folder's games show where they are, each on its console's shelf,
 test("games from RetroArch's playlists come in on their playlist's console, where they are", () => {
   const ra = path.join(home, "RetroArch", "playlists"), lib = path.join(home, "roms");
   fs.mkdirSync(ra, { recursive: true }); fs.mkdirSync(path.join(lib, "md"), { recursive: true }); fs.mkdirSync(path.join(lib, "sfc"), { recursive: true });
-  fs.writeFileSync(path.join(lib, "sfc", "Chrono Trigger (USA).sfc"), "");
-  fs.writeFileSync(path.join(lib, "md", "Streets of Rage 2 (USA).bin"), "");        // .bin: could be several consoles; the playlist says
+  fs.writeFileSync(path.join(lib, "sfc", "Chrono Trigger (USA).sfc"), "x");
+  fs.writeFileSync(path.join(lib, "md", "Streets of Rage 2 (USA).bin"), "x");        // .bin: could be several consoles; the playlist says
   put("snes/Super Metroid (USA).sfc");
   const item = (p, db) => ({ path: p, label: path.basename(p), core_path: "DETECT", core_name: "DETECT", crc32: "DETECT", db_name: db });
   fs.writeFileSync(path.join(ra, "Nintendo - Super Nintendo Entertainment System.lpl"), JSON.stringify({ version: "1.5", items: [

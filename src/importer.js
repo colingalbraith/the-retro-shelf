@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const zlib = require("zlib");
 const { biosDest } = require("./bios");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
@@ -20,6 +21,11 @@ function withFile(p, fn) {
   try { fd = fs.openSync(p, "r"); return fn(fd, fs.fstatSync(fd).size); } catch { return null; } finally { if (fd !== undefined) fs.closeSync(fd); }
 }
 const ascii = (b, a, n) => b.length >= a + n ? b.toString("latin1", a, a + n) : "";
+/** a path as the disk compares it: on a Mac or Windows "TRACK 01.BIN" is "Track 01.bin" (and é is é however it's
+    written); on Linux names are exact */
+const pathKey = p => process.platform === "linux" ? path.resolve(p) : path.resolve(p).normalize("NFC").toLowerCase();
+/** the last part of a path from a .cue (which may use either kind of slash) */
+const leaf = ref => String(ref).split(/[\\/]/).pop();
 
 /** File names inside a zip, from its central directory (no extraction). */
 function zipEntries(p) {
@@ -43,13 +49,50 @@ function zipEntries(p) {
 
 /** ISO 9660 system identifier of a CD/DVD image (raw 2352-byte sectors or plain 2048), or null. */
 function discSystemId(fd, size) {
+  const v = discVolume(fd, size);
+  return v ? v.id : null;
+}
+function discVolume(fd, size) {
   for (const [sector, off] of [[2048, 0], [2352, 16], [2352, 24]]) {
     const at = sector * 16 + off;
-    if (at + 40 > size) continue;
-    const b = readAt(fd, at, 40);
-    if (ascii(b, 1, 5) === "CD001") return ascii(b, 8, 32).trim();
+    if (at + 2048 > size) continue;
+    const b = readAt(fd, at, 2048);
+    if (ascii(b, 1, 5) === "CD001") return { id: ascii(b, 8, 32).trim(), sector, off, root: b.readUInt32LE(156 + 2), rootLen: b.readUInt32LE(156 + 10) };
   }
   return null;
+}
+/**
+ * PlayStation 1 or 2, by the disc's own SYSTEM.CNF: "BOOT2 =" is a PS2 game, "BOOT =" a PS1 one (both say
+ * PLAYSTATION as their system). null when it can't be read.
+ */
+function psGeneration(fd, size) {
+  const v = discVolume(fd, size);
+  if (!v || !/PLAYSTATION/.test(v.id)) return null;
+  const sectorData = (lba, n) => Buffer.concat(Array.from({ length: n }, (_, k) => readAt(fd, (lba + k) * v.sector + v.off, 2048)));
+  const dir = sectorData(v.root, Math.min(4, Math.ceil(v.rootLen / 2048) || 1));
+  for (let i = 0; i < dir.length;) {
+    const len = dir[i];
+    if (!len) { i = (Math.floor(i / 2048) + 1) * 2048; continue; }
+    const name = ascii(dir, i + 33, dir[i + 32]).split(";")[0].toUpperCase();
+    if (name === "SYSTEM.CNF") {
+      const text = sectorData(dir.readUInt32LE(i + 2), 1).toString("latin1", 0, Math.min(2048, dir.readUInt32LE(i + 10)));
+      return /^\s*BOOT2\s*=/m.test(text) ? "ps2" : /^\s*BOOT\s*=/m.test(text) ? "ps1" : null;
+    }
+    i += len;
+  }
+  return null;
+}
+/** the system identifier inside a compressed (CISO) PSP or PS2 image: block 16 unpacked */
+function csoSystemId(fd) {
+  const h = readAt(fd, 0, 0x18);
+  if (ascii(h, 0, 4) !== "CISO") return null;
+  const bs = h.readUInt32LE(0x10) || 2048, align = h[0x15], blk = Math.floor(32768 / bs), within = 32768 % bs;
+  const idx = readAt(fd, 0x18 + blk * 4, 8);
+  if (idx.length < 8) return null;
+  const a = idx.readUInt32LE(0), b = idx.readUInt32LE(4), pos = (a & 0x7fffffff) * 2 ** align, end = (b & 0x7fffffff) * 2 ** align;
+  let data = readAt(fd, pos, Math.max(0, Math.min(end - pos, bs + 64)));
+  if (!(a & 0x80000000)) { try { data = zlib.inflateRawSync(data, { maxOutputLength: bs }); } catch { return null; } }
+  return ascii(data, within + 1, 5) === "CD001" ? ascii(data, within + 8, 32).trim() : null;
 }
 
 /** Parse a .cue/.gdi/.m3u and return the files it points to (absolute paths). */
@@ -98,11 +141,19 @@ class Importer {
       return null;
     };
     if (ext === ".zip") {
-      const es = zipEntries(p);
-      if (!es || !es.length) return null;
+      const all = zipEntries(p);
+      if (!all || !all.length) return null;
+      // readmes, info files and pictures that come along aren't the game
+      const es = all.filter(e => !/\.(txt|nfo|diz|url|pdf|html?|jpe?g|png|gif|bmp|ini|xml|dat|sfv|md5|sha1)$/i.test(e.name));
+      if (!es.length) return null;
+      // a BIOS in a zip isn't a game, and a disc needs its track files beside it (unzipped): asked about, not guessed
+      if (es.some(e => biosDest(path.posix.basename(e.name), this.systems))) return null;
+      if (es.some(e => [...SHEETS, ".ccd"].includes(path.extname(e.name).toLowerCase()))) return null;
       const known = es.filter(e => { const x = path.extname(e.name).toLowerCase(); return this.byExt[x] && x !== ".zip" && x !== ".7z"; });
-      // arcade romsets are zips of chip dumps with no console file extension
-      if (!known.length || (es.length > 2 && known.length < es.length / 2)) return { system: pick("arcade") };
+      // arcade romsets are zips of chip dumps: mostly not console files, or several .bin/.rom chips (a console game's zip
+      // holds one ROM)
+      const chips = known.length > 1 && known.every(e => [".bin", ".rom"].includes(path.extname(e.name).toLowerCase()));
+      if (!known.length || chips || (es.length > 2 && known.length < es.length / 2)) return { system: pick("arcade") };
       const x = path.extname(known[0].name).toLowerCase();
       if (x === ".bin") return { system: pick(known[0].size > 65536 ? "genesis" : "atari2600") };
       const ss = this.byExt[x].filter(s => cands.includes(s));
@@ -114,7 +165,10 @@ class Importer {
         if (ascii(head, 0x100, 4) === "SEGA") return { system: pick("genesis") };
         if (size <= 65536) return { system: pick("atari2600") };
         const id = size > 4 * 1048576 ? discSystemId(fd, size) : null;
-        if (id && /PLAYSTATION/.test(id) && this.sys("ps1")) return { system: this.sys("ps1"), makeCue: true };
+        if (id && /PLAYSTATION/.test(id)) {
+          if (psGeneration(fd, size) === "ps2") return { system: pick("ps2") };
+          if (this.sys("ps1")) return { system: this.sys("ps1"), makeCue: true };
+        }
         if (id !== null) return null;
         return size <= 8 * 1048576 ? { system: pick("genesis") } : null;
       }
@@ -124,10 +178,14 @@ class Importer {
         if (head.length >= 0x20 && (head.readUInt32BE(0x18) === 0x5D1C9EA3 || head.readUInt32BE(0x1C) === 0xC2339F3D)) return { system: pick("gc") };
         const id = discSystemId(fd, size) || "";
         if (/PSP GAME/.test(id)) return { system: pick("psp") };
-        if (/PLAYSTATION/.test(id)) return { system: pick("ps2") };
+        // a PS1 game as an .iso (rare, but it happens) isn't a PS2 one: the disc's SYSTEM.CNF says which
+        if (/PLAYSTATION/.test(id)) { const gen = psGeneration(fd, size); return gen === "ps1" ? { system: pick("ps1") } : gen === "ps2" || gen === null ? { system: pick("ps2") } : null; }
         return null;
       }
-      if (ext === ".cso") return { system: pick("psp") };
+      if (ext === ".cso") {
+        const id = csoSystemId(fd) || "";
+        return /PSP GAME/.test(id) ? { system: pick("psp") } : /PLAYSTATION/.test(id) ? { system: pick("ps2") } : null;
+      }
       if (ext === ".pbp") {
         if (ascii(head, 1, 3) !== "PBP") return null;
         const psar = head.readUInt32LE(0x24), tag = ascii(readAt(fd, psar, 10), 0, 10);
@@ -152,7 +210,7 @@ class Importer {
           const sg = withFile(files[0], sega);
           if (sg) return { system: pick(sg) };
           const id = withFile(files[0], discSystemId);
-          if (id && /PLAYSTATION/.test(id)) return { system: pick("ps1") };
+          if (id && /PLAYSTATION/.test(id)) return { system: pick(withFile(files[0], psGeneration) === "ps2" ? "ps2" : "ps1") };
           if (id) return null;
         }
         return cueFirstTrackAudio(p) ? { system: pick("pce") } : null;
@@ -170,13 +228,18 @@ class Importer {
   /** Walk dropped files/folders and classify everything that looks like a game. */
   /** hints: a file's console, already known (from an earlier look), so it isn't read again */
   inspect(paths, hints = null) {
-    const files = [], seen = new Set();
-    const add = p => { if (!seen.has(p) && files.length < MAX_FILES) { seen.add(p); files.push(p); } };
+    const files = [], seen = new Set(), dirs = new Set();
+    const add = p => { const k = pathKey(p); if (!seen.has(k) && files.length < MAX_FILES) { seen.add(k); files.push(p); } };
     const walk = (p, depth) => {
+      if (files.length >= MAX_FILES) return;
       let st;
       try { st = fs.statSync(p); } catch { return; }
       if (st.isDirectory()) {
         if (depth > 6 || (depth > 0 && path.basename(p).startsWith("."))) return;
+        // a folder reached twice (a link back up, a Wine drive pointing at the whole disk) is walked once
+        let real = p; try { real = fs.realpathSync(p); } catch {}
+        if (dirs.has(real)) return;
+        dirs.add(real);
         let names = [];
         try { names = fs.readdirSync(p); } catch {}
         // macOS's leftovers (._Game.iso, .DS_Store) aren't games; hidden folders are skipped below. A game whose name
@@ -187,21 +250,22 @@ class Importer {
     for (const p of paths) if (typeof p === "string" && p) walk(path.resolve(p), 0);
 
     // files a .cue/.gdi/.m3u points at travel with it instead of showing up on their own
-    const owned = new Map();
+    // (keyed as the disk compares names: a .cue saying "TRACK 01.BIN" owns "Track 01.bin")
+    const owned = new Map(), own = (x, f) => { const k = pathKey(x); if (!owned.has(k)) owned.set(k, { x, owner: f }); };
     for (const f of files) {
       if (!SHEETS.includes(path.extname(f).toLowerCase())) continue;
       for (const x of sheetFiles(f)) {
-        if (!owned.has(x)) owned.set(x, f);
-        if (path.extname(x).toLowerCase() === ".cue") for (const y of sheetFiles(x)) if (!owned.has(y)) owned.set(y, f);
+        own(x, f);
+        if (path.extname(x).toLowerCase() === ".cue") for (const y of sheetFiles(x)) own(y, f);
       }
     }
     // an .m3u wins over the discs it lists
-    for (const [x, owner] of [...owned]) if (path.extname(owner).toLowerCase() === ".cue" && owned.get(owner)) owned.set(x, owned.get(owner));
+    for (const v of owned.values()) { const up = path.extname(v.owner).toLowerCase() === ".cue" && owned.get(pathKey(v.owner)); if (up) v.owner = up.owner; }
 
     const items = [], unknown = [], stems = new Map(), bios = [];
     for (const f of files) {
       const ext = path.extname(f).toLowerCase(), name = path.basename(f);
-      if (owned.has(f) && owned.get(f) !== f) continue;
+      if (owned.has(pathKey(f)) && owned.get(pathKey(f)).owner !== f) continue;
       if (IMG.includes(ext)) continue;
       // a BIOS file (scph5501.bin, neogeo.zip…) goes to the BIOS folder, not onto a shelf
       const dest = biosDest(name, this.systems);
@@ -210,6 +274,13 @@ class Importer {
       if (!cands) { if (!/^(readme|desktop\.ini|thumbs\.db)/i.test(name)) unknown.push(name); continue; }
       let size = 0;
       try { size = fs.statSync(f).size; } catch {}
+      // an empty file (a download that never finished) isn't a game
+      if (!size) { unknown.push(name); continue; }
+      // a disc whose track files aren't there wouldn't play: said so, not added
+      if (SHEETS.includes(ext)) {
+        const gone = sheetFiles(f).find(x => !fs.existsSync(x));
+        if (gone) { unknown.push(`${name} (${leaf(gone)} is missing)`); continue; }
+      }
       const it = { id: crypto.createHash("sha1").update(f).digest("hex").slice(0, 12), src: f, name, ext, size, system: null, choices: cands, extras: [], makeCue: false };
       if (cands.length === 1) it.system = cands[0];
       else if (hints && hints[f] && cands.includes(hints[f])) it.system = hints[f];
@@ -223,7 +294,7 @@ class Importer {
         }
       }
       if (SHEETS.includes(ext)) {
-        for (const [x, owner] of owned) if (owner === f && fs.existsSync(x)) { it.extras.push(x); try { it.size += fs.statSync(x).size; } catch {} }
+        for (const { x, owner } of owned.values()) if (owner === f && fs.existsSync(x)) { it.extras.push(x); try { it.size += fs.statSync(x).size; } catch {} }
       }
       items.push(it);
       stems.set(path.join(path.dirname(f), path.parse(f).name).toLowerCase(), it);
@@ -242,14 +313,17 @@ class Importer {
     const s = this.systems[it.system], dir = path.join(root, s.folder || it.system);
     const stem = path.parse(it.name).name, nested = it.makeCue || it.extras.some(x => !IMG.includes(path.extname(x).toLowerCase()));
     const base = nested ? path.join(dir, stem) : dir, srcDir = path.dirname(it.src);
-    const copies = [[it.src, path.join(base, it.name)]];
+    // the files the game needs first, the game itself last: a copy that fails halfway leaves no game that looks whole
+    const copies = [], moved = [];
     for (const x of it.extras) {
       let rel = path.relative(srcDir, x);
-      if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) rel = path.basename(x);
+      if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) { rel = path.basename(x); moved.push(x); }
       copies.push([x, path.join(base, rel)]);
     }
+    copies.push([it.src, path.join(base, it.name)]);
     const cue = it.makeCue ? path.join(base, stem + ".cue") : null;
-    return { copies, cue, main: cue || copies[0][1] };
+    // a disc list naming tracks outside its own folder ("../Tracks/x.bin") is rewritten to where they now are
+    return { copies, cue, main: cue || copies[copies.length - 1][1], rewrite: moved.length > 0 && SHEETS.includes(it.ext) };
   }
 
   /** Copy planned items. onProgress({done, total, current}) after each game. Returns counts. */
@@ -259,8 +333,9 @@ class Importer {
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       onProgress({ done: i, total: items.length, current: it.name });
+      const made = [];
       try {
-        const { copies, cue } = this.plan(it, root);
+        const { copies, cue, rewrite } = this.plan(it, root);
         let fresh = false;
         for (const [src, dest] of copies) {
           if (path.resolve(src) === path.resolve(dest)) continue;
@@ -269,7 +344,17 @@ class Importer {
           // clone where the disk supports it (instant on APFS), copy otherwise
           await fs.promises.copyFile(src, dest + ".part", fs.constants.COPYFILE_FICLONE);
           await fs.promises.rename(dest + ".part", dest);
+          made.push(dest);
           fresh = true;
+        }
+        if (rewrite) {
+          const dest = copies[copies.length - 1][1], text = fs.readFileSync(dest, "utf8");
+          const fixed = text.split(/\r?\n/).map(line => {
+            if (/^\s*FILE\s/i.test(line)) return line.replace(/^(\s*FILE\s+)(?:"([^"]+)"|(\S+))/i, (m, a, q, b) => `${a}"${leaf(q || b)}"`);
+            if (path.extname(dest).toLowerCase() === ".m3u" && line.trim() && !line.trim().startsWith("#")) return leaf(line.trim());
+            return line;
+          }).join("\n");
+          if (fixed !== text) fs.writeFileSync(dest, fixed);
         }
         if (cue && !fs.existsSync(cue)) {
           fs.writeFileSync(cue, `FILE "${it.name}" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n`);
@@ -277,6 +362,8 @@ class Importer {
         }
         fresh ? added++ : already++;
       } catch (e) {
+        // what this try copied goes again (copies only: the files dropped are untouched), so adding it again works
+        for (const f of made) { try { fs.rmSync(f, { force: true }); } catch {} }
         failed++;
         errors.push(`${it.name}: ${e.code === "ENOSPC" ? "the disk is full" : e.message}`);
       }

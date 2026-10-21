@@ -98,3 +98,64 @@ test("a bare PlayStation .bin gets a .cue written for it", async () => {
     assert.match(cue, /FILE "Spyro the Dragon \(USA\)\.bin" BINARY/);
   } finally { fs.rmSync(out, { recursive: true, force: true }); }
 });
+
+test("zips: arcade chip sets, a game with its readme, discs and BIOS files that need asking about, and empty files", () => {
+  const was = dir; dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-zips-"));
+  try {
+    zip("dkong.zip", ["c_5et_g.bin", "c_5ct_g.bin", "c_5bt_g.bin", "v_5h_b.bin"].map(n => [n, Buffer.alloc(64)]));
+    zip("Pokemon Emerald (USA).zip", [["Pokemon Emerald (USA).gba", Buffer.alloc(4096)], ["readme.txt", Buffer.from("hi")], ["release.nfo", Buffer.from("x")]]);
+    zip("Crash (USA).zip", [["Crash (USA).bin", Buffer.alloc(2048)], ["Crash (USA).cue", Buffer.from('FILE "Crash (USA).bin" BINARY')]]);
+    zip("PS BIOS.zip", [["scph5501.bin", Buffer.alloc(524288)]]);
+    fs.writeFileSync(path.join(dir, "Empty (USA).nes"), "");
+    const { items, unknown } = new Importer(config.systems).inspect([dir]), by = n => items.find(i => i.name === n);
+    assert.equal(by("dkong.zip").system, "Arcade");
+    assert.equal(by("Pokemon Emerald (USA).zip").system, "GBA");
+    assert.equal(by("Crash (USA).zip").system, null);                                // asked, not guessed
+    assert.equal(by("PS BIOS.zip").system, null);
+    assert.ok(unknown.includes("Empty (USA).nes"));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); dir = was; }
+});
+
+test("a .cue's tracks travel with it whatever their letter case, a missing track is said, and tracks from another folder are rewritten", async () => {
+  const was = dir; dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-cues-"));
+  try {
+    file("Sonic CD (USA) (Track 01).bin", 2352 * 20, [[16, "SEGADISCSYSTEM  "]]); file("Sonic CD (USA) (Track 02).bin", 4096);
+    fs.writeFileSync(path.join(dir, "Sonic CD (USA).cue"), 'FILE "SONIC CD (USA) (TRACK 01).BIN" BINARY\n  TRACK 01 MODE1/2352\nFILE "SONIC CD (USA) (TRACK 02).BIN" BINARY\n  TRACK 02 AUDIO\n');
+    fs.writeFileSync(path.join(dir, "Lost (USA).cue"), 'FILE "Lost (USA).bin" BINARY\n  TRACK 01 MODE2/2352\n');
+    file("Tracks/Far (USA).bin", 2352 * 20, [[16, "SEGADISCSYSTEM  "]]);
+    fs.mkdirSync(path.join(dir, "Sheets")); fs.writeFileSync(path.join(dir, "Sheets", "Far (USA).cue"), 'FILE "../Tracks/Far (USA).bin" BINARY\n  TRACK 01 MODE1/2352\n');
+    const imp = new Importer(config.systems), { items, unknown } = imp.inspect([dir]);
+    if (process.platform !== "linux") {
+      assert.deepEqual(items.filter(i => /Sonic/.test(i.name)).map(i => i.name), ["Sonic CD (USA).cue"]);   // its tracks aren't games of their own
+    }
+    assert.ok(unknown.some(u => /^Lost \(USA\)\.cue \(Lost \(USA\)\.bin is missing\)$/.test(u)));
+    const far = items.find(i => i.name === "Far (USA).cue"), root = path.join(dir, "out");
+    assert.equal(far.system, "Sega CD");
+    await imp.copy([far], root, () => {});
+    const copied = fs.readFileSync(path.join(root, "segacd", "Far (USA)", "Far (USA).cue"), "utf8");
+    assert.match(copied, /^FILE "Far \(USA\)\.bin" BINARY/);
+    assert.ok(fs.existsSync(path.join(root, "segacd", "Far (USA)", "Far (USA).bin")));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); dir = was; }
+});
+
+test("a PlayStation disc's SYSTEM.CNF says whether it's PS1 or PS2", () => {
+  const was = dir; dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-ps-"));
+  // a 2048-byte-sector ISO: the volume descriptor at sector 16, the root folder at 20, SYSTEM.CNF at 21
+  const iso = (name, cnf) => {
+    const b = Buffer.alloc(2048 * 24), at = s => s * 2048;
+    Buffer.from("\x01CD001\x01\x00", "latin1").copy(b, at(16)); Buffer.from("PLAYSTATION".padEnd(32)).copy(b, at(16) + 8);
+    b[at(16) + 156] = 34; b.writeUInt32LE(20, at(16) + 156 + 2); b.writeUInt32LE(2048, at(16) + 156 + 10);
+    const rec = at(20), nm = Buffer.from("SYSTEM.CNF;1");
+    b[rec] = 33 + nm.length; b.writeUInt32LE(21, rec + 2); b.writeUInt32LE(cnf.length, rec + 10); b[rec + 32] = nm.length; nm.copy(b, rec + 33);
+    Buffer.from(cnf).copy(b, at(21));
+    fs.writeFileSync(path.join(dir, name), b);
+  };
+  try {
+    iso("Final Fantasy VII (USA) (Disc 1).iso", "BOOT = cdrom:\\SCUS_941.63;1\r\nTCB = 4\r\n");
+    iso("Ico (USA).iso", "BOOT2 = cdrom0:\\SCUS_971.13;1\r\nVER = 1.00\r\n");
+    const { items } = new Importer(config.systems).inspect([dir]), by = n => items.find(i => i.name === n);
+    assert.equal(by("Ico (USA).iso").system, "PS2");
+    const ff = by("Final Fantasy VII (USA) (Disc 1).iso");
+    assert.ok(ff.system === "PS1" || ff.system === null, ff.system);                 // never filed as PS2
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); dir = was; }
+});
