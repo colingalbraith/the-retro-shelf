@@ -3,6 +3,7 @@
 // process, and RetroArch (bundled in Resources/emulators) launched for each game.
 const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu, screen, clipboard } = require("electron");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { Backend, GAME_CHOICES, within } = require("./backend");
 const { Updater } = require("./updater");
@@ -206,8 +207,8 @@ function gameMenu(id) {
       ...(backend.state.shelves.length ? [{ type: "separator" }] : []),
       { label: "New Shelf…", click: () => send({ cmd: "new-shelf", id: g.id }) },
     ] },
-    // this game's own picture and screen shape, over the ones in Settings
-    ...Object.entries({ picture: "Picture", shape: "Screen Shape" }).map(([k, label]) => ({ label, submenu: [
+    // this game's own picture, screen shape and fast-forward speed (the app's own emulators), over the ones in Settings
+    ...Object.entries({ picture: "Picture", shape: "Screen Shape", ...(!sys[g.system].emulator && !backend.ownEmu() ? { ffSpeed: "Fast-Forward Speed" } : {}) }).map(([k, label]) => ({ label, submenu: [
       { label: "Same as Settings", type: "radio", checked: !(backend.state.gameOpts[g.id] || {})[k], click: () => { backend.setGameOpts(g.id, { [k]: null }); send({ cmd: "refresh", focus: g.id }); } },
       { type: "separator" },
       ...GAME_CHOICES[k].map(([v, name]) => ({ label: name, type: "radio", checked: (backend.state.gameOpts[g.id] || {})[k] === v,
@@ -318,6 +319,7 @@ function ipc() {
       file = out.filePath;
     }
     try { fs.writeFileSync(file, img.toPNG()); } catch (e) { return { ok: false, error: "Couldn't save the picture: " + e.message }; }
+    backend.event("picture");
     return { ok: true, file };
   });
   ipcMain.handle("export-saves", async (_, id, quick) => {
@@ -334,6 +336,39 @@ function ipc() {
       .map(f => ({ name: "Saves/" + path.relative(backend.folders.saves, f).split(path.sep).join("/"), full: f }));
     try { return { ok: true, count: await zipFiles(list, r.filePath), path: r.filePath }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
   });
+  // the list of games as a spreadsheet; with only a controller, straight into Documents
+  ipcMain.handle("export-list", async (_, quick) => {
+    const name = `The Retro Shelf games ${new Date().toISOString().slice(0, 10)}`;
+    const r = quick ? { filePath: freeName(app.getPath("documents"), name, ".csv") }
+      : await dialog.showSaveDialog(win, { title: tm("Export the list"), buttonLabel: tm("Export"),
+        defaultPath: path.join(app.getPath("documents"), name + ".csv"), filters: [{ name: tm("Spreadsheet (CSV)"), extensions: ["csv"] }] });
+    if (r.canceled || !r.filePath) return { ok: false };
+    try { fs.writeFileSync(r.filePath, backend.listCsv()); } catch (e) { return { ok: false, error: "Couldn't save the list: " + e.message }; }
+    backend.event("export");
+    return { ok: true, count: backend.games.size, path: r.filePath };
+  });
+  // opening when you sign in to the computer. Linux: a file in ~/.config/autostart, for the AppImage only (its place
+  // stays put across updates); Mac and Windows: the system's own list
+  const autostart = path.join(os.homedir(), ".config", "autostart", "the-retro-shelf.desktop");
+  ipcMain.handle("login-item", (_, on) => {
+    // not the portable copy: its USB stick may not be there next time
+    if (!app.isPackaged || PORTABLE) return { supported: false };
+    if (process.platform === "linux") {
+      if (!process.env.APPIMAGE) return { supported: false };
+      if (on === true || on === false) {
+        try {
+          if (on) { fs.mkdirSync(path.dirname(autostart), { recursive: true });
+            fs.writeFileSync(autostart, `[Desktop Entry]\nType=Application\nName=The Retro Shelf\nExec="${process.env.APPIMAGE.replace(/"/g, "")}"\nX-GNOME-Autostart-enabled=true\n`); }
+          else fs.rmSync(autostart, { force: true });
+        } catch (e) { return { supported: true, on: fs.existsSync(autostart), error: e.message }; }
+      }
+      return { supported: true, on: fs.existsSync(autostart) };
+    }
+    if (on === true || on === false) { try { app.setLoginItemSettings({ openAtLogin: on }); } catch (e) { return { supported: true, on: false, error: e.message }; } }
+    const st = app.getLoginItemSettings();
+    // macOS can ask for an OK first, in System Settings → General → Login Items
+    return { supported: true, on: !!st.openAtLogin || st.status === "enabled", approve: st.status === "requires-approval" };
+  });
   // a folder of games to show where it is, without copying
   ipcMain.handle("watch-folder", async () => {
     const r = await dialog.showOpenDialog(win, { title: tm("Watch a folder of games"), buttonLabel: tm("Watch"), properties: ["openDirectory"] });
@@ -342,7 +377,7 @@ function ipc() {
     return code === 200 ? { ok: true, games: res.games } : { ok: false, error: res.error };
   });
   /** a file name in dir that isn't taken yet: "name.zip", then "name 2.zip"… */
-  const freeName = (dir, name) => { let f = path.join(dir, name + ".zip"); for (let i = 2; fs.existsSync(f); i++) f = path.join(dir, `${name} ${i}.zip`); return f; };
+  const freeName = (dir, name, ext = ".zip") => { let f = path.join(dir, name + ext); for (let i = 2; fs.existsSync(f); i++) f = path.join(dir, `${name} ${i}${ext}`); return f; };
   // quick: from a controller, which can't work the save window: straight into the backups folder
   ipcMain.handle("backup-saves", async (_, quick) => {
     const saves = backend.folders.saves;

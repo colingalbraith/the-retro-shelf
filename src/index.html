@@ -30,7 +30,11 @@
 /* shelf themes: the wood (walnut by default), and a lighter wall */
 html[data-wood="oak"]{--w0:#6e4f2c;--w1:#c09663;--w2:#c79d68;--w3:#dfbb86;--w4:#a27845;--w5:#94693b;--w6:#46301a;--w7:#8a6236}
 html[data-wood="white"]{--w0:#a29c90;--w1:#e2ddd2;--w2:#e8e4da;--w3:#f8f6f0;--w4:#cfc9bc;--w5:#c4bdaf;--w6:#77726a;--w7:#bcb5a7}
+html[data-wood="cherry"]{--w0:#4a1f14;--w1:#9a4a32;--w2:#a2513a;--w3:#bf6a4c;--w4:#73351f;--w5:#66301d;--w6:#2a100a;--w7:#5c2a19}
+html[data-wood="black"]{--w0:#0b0b0b;--w1:#2e2b28;--w2:#34312d;--w3:#4d4944;--w4:#23211f;--w5:#1d1b1a;--w6:#050505;--w7:#1b1a18}
 html[data-wall="light"]{--wall:#cdc4b2;--wall-hi:#dcd4c4;--floor:#b9af9b;--chalk:#2a2520;--dust:#5d554a}
+html[data-wall="green"]{--wall:#1a2520;--wall-hi:#213028;--floor:#111915}
+html[data-wall="blue"]{--wall:#1b2230;--wall-hi:#222b3c;--floor:#121722}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--wall);color:var(--chalk);font:16px/1.4 var(--disp);overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none}
@@ -895,7 +899,7 @@ const HTML = document.documentElement;
 /* each language's words, keyed by the English (see t() below); LOCALE formats dates and numbers to match */
 const WORDS = {};
 let LANG = "en", LOCALE = undefined;
-let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {}, GAMECHOICES = {};
+let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {}, GAMECHOICES = {}, LOGIN;
 let UI = {accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines"};
 let PATHS = {}, STATUS = {running: null, covers: {}}, APPINFO = {}, CHEEVOS = {};
 /* hardcore achievements: games start from the beginning, so there's no "continue" */
@@ -976,6 +980,7 @@ const SORTS = {
   title: byTitle,
   year: (a, b) => ((parseInt(a.year, 10) || 9999) - (parseInt(b.year, 10) || 9999)) || byTitle(a, b),
   played: (a, b) => (b.last || 0) - (a.last || 0) || byTitle(a, b),
+  most: (a, b) => (b.time || 0) - (a.time || 0) || byTitle(a, b),
   rating: (a, b) => (b.rating || 0) - (a.rating || 0) || byTitle(a, b),
 };
 /* how far you are with a game, as you set it (progress), in words, and a rating in stars */
@@ -1806,7 +1811,8 @@ function showLaunch(g) {
   /* what this console's games can do besides */
   const c2 = cons(g.system), rw = c2.light && UI.rewind !== false;
   $("#lhint2").textContent = /\.m3u$/i.test(g.file || "") ? t("Asked for another disc? On a keyboard, E opens the tray, D picks the next disc, E closes it. With a controller, hold Select, then Disc Control.")
-    : !c2.light ? "" : c2.freeTriggers ? (rw ? t("Hold the left trigger (or R) to rewind, the right one (or L) to fast-forward.") : t("Hold the right trigger (or L) to fast-forward."))
+    : !c2.light ? "" : c2.freeTriggers && UI.ffTrigger === "toggle" ? (rw ? t("Hold the left trigger (or R) to rewind. The right one (or Space) switches fast-forward on and off.") : t("The right trigger (or Space) switches fast-forward on and off."))
+    : c2.freeTriggers ? (rw ? t("Hold the left trigger (or R) to rewind, the right one (or L) to fast-forward.") : t("Hold the right trigger (or L) to fast-forward."))
     : (rw ? t("Hold R to rewind, L to fast-forward.") : t("Hold L to fast-forward."));
   $("#lhint2").style.visibility = "hidden";
   /* the controllers in the order they were connected: RetroArch numbers players the same way */
@@ -2077,14 +2083,14 @@ function openOpts(sub) {
     else [5, 4, 3, 2, 1].forEach(n => item((g.rating === n ? "✓ " : "") + stars(n), set(n)));
     list.appendChild(el("i", "sep"));
     item(sub === "progress" ? t("Not set") : t("No rating"), set(null));
-  } else if (g && (sub === "picture" || sub === "shape")) {
-    /* this game's own picture or screen shape, over the one in Settings */
+  } else if (g && (sub === "picture" || sub === "shape" || sub === "ffSpeed")) {
+    /* this game's own picture, screen shape or fast-forward speed, over the one in Settings */
     const own = (g.opts || {})[sub], set = v => async () => {
       const r = await api("/api/game/opts", {id: g.id, opts: {[sub]: v}});
       if (!r.ok) return toast(r.data.error || t("Couldn't save that."), true);
       await refresh(true); focusFree(g.id); toast(v ? t("Saved for {title}.", {title: g.title}) : t("{title} uses Settings again.", {title: g.title}));
     };
-    $("#optst").textContent = (sub === "picture" ? t("Picture for {title}", {title: g.title}) : t("Screen shape for {title}", {title: g.title}));
+    $("#optst").textContent = (sub === "picture" ? t("Picture for {title}", {title: g.title}) : sub === "shape" ? t("Screen shape for {title}", {title: g.title}) : t("Fast-forward speed for {title}", {title: g.title}));
     item((own ? "" : "✓ ") + t("Same as Settings"), set(null));
     list.appendChild(el("i", "sep"));
     (GAMECHOICES[sub] || []).forEach(([v, name]) => item((own === v ? "✓ " : "") + t(name), set(v)));
@@ -2103,6 +2109,7 @@ function openOpts(sub) {
       if (cons(g.system).builtin && !PATHS.own) item(t("Saves…"), () => openSaves(g.id));
       item(t("Picture…"), () => setTimeout(() => openOpts("picture"), 30));
       item(t("Screen shape…"), () => setTimeout(() => openOpts("shape"), 30));
+      if (cons(g.system).builtin && !PATHS.own) item(t("Fast-forward speed…"), () => setTimeout(() => openOpts("ffSpeed"), 30));
       if (cons(g.system).builtin && !PATHS.own) item(g.cheats ? t("Cheats ({n} on)…", {n: g.cheats}) : t("Cheats…"), () => openCheats(g.id));
       item("Find cover…", () => openPicker(g.id));
       item("Rename…", () => openRename(g.id));
@@ -2527,7 +2534,7 @@ function openKeys() {
   fill($("#kpad"), [[t("On the shelves")], [t("D-pad"), t("Browse")], [nm[nin ? 1 : 0], t("Play")], [nm[nin ? 0 : 1], t("Back")], [nm[nin ? 2 : 3], t("Turn the box over")],
     [nm[nin ? 3 : 2], t("Favorite")], [nm[4] + "  " + nm[5], t("Previous or next shelf")], [nm[8], t("Options, and this sheet")], [nm[9], t("Settings")],
     [t("In a game")], [t("Hold {b}", {b: nm[9]}), t("Back to the shelves")], [t("Hold {b}", {b: nm[8]}), t("The emulator's menu")],
-    [t("Hold {b}", {b: nm[6]}), t("Rewind")], [t("Hold {b}", {b: nm[7]}), t("Fast-forward")]]);
+    [t("Hold {b}", {b: nm[6]}), t("Rewind")], UI.ffTrigger === "toggle" ? [nm[7], t("Fast-forward on and off")] : [t("Hold {b}", {b: nm[7]}), t("Fast-forward")]]);
   keysFrom = opener(); blurActive(); $("#keys").classList.add("show"); light(); beep(520);
   setTimeout(() => $("#keysok").focus({preventScroll: true}), 40);
 }
@@ -2985,10 +2992,10 @@ function renderSettings() {
 
   H("Shelves");
   R("Shelf style", "Spines fit hundreds of games on a wall. Covers show every box face-out.", seg([["spines", "Spines"], ["covers", "Covers"]], UI.shelf, v => { UI.shelf = v; saveUI(); renderShelves(focusId); }));
-  R(t("Wood"), t("Walnut, honey oak, or shelves painted white."), seg([["walnut", t("Walnut")], ["oak", t("Oak")], ["white", t("Painted white")]], UI.wood || "walnut", v => { UI.wood = v; saveUI(); applyUI(); }));
-  R(t("Wall"), t("A dark wall like a den, or a light one like a living room."), seg([["dark", t("Dark")], ["light", t("Light")]], UI.wall || "dark", v => { UI.wall = v; saveUI(); applyUI(); }));
+  R(t("Wood"), t("Walnut, honey oak or cherry, or shelves painted white or black."), seg([["walnut", t("Walnut")], ["oak", t("Oak")], ["cherry", t("Cherry")], ["white", t("Painted white")], ["black", t("Painted black")]], UI.wood || "walnut", v => { UI.wood = v; saveUI(); applyUI(); }));
+  R(t("Wall"), t("A dark wall like a den, a light one like a living room, or deep green or blue."), seg([["dark", t("Dark")], ["light", t("Light")], ["green", t("Green")], ["blue", t("Blue")]], UI.wall || "dark", v => { UI.wall = v; saveUI(); applyUI(); }));
   R("Arrange shelves by", "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.", seg([["console", "Console"], ["genre", "Genre"], ["decade", "Decade"], ["status", t("Progress")]], UI.arrange || "console", v => { UI.arrange = v; saveUI(); renderShelves(focusId); }));
-  R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"], ["rating", t("Rating")]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
+  R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"], ["most", t("Most played")], ["rating", t("Rating")]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
   rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); saveUI(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
   R("Shelf size", "", rg);
@@ -3066,6 +3073,9 @@ function renderSettings() {
   const dups = duplicates();
   if (dups.length) { const db2 = el("button", "btn", t("Look")); db2.onclick = openDuplicates; R(t("The same game twice"), dups.length === 1 ? t("1 game is on the same console more than once, like two regions or revisions.") : t("{n} games are on the same console more than once, like two regions or revisions.", {n: dups.length}), db2); }
 
+  const xl = el("button", "btn", t("Export…"));
+  xl.onclick = async () => { const quick = byPad(), r = await APP.exportList(quick); if (r && r.ok) toast(t("Saved a list of {n}.", {n: plural(r.count, "game", "games")}) + (quick ? " " + t("It's in {place}.", {place: r.path}) : "")); else if (r && r.error) toast(r.error, true); };
+  R(t("A list of your games"), t("Every game with its console, year, progress, rating and time played, as a spreadsheet file (CSV) for Excel, Numbers or Google Sheets."), xl);
   R("Download missing covers", "Looks up box art by title on thumbnails.libretro.com. Nothing else is sent.", sw(UI.autoCovers, v => { UI.autoCovers = v; saveUI(); }));
   const pr = el("div", ""), bar = el("div", "pbar"); bar.id = "cbar"; bar.appendChild(el("i")); pr.appendChild(bar);
   const row = R("Progress", "", pr); row.querySelector(".rl").appendChild(Object.assign(el("span", ""), {id: "ctext"}));
@@ -3101,6 +3111,8 @@ function renderSettings() {
     R(t("Rewind"), t("Hold the left trigger, or R on a keyboard, to go back a few seconds. The right trigger, or L, fast-forwards. On 8- and 16-bit consoles and Game Boy."), sw(UI.rewind !== false, v => { UI.rewind = v; saveUI(); }));
     R(t("Fast-forward speed"), t("How fast a game goes while you hold the right trigger (on the same consoles) or L, or after pressing Space. The sound speeds up with it, and is off at Fastest."),
       seg([[2, "2×"], [3, "3×"], [4, "4×"], [0, t("Fastest")]], UI.ffSpeed ?? 3, v => { UI.ffSpeed = v; saveUI(); }));
+    R(t("Fast-forward on the trigger"), t("Hold the right trigger to speed up, or press it once to switch fast-forward on and again to switch it off."),
+      seg([["hold", t("Hold")], ["toggle", t("Press to switch")]], UI.ffTrigger || "hold", v => { UI.ffTrigger = v; saveUI(); }));
     R(t("Less lag"), t("Games answer the controller a frame sooner, on the same consoles. Turn it off if a game's sound crackles."), sw(UI.lessLag !== false, v => { UI.lessLag = v; saveUI(); }));
   R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); renderHints(); }));
     const cb = el("div", "btns"), ct = el("button", "btn", t("Test…")), cr = el("button", "btn", t("Change buttons…"));
@@ -3178,6 +3190,14 @@ function renderSettings() {
   if (LANG !== "en") { const fx = el("button", "btn", t("Suggest better words")); fx.onclick = () => APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new?title=" + encodeURIComponent("Translation (" + LANG + "): ")); lw.appendChild(fx); }
   R(t("Language"), t("Languages other than English are drafts. If something reads oddly, suggest better words."), lw);
   R("TV mode", "For a computer hooked up to a TV: opens fullscreen and bigger, and everything works with a controller. Select opens a game's options.", sw(!!UI.tv, v => { UI.tv = v; saveUI(); applyUI(); APP.tvMode(v, UI.textSize); }));
+  /* opening when the computer starts: asked of the system, which keeps the answer */
+  if (LOGIN === undefined && APP.loginItem) { LOGIN = null; APP.loginItem().then(r => { LOGIN = r; if (r && r.supported && isOpen("settings")) renderSettings(); }); }
+  if (LOGIN && LOGIN.supported) R(t("Open when the computer starts"), t("Opens The Retro Shelf when you sign in, in TV mode if that's on: for a computer hooked up to a TV."), sw(!!LOGIN.on, async v => {
+    const r = await APP.loginItem(v); LOGIN = r || LOGIN;
+    if (r && r.error) toast(t("Couldn't change that: {why}", {why: r.error}), true);
+    else if (r && r.approve) toast(t("macOS asks for your OK first: System Settings → General → Login Items."));
+    renderSettings();
+  }));
   R(t("Text size"), t("Everything bigger, for reading from further away."), seg([[100, "100%"], [115, "115%"], [130, "130%"]], UI.textSize || 100, v => { UI.textSize = v; saveUI(); APP.textSize(!!UI.tv, v); }));
   R("Animations", "Choose Reduced or Off on older computers.", seg([["full", "Full"], ["reduced", "Reduced"], ["off", "Off"]], UI.fx, v => { UI.fx = v; applyUI(); saveUI(); }));
   R(t("Screensaver"), t("In TV mode, after a while with nothing pressed: the shelves drift and pictures from your games fade through. Any button wakes it."),

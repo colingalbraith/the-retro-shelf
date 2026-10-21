@@ -46,6 +46,8 @@ const main = read("src/main.js");
 for (const m of main.matchAll(new RegExp(`(?:label: |tm\\()${str}`, "g"))) add(unq(m[1]));
 for (const m of main.matchAll(/\[\s*"[^"]*", "([A-Z][^"]*)"\]/g)) add(m[1]);
 for (const m of main.matchAll(new RegExp(`error: ${str}`, "g"))) add(unq(m[1]));
+// the right-click menu's own choices for a game ({ picture: "Picture", shape: "Screen Shape", … })
+for (const m of main.matchAll(/\{ picture: "([^"]+)", shape: "([^"]+)"[^}]*?ffSpeed: "([^"]+)"/g)) m.slice(1).forEach(add);
 
 // the backend's messages (the ones without blanks filled in by code)
 const backend = read("src/backend.js");

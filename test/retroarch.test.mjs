@@ -106,6 +106,25 @@ test("each controller's own triggers rewind and fast-forward, whatever they are 
   assert.equal(ra.withTriggers(own), own);
 });
 
+test("the trigger can switch fast-forward on and off instead, from its own copy of the profiles", () => {
+  const on = text => Object.fromEntries([...text.matchAll(/^input_(rewind|hold_fast_forward|toggle_fast_forward)_(btn|axis) = "([^"]*)"$/gm)].map(m => [m[1] + "_" + m[2], m[3]]));
+  assert.deepEqual(on(ra.withTriggers('input_l2_axis = "+2"\ninput_r2_axis = "+5"\n', true)), { rewind_axis: "+2", toggle_fast_forward_axis: "+5" });
+  assert.deepEqual(on(ra.withTriggers('input_l2_btn = "6"\ninput_r2_btn = "7"\n', true)), { rewind_btn: "6", toggle_fast_forward_btn: "7" });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-pads-"));
+  try {
+    const src = path.join(dir, "autoconfig");
+    fs.mkdirSync(src, { recursive: true });
+    fs.writeFileSync(path.join(src, "Pad.cfg"), 'input_l2_axis = "+4"\ninput_r2_axis = "+5"\n');
+    const hold = ra.triggerProfiles({ autoconfig: src }, path.join(dir, "p")), toggle = ra.triggerProfiles({ autoconfig: src }, path.join(dir, "p"), true);
+    assert.notEqual(hold, toggle, "two copies, side by side");
+    assert.match(fs.readFileSync(path.join(hold, "Pad.cfg"), "utf8"), /^input_hold_fast_forward_axis = "\+5"$/m);
+    assert.match(fs.readFileSync(path.join(toggle, "Pad.cfg"), "utf8"), /^input_toggle_fast_forward_axis = "\+5"$/m);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  // the settings bind neither, so the profile's binding counts; Space still switches it from the keyboard
+  const x = ra.enforced({ autoconfig: "j" }, { saves: "s", states: "t", screenshots: "p", system: "b", private: "x" }, {});
+  assert.deepEqual([x.input_toggle_fast_forward, x.input_toggle_fast_forward_btn, x.input_toggle_fast_forward_axis], ["space", "nul", "nul"]);
+});
+
 test("the copy of the controller profiles is made once, again when they change, and never half", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-pads-"));
   try {

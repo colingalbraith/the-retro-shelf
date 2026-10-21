@@ -152,6 +152,14 @@ const STATIC = [
   { key: "rename", title: "Name Tag", desc: "Rename a game.", tier: "bronze", icon: "✐", cat: "app", test: c => !!c.events.rename },
   { key: "tidy", title: "Tidy Up", desc: "Hide a game from your shelves.", tier: "bronze", icon: "◌", cat: "app", test: c => !!c.events.hide },
   { key: "rearrange", title: "Rearranged", desc: "Arrange your shelves by genre, decade or what you've played.", tier: "bronze", icon: "⇅", cat: "app", test: c => !!c.events.arrange },
+  { key: "redecorate", title: "Redecorated", desc: "Change your shelves' wood or wall.", tier: "bronze", icon: "▤", cat: "app", test: c => !!c.events.theme },
+  { key: "shutterbug", title: "Shutterbug", desc: "Save a recap, time card or trophy shelf as a picture.", tier: "bronze", icon: "▣", cat: "app", test: c => !!c.events.picture },
+  { key: "lookback", title: "Looking Back", desc: "Look at a recap of your play.", tier: "bronze", icon: "↺", cat: "app", test: c => !!c.events.recap },
+  { key: "speedset", title: "Speed Setter", desc: "Choose how fast fast-forward goes.", tier: "bronze", icon: "≫", cat: "app", test: c => !!c.events.ffspeed },
+  { key: "lookout", title: "On the Lookout", desc: "Watch a folder of games.", tier: "bronze", icon: "◎", cat: "app", test: c => !!c.events.watch },
+  { key: "inventory", title: "Inventory", desc: "Save the list of your games.", tier: "bronze", icon: "☰", cat: "app", test: c => !!c.events.export },
+  { key: "clouds", title: "Head in the Clouds", desc: "Keep your saves in a cloud folder.", tier: "bronze", icon: "☁", cat: "app", test: c => !!c.events.cloud },
+  { key: "polyglot", title: "Polyglot", desc: "Choose a language in Settings.", tier: "bronze", icon: "¿", cat: "app", test: c => !!c.events.lang },
 ];
 
 const build = systems => [...STATIC, ...consolePins(systems), ...seriesPins()];

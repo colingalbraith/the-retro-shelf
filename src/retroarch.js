@@ -94,7 +94,7 @@ function enforced(ra, dirs, opts) {
     rewind_enable: opts.light && opts.rewind !== false && !hardcore ? "true" : "false",
     input_rewind: "r", input_rewind_btn: "nul", input_rewind_axis: "nul",
     input_hold_fast_forward: "l", input_hold_fast_forward_btn: "nul", input_hold_fast_forward_axis: "nul",
-    input_toggle_fast_forward: "space",
+    input_toggle_fast_forward: "space", input_toggle_fast_forward_btn: "nul", input_toggle_fast_forward_axis: "nul",
     // how fast: 2, 3 or 4 times (opts.ffSpeed), or 0, as fast as the computer can. The sound speeds up with it rather
     // than breaking up, and goes quiet at the fastest, where sped up it would only be noise
     fastforward_ratio: ffSpeed(opts.ffSpeed) + ".0",
@@ -196,15 +196,16 @@ function writeConfig(file, keys) {
 }
 
 /** a controller profile with rewind on its left trigger and fast-forward on its right one, whatever they are on that
-    controller (an axis, or a button on some): its own L2 and R2. Unchanged if it has neither, or binds them itself */
-function withTriggers(text) {
+    controller (an axis, or a button on some): its own L2 and R2. Held to fast-forward, or with toggle, pressed once to
+    switch it on and again to switch it off. Unchanged if it has neither, or binds them itself */
+function withTriggers(text, toggle = false) {
   const bound = key => (new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*"?([^"\\r\\n]*)"?`, "m").exec(text) || [])[1];
   const lines = [];
-  for (const [hotkey, trigger] of [["rewind", "l2"], ["hold_fast_forward", "r2"]]) for (const kind of ["btn", "axis"]) {
+  for (const [hotkey, trigger] of [["rewind", "l2"], [toggle ? "toggle_fast_forward" : "hold_fast_forward", "r2"]]) for (const kind of ["btn", "axis"]) {
     const v = (bound(`input_${trigger}_${kind}`) || "").trim();
     if (v && v !== "nul") lines.push(`input_${hotkey}_${kind} = "${v}"`);
   }
-  if (!lines.length || /^[ \t]*input_(rewind|hold_fast_forward)_(btn|axis)[ \t]*=/m.test(text)) return text;
+  if (!lines.length || /^[ \t]*input_(rewind|hold_fast_forward|toggle_fast_forward)_(btn|axis)[ \t]*=/m.test(text)) return text;
   return text.replace(/\s*$/, "\n") + "# The Retro Shelf: the triggers rewind and fast-forward\n" + lines.join("\n") + "\n";
 }
 
@@ -213,10 +214,11 @@ function withTriggers(text) {
  * controllers had no triggers. Made in the app's own RetroArch folder the first time, and again when the bundled
  * profiles change. Null if it can't be made: then the triggers do nothing in those games, and the keys still work.
  */
-const TRIGGERS_MADE = 1;
-function triggerProfiles(ra, privateDir) {
+const TRIGGERS_MADE = 2;
+function triggerProfiles(ra, privateDir, toggle = false) {
   if (!ra || !ra.autoconfig || !privateDir) return null;
-  const out = path.join(privateDir, "autoconfig-triggers"), made = path.join(out, ".made-from"), files = [];
+  // one copy for each way of fast-forwarding: held, or switched on and off
+  const out = path.join(privateDir, toggle ? "autoconfig-triggers-toggle" : "autoconfig-triggers"), made = path.join(out, ".made-from"), files = [];
   let size = 0;
   try {
     const walk = rel => {
@@ -228,7 +230,7 @@ function triggerProfiles(ra, privateDir) {
     };
     walk("");
     if (!files.length) return null;
-    const from = [TRIGGERS_MADE, ra.autoconfig, ra.version || "", files.length, size].join("\n");
+    const from = [TRIGGERS_MADE, toggle ? "toggle" : "hold", ra.autoconfig, ra.version || "", files.length, size].join("\n");
     try { if (fs.readFileSync(made, "utf8") === from) return out; } catch {}
     // made beside it and swapped in whole, so a launch never sees half a folder
     const tmp = out + ".part";
@@ -236,7 +238,7 @@ function triggerProfiles(ra, privateDir) {
     for (const r of files) {
       const to = path.join(tmp, r), src = path.join(ra.autoconfig, r);
       fs.mkdirSync(path.dirname(to), { recursive: true });
-      if (r.endsWith(".cfg")) fs.writeFileSync(to, withTriggers(fs.readFileSync(src, "utf8")));
+      if (r.endsWith(".cfg")) fs.writeFileSync(to, withTriggers(fs.readFileSync(src, "utf8"), toggle));
       else fs.copyFileSync(src, to);
     }
     fs.writeFileSync(path.join(tmp, ".made-from"), from);

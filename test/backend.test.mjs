@@ -561,6 +561,7 @@ test("a month's and a year's recap, and last month's offered once when a new mon
   const ct = byTitle("Chrono Trigger").id, co = byTitle("Contra").id, at = (m, d, h = 20) => new Date(2026, m, d, h).getTime() / 1000;
   be.state.sessions = [[co, at(8, 28), 600], [ct, at(9, 3), 3600], [ct, at(9, 3, 22), 1800], [co, at(9, 10), 7200], [ct, at(9, 20), 900], ["gone", at(9, 21), 300]];
   be.state.pins = { first: at(8, 28), sampler: at(9, 10), old: 0 };
+  be.state.events.recap = 1;   // looked at before: its pin isn't earned now
   const r = (await be.route("POST", "/api/recap", { year: 2026, month: 9 })).body;                // October
   assert.deepEqual([r.total, r.sittings, r.days, r.games, r.newGames], [3600 + 1800 + 7200 + 900 + 300, 5, 4, 3, 2]);
   assert.deepEqual(r.top.map(t => [t.id, t.time]), [[co, 7200], [ct, 6300]]);                  // a game no longer here isn't listed
@@ -587,6 +588,42 @@ test("display settings are kept as chosen: sort by rating, the shelves' wood and
   await be.route("POST", "/api/settings", { ui: { sort: "nope", wood: "pine", saver: 7 } });
   const back = be.ui;
   assert.deepEqual([back.sort, back.wood, back.saver], ["title", "walnut", 5]);
+});
+
+test("the newer display choices are kept: cherry and black wood, green and blue walls, most played, the trigger", async () => {
+  await be.route("POST", "/api/settings", { ui: { wood: "cherry", wall: "green", sort: "most", ffTrigger: "toggle" } });
+  assert.deepEqual([be.ui.wood, be.ui.wall, be.ui.sort, be.ui.ffTrigger], ["cherry", "green", "most", "toggle"]);
+  await be.route("POST", "/api/settings", { ui: { wood: "black", wall: "blue", ffTrigger: "mash" } });
+  assert.deepEqual([be.ui.wood, be.ui.wall, be.ui.ffTrigger], ["black", "blue", "hold"]);
+  assert.ok(be.state.events.theme, "changing the look counts for its pin");
+  await be.route("POST", "/api/settings", { ui: { wood: "walnut", wall: "dark", sort: "title" } });
+});
+
+test("a game's own fast-forward speed, over the app's", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const g = byTitle("Chrono Trigger");
+  assert.equal(be.setGameOpts(g.id, { ffSpeed: "max" })[0], 200);
+  assert.equal(be.playOpts(g).ffSpeed, 0, "as fast as it goes");
+  assert.equal(be.setGameOpts(g.id, { ffSpeed: "4" })[0], 200);
+  assert.equal(be.playOpts(g).ffSpeed, 4);
+  assert.equal(be.setGameOpts(g.id, { ffSpeed: "9" })[0], 400);
+  be.setGameOpts(g.id, { ffSpeed: null });
+  assert.equal(be.playOpts(g).ffSpeed, be.ui.ffSpeed, "back to the app's");
+});
+
+test("the list of games is a spreadsheet: a row each, quoted where needed, and no formulas", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const g = byTitle("Chrono Trigger");
+  be.state.notes[g.id] = '=HYPERLINK("x"), "quoted"';
+  be.state.plays[g.id] = 3; be.state.time[g.id] = 5400;
+  const csv = be.listCsv(), lines = csv.replace(/^\ufeff/, "").trim().split("\r\n");
+  assert.ok(csv.startsWith("\ufeff"), "a mark for Excel");
+  assert.equal(lines[0].split(",")[0], "Title");
+  assert.equal(lines.length, be.games.size + 1);
+  const row = lines.find(l => l.includes("HYPERLINK"));
+  assert.ok(row.includes(`"'=HYPERLINK(""x""), ""quoted"""`), row);
+  assert.ok(row.includes(",3,1.5,"), "times played and hours");
+  delete be.state.notes[g.id];
 });
 
 test("fast-forward's speed is kept as chosen, as fast as it goes included", async () => {

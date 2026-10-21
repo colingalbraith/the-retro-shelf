@@ -228,7 +228,7 @@ try {
 
   // every wood and wall: the shelves, box backs and the screens that sit on the wall, readable and fitting
   await p.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-  for (const [wood, wall] of [["walnut", "dark"], ["oak", "dark"], ["white", "dark"], ["walnut", "light"], ["white", "light"]]) {
+  for (const [wood, wall] of [["walnut", "dark"], ["oak", "dark"], ["white", "dark"], ["walnut", "light"], ["white", "light"], ["cherry", "green"], ["black", "blue"], ["black", "light"]]) {
     await p.ev(`(HTML.dataset.wood = "${wood}", HTML.dataset.wall = "${wall}", 1)`); await sleep(500);
     const theme = `${wood} wood, ${wall} wall`;
     for (const r of await p.ev(CONTRAST)) problems.push(`${theme}, the shelves: ${r} is hard to read`);

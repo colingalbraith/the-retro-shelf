@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("arcade", {
   backupSaves: quick => ipcRenderer.invoke("backup-saves", !!quick),
   watchFolder: () => ipcRenderer.invoke("watch-folder"),
   exportSaves: (id, quick) => ipcRenderer.invoke("export-saves", id, !!quick),
+  exportList: quick => ipcRenderer.invoke("export-list", !!quick),
+  loginItem: on => ipcRenderer.invoke("login-item", on),
   backupFolder: () => ipcRenderer.invoke("backup-folder"),
   moveSaves: home => ipcRenderer.invoke("move-saves", !!home),
   moveLibrary: () => ipcRenderer.invoke("move-library"),
