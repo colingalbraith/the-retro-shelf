@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0-beta.11
+
+- **Linux:** an AppImage for 64-bit Linux, with RetroArch and every console's emulator built in, that updates itself
+  like the Mac and Windows versions. GameCube and Wii need a recent Linux (like Ubuntu 24.04 or SteamOS).
+- **Steam Deck:** checked in TV mode at the Deck's screen size, and a short guide to adding it to Game Mode
+  (docs/steam-deck.md).
+- **Portable Windows copy:** unzip it anywhere, like a USB stick: games, saves and settings stay in the Data folder
+  beside it. It tells you when a new version is out rather than installing it.
+- When a game closes straight away, Settings → Copy info now includes how the emulator ended, for bug reports.
+
 ## 0.4.0-beta.10
 
 - **Five more languages (beta):** Español, Français, Deutsch, Português and 日本語. The app follows your computer's
