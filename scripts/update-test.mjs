@@ -87,6 +87,8 @@ fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: 
 let app = null, server = null, failed = false;
 try {
   const rel = await github("releases/latest"), OLD = rel.tag_name.replace(/^v/, "");
+  // Linux builds start with 0.4.0: until a release has one, there's nothing to update from
+  if (process.platform === "linux" && !rel.assets.some(x => x.name.endsWith(".AppImage"))) { console.log(`skipped: the last release (${OLD}) has no Linux build to update from`); process.exit(0); }
   if (compare(OLD, NEW) >= 0) { console.log(`skipped: the last release (${OLD}) isn't older than this build (${NEW})`); process.exit(0); }
   step(`updating ${OLD} → ${NEW}`);
 

@@ -119,6 +119,21 @@
       "shortcutName": "The Retro Shelf",
       "artifactName": "The-Retro-Shelf-Setup-${version}.exe"
     },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "The-Retro-Shelf-${version}-linux-x86_64.${ext}",
+      "category": "Game",
+      "icon": "build/icon.png",
+      "executableName": "the-retro-shelf",
+      "synopsis": "A retro game shelf with the emulators built in"
+    },
     "detectUpdateChannel": false
   },
   "dependencies": {

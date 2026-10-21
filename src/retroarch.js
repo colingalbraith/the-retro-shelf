@@ -58,6 +58,8 @@ function enforced(ra, dirs, opts) {
   const hardcore = !!(opts.cheevos && opts.hardcore);
   return {
     video_fullscreen: opts.fullscreen ? "true" : "false",
+    // Linux's usual driver can't run the old-TV and handheld looks (slang shaders); glcore can
+    ...(process.platform === "linux" ? { video_driver: "glcore" } : {}),
     // Hold Start (or press Esc) to come back to the shelf; hold Select for RetroArch's menu.
     input_quit_gamepad_combo: "7",
     input_menu_toggle_gamepad_combo: "8",

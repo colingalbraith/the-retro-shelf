@@ -41,6 +41,8 @@ function findApp() {
     }
     throw new Error("the installer finished, but The Retro Shelf.exe isn't in " + progs);
   }
+  // Linux: the unpacked build (the AppImage holds the same files)
+  if (process.platform === "linux") return path.join(DIST, "linux-unpacked", "the-retro-shelf");
   const dir = process.arch === "arm64" ? "mac-arm64" : "mac";
   return path.join(DIST, dir, "The Retro Shelf.app", "Contents", "MacOS", "The Retro Shelf");
 }
@@ -169,7 +171,7 @@ try {
   const exe = findApp();
   step("opening " + exe);
   const out = fs.openSync(path.join(OUT, "app.log"), "w");
-  app = spawn(exe, [`--remote-debugging-port=${PORT}`], { env: { ...process.env, ARCADE_HOME: home, RETRO_SHELF_TEST: "1" }, stdio: ["ignore", out, out] });
+  app = spawn(exe, [`--remote-debugging-port=${PORT}`, ...(process.platform === "linux" ? ["--no-sandbox"] : [])], { env: { ...process.env, ARCADE_HOME: home, RETRO_SHELF_TEST: "1" }, stdio: ["ignore", out, out] });
   app.once("exit", code => { if (app) console.log("  (the app closed, code " + code + ")"); });
   const page = await connect();
 

@@ -1,7 +1,8 @@
 name: Build installers
 
 # Builds The-Retro-Shelf-<version>-mac-arm64.dmg (Apple silicon), -mac-x64.dmg (Intel) and
-# The-Retro-Shelf-Setup-<version>.exe, plus the files the app's updater reads (latest*.yml, the Mac .zips).
+# The-Retro-Shelf-Setup-<version>.exe, a portable Windows .zip, The-Retro-Shelf-<version>-linux-x86_64.AppImage,
+# plus the files the app's updater reads (latest*.yml, the Mac .zips).
 # Each build is then checked: the last release updates itself to it (scripts/update-test.mjs), and it's installed,
 # opened and a test game played (scripts/smoke.mjs).
 # Run it by hand from the Actions tab, or push a tag like v0.1.0 to also get a draft release.
@@ -20,6 +21,9 @@ jobs:
             target: mac
           - os: windows-latest
             target: win
+          # an older Ubuntu, so the AppImage runs on older Linux systems too
+          - os: ubuntu-22.04
+            target: linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -54,9 +58,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      # the portable Windows copy: the installed app's files and portable.txt, which keeps everything in a Data folder
+      # beside it (for a USB stick)
+      - name: Portable copy
+        if: matrix.target == 'win'
+        shell: bash
+        run: |
+          v=$(node -p "require('./package.json').version")
+          rm -rf "dist/The Retro Shelf" && cp -r dist/win-unpacked "dist/The Retro Shelf"
+          printf 'The Retro Shelf keeps its games, saves and settings in the Data folder beside it.\r\n' > "dist/The Retro Shelf/portable.txt"
+          (cd dist && 7z a -tzip -mx=5 "The-Retro-Shelf-$v-portable-win.zip" "The Retro Shelf" > /dev/null)
+
       # installs it (Windows), opens it with one small test game, and plays it: a build that can't doesn't get released
       - name: Open the app and play a game
+        if: matrix.target != 'linux'
         run: node scripts/smoke.mjs
+      - name: Open the app and play a game (on a virtual screen)
+        if: matrix.target == 'linux'
+        run: xvfb-run -a --server-args="-screen 0 1920x1080x24" node scripts/smoke.mjs
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -72,6 +91,7 @@ jobs:
             dist/*.dmg
             dist/*.zip
             dist/*.exe
+            dist/*.AppImage
             dist/*.blockmap
             dist/latest*.yml
           if-no-files-found: error

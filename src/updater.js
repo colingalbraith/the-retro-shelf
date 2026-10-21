@@ -36,6 +36,10 @@ function parseFeed(text) {
   return { version, files };
 }
 
+/** the portable Windows copy (a folder with portable.txt beside the app): it keeps everything in its own folder, so it
+    tells you about a new version rather than installing one */
+const portable = () => process.platform === "win32" && fs.existsSync(path.join(path.dirname(process.execPath), "portable.txt"));
+
 class Updater extends EventEmitter {
   constructor() {
     super();
@@ -63,8 +67,11 @@ class Updater extends EventEmitter {
     if (!app.isPackaged && !process.env.RETRO_SHELF_UPDATE_FEED) { this.set({ status: "error", error: "Updates only work in the installed app." }); return this.state; }
     this.set({ status: "checking", error: "" });
     try {
-      if (process.platform === "win32") await this.checkWindows();
-      else if (process.platform === "darwin") await this.checkMac();
+      if (process.platform === "darwin") await this.checkMac();
+      else if (portable()) await this.checkOnly("latest.yml");
+      else if (process.platform === "win32") await this.checkWindows();
+      // Linux: the AppImage replaces itself; run any other way (unpacked, from a package), it only tells you
+      else if (process.platform === "linux") await (process.env.APPIMAGE ? this.checkWindows() : this.checkOnly("latest-linux.yml"));
       else this.set({ status: "idle" });
     } catch (e) {
       // a check that runs by itself fails quietly (no internet, GitHub down); one asked for says why
@@ -103,12 +110,21 @@ class Updater extends EventEmitter {
     try { fs.accessSync(path.dirname(b), fs.constants.W_OK); fs.accessSync(b, fs.constants.W_OK); return b; } catch { return null; }
   }
 
-  /** where this Mac's update comes from: the latest release, or with test versions on, the newest of any kind */
-  async macBase() {
+  /** a new version to download by hand: for copies that can't replace themselves */
+  async checkOnly(name) {
+    const r = await net.fetch(await this.macBase(name) + "/" + name, { cache: "no-store", signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const feed = parseFeed(await r.text());
+    this.set(feed.version && newer(feed.version, app.getVersion()) ? { status: "manual", version: feed.version } : { status: "current" });
+  }
+
+  /** where an update comes from: the latest release, or with test versions on, the newest of any kind (name: the
+      update file to look for, latest-mac.yml by default) */
+  async macBase(name = "latest-mac.yml") {
     if (process.env.RETRO_SHELF_UPDATE_FEED || !this.beta()) return FEED;
     const r = await net.fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { cache: "no-store", headers: { Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(20000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const rel = (await r.json()).filter(x => !x.draft && (x.assets || []).some(a => a.name === "latest-mac.yml"))
+    const rel = (await r.json()).filter(x => !x.draft && (x.assets || []).some(a => a.name === name))
       .sort((a, b) => compare(b.tag_name, a.tag_name))[0];
     return rel ? `https://github.com/${REPO}/releases/download/${encodeURIComponent(rel.tag_name)}` : FEED;
   }
@@ -169,7 +185,7 @@ class Updater extends EventEmitter {
   /** quit now and come back as the new version */
   restart() {
     if (this.state.status !== "ready") return;
-    if (process.platform === "win32") return this.win().quitAndInstall(true, true);
+    if (process.platform === "win32" || process.platform === "linux") return this.win().quitAndInstall(true, true);
     this.relaunch = true;
     app.quit();
   }
