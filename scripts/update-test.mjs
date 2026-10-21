@@ -145,7 +145,9 @@ try {
     env: { ...process.env, ARCADE_HOME: home, RETRO_SHELF_UPDATE_FEED: `http://127.0.0.1:${FEED}`, ...(linux ? { APPIMAGE_EXTRACT_AND_RUN: "1", APPIMAGE: exe } : {}) }, stdio: "ignore" });
   const p = await page();
   await sleep(1500);
-  let s = await p.evaluate(`APP.update("check")`);
+  // the old app answers once it has started (on a slow machine's first launch that's a while after the window opens)
+  let s = null;
+  for (let i = 0; i < 60 && !(s && s.status); i++) { s = await p.evaluate(`APP.update("check").catch(() => null)`); if (!(s && s.status)) await sleep(1000); }
   const end = Date.now() + 5 * 60000;
   while (s && ["checking", "downloading"].includes(s.status) && Date.now() < end) { await sleep(1000); s = await p.evaluate(`APP.update("state")`); }
   if (!s || s.status !== "ready") throw new Error(`the update didn't download: ${JSON.stringify(s)}`);
