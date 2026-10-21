@@ -66,7 +66,11 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
   </tr>
   <tr>
     <td width="55%"><img src="docs/images/collections.jpg" alt="Collections: the Legend of Zelda and Mario Kart series on shelves, with the games not in the library standing faded"></td>
-    <td width="45%"><img src="docs/images/pins.jpg" alt="The corkboard of pins: copper and silver pins earned for playing, and faded ones still to earn with progress bars"></td>
+    <td width="45%"><img src="docs/images/pins.jpg" alt="The corkboard of pins: round bronze and eight-sided silver pins earned for playing, and faded ones still to earn with progress bars"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/recap.jpg" alt="A month's recap card: hours played, sittings, days, the most played games, the longest sitting and the pins earned"></td>
+    <td width="50%"><img src="docs/images/controller-test.jpg" alt="The controller test: a drawing of an Xbox controller with the A button lit up as it's pressed"></td>
   </tr>
 </table>
 
