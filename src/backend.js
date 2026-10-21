@@ -547,7 +547,9 @@ class Backend extends EventEmitter {
         const c = this._watched && this._watched.get(dir);
         if (c) c.dirty = true;
         clearTimeout(this._watchT);
-        this._watchT = setTimeout(() => { try { this.scan(); this.emit("changed"); } catch {} }, 1500);
+        // while games are being added or moved, files arrive one at a time: a look halfway would make a disc list with
+        // only the first discs. Adding and moving look again when they're done
+        this._watchT = setTimeout(() => { if (this.imp.running || this.moving) return; try { this.scan(); this.emit("changed"); } catch {} }, 1500);
         if (this._watchT.unref) this._watchT.unref();
       });
       // watching doesn't keep the app (or a test) running on its own
@@ -711,20 +713,29 @@ class Backend extends EventEmitter {
     const from = path.resolve(this.romsRoot()), to = path.join(path.resolve(String(dest || "")), "Games");
     if (within(to, from)) return [400, { error: "That's inside the games folder." }];
     if (fs.existsSync(to) && fs.readdirSync(to).length) return [409, { error: "There's a Games folder there already, with things in it." }];
-    const files = [];
-    const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.isFile()) files.push([p, fs.statSync(p).size]); } };
-    try { walk(from); } catch (e) { return [500, { error: e.message }]; }
-    this.moving = { done: 0, total: files.reduce((t, f) => t + f[1], 0), files: files.length };
+    const listAll = () => { const out = []; const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.isFile()) out.push([p, fs.statSync(p).size]); } }; walk(from); return out; };
+    let files;
+    try { files = listAll(); } catch (e) { return [500, { error: e.message }]; }
+    const total = files.reduce((t, f) => t + f[1], 0);
+    // room for them all, with a little to spare
+    try { const fsInfo = fs.statfsSync(path.dirname(to)); if (fsInfo.bavail * fsInfo.bsize < total + 50 * 1048576) return [507, { error: `There isn't room there: the games need ${(total / 1073741824).toFixed(1)} GB.` }]; } catch {}
+    const existed = fs.existsSync(to);
+    // nothing else writes into the games folder until it's done (adding games, moving one, new art)
+    this.moving = { done: 0, total, files: files.length };
+    const copy = async ([p, size]) => {
+      const q = path.join(to, path.relative(from, p));
+      await fsp.mkdir(path.dirname(q), { recursive: true });
+      await fsp.copyFile(p, q);
+      if (fs.statSync(q).size !== size) throw new Error(`${path.basename(p)} didn't copy whole`);
+    };
     try {
-      for (const [p, size] of files) {
-        const q = path.join(to, path.relative(from, p));
-        await fsp.mkdir(path.dirname(q), { recursive: true });
-        await fsp.copyFile(p, q);
-        if (fs.statSync(q).size !== size) throw new Error(`${path.basename(p)} didn't copy whole`);
-        this.moving.done += size;
-      }
+      for (const f of files) { await copy(f); this.moving.done += f[1]; }
+      // anything that arrived or changed meanwhile comes too
+      for (const f of listAll()) { const q = path.join(to, path.relative(from, f[0])); let st = null; try { st = fs.statSync(q); } catch {} if (!st || st.size !== f[1]) await copy(f); }
     } catch (e) {
       this.moving = null;
+      // the half-made copy goes (only the copy: the games themselves never moved), so trying again works
+      try { if (existed) for (const n of fs.readdirSync(to)) fs.rmSync(path.join(to, n), { recursive: true, force: true }); else fs.rmSync(to, { recursive: true, force: true }); } catch {}
       return [500, { error: "Couldn't move the games: " + e.message + ". Nothing changed: they're still where they were." }];
     }
     this.paths.roms_dir = to; this.saveSettings();
@@ -812,6 +823,11 @@ class Backend extends EventEmitter {
 
   scan() {
     const found = new Map(), root = this.romsRoot(), adopt = [];
+    // the games folder watched, and a previous one (before it was changed or moved) not any more
+    if (this._root && this._root !== root && this._watchers && !(this.paths.watch || []).includes(this._root)) {
+      const w = this._watchers.get(this._root); if (w) { try { w.close(); } catch {} this._watchers.delete(this._root); }
+    }
+    this._root = root;
     this.watchDir(root);
     for (const [name, s] of Object.entries(this.cfg.systems)) {
       const exts = (s.exts || []).map(e => e.toLowerCase()), folder = s.folder || name;
@@ -1184,6 +1200,7 @@ class Backend extends EventEmitter {
 
   /** use a picture of your own as a game's cover, logo or screenshot: saved next to the game, where it wins */
   async setArt(id, kind, src) {
+    if (this.moving) return [409, { error: "The games are being moved. Try again when that's done." }];
     const g = this.games.get(id);
     if (!g || !["cover", "logo", "snap"].includes(kind)) return [404, { error: "Unknown game." }];
     const ext = path.extname(src).toLowerCase();
@@ -1213,6 +1230,16 @@ class Backend extends EventEmitter {
   moveTo(id, system) {
     const g = this.games.get(id), s = this.cfg.systems[system];
     if (!g || !s) return [404, { error: "Unknown game or system." }];
+    if (this.moving) return [409, { error: "The games are being moved. Try again when that's done." }];
+    if (this.launching || (this.running && this.running.alive && this.running.id === id)) return [409, { error: "Close the game first." }];
+    // a game in a watched folder stays where it is in that folder: only which console it's for changes (its history
+    // stays, as it's known by its path)
+    if (g.watched) {
+      this.state.watchSys = this.state.watchSys || {}; this.state.watchSys[g.path] = system;
+      for (const c of (this._watched || new Map()).values()) c.dirty = true;
+      this.saveState(); this.scan();
+      return [200, { ok: true, id }];
+    }
     const destDir = path.join(this.romsRoot(), s.folder || system), srcDir = path.dirname(g.path);
     try {
       fs.mkdirSync(destDir, { recursive: true });
@@ -1225,9 +1252,15 @@ class Backend extends EventEmitter {
         fs.renameSync(folder, to);
         newPath = path.join(to, path.relative(folder, g.path));
       } else {
-        const moves = files.map(f => [f, path.join(destDir, path.relative(srcDir, f))]);
+        const moves = files.map(f => [f, path.join(destDir, path.relative(srcDir, f))]), done = [];
         if (moves.some(([, to]) => fs.existsSync(to))) return [409, { error: "There's already a game with that name there." }];
-        for (const [from, to] of moves) { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.renameSync(from, to); }
+        try {
+          for (const [from, to] of moves) { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.renameSync(from, to); done.push([from, to]); }
+        } catch (e) {
+          // one file that wouldn't move (another program has it open): the ones that did go back, so it stays whole
+          for (const [from, to] of done.reverse()) { try { fs.renameSync(to, from); } catch {} }
+          throw e;
+        }
         newPath = path.join(destDir, path.basename(g.path));
       }
       this.moveStats(id, gid(newPath));
@@ -1651,6 +1684,7 @@ class Backend extends EventEmitter {
 
   importRun(picks) {
     if (this.imp.running) return [409, { error: "Already adding games." }];
+    if (this.moving) return [409, { error: "The games are being moved. Add these when that's done." }];
     const items = [];
     for (const p of Array.isArray(picks) ? picks : []) {
       const it = this.pending.get(String(p.id));
