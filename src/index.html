@@ -2231,7 +2231,8 @@ function openGetGames() { if (LAUNCH.open) return; leaveScreens("getg"); blurAct
 function closeGetGames() { if (!isOpen("getg")) return; $("#getg").classList.remove("show"); focusById(focusId); light(); beep(330); }
 
 /* ---------- settings ---------- */
-function openSettings() { if (isOpen("settings") || LAUNCH.open) return; leaveScreens("settings"); blurActive(); checkBios(); renderSettings(); $("#settings").classList.add("show"); light(); beep(520); }
+let RAFIND = null;
+function openSettings() { if (isOpen("settings") || LAUNCH.open) return; api("/api/retroarch/find", {}).then(r => { if (r.ok && r.data.games && isOpen("settings")) { RAFIND = r.data; renderSettings(); } }); leaveScreens("settings"); blurActive(); checkBios(); renderSettings(); $("#settings").classList.add("show"); light(); beep(520); }
 /* which BIOS files are in place, for Settings */
 let BIOSST = null;
 function checkBios() { api("/api/bios", {}).then(r => { if (r.ok) { BIOSST = r.data.systems; if (isOpen("settings")) renderSettings(); } }); }
@@ -2308,6 +2309,17 @@ function renderSettings() {
     await refresh(true); renderSettings(); toast(t("{n} from that folder are on the shelves.", {n: plural(r.games, "game", "games")}));
   };
   R(t("Watch a folder"), t("Games in a folder of yours show on the shelves where they are, without being copied. New ones appear by themselves."), wf);
+  /* games another RetroArch on this computer already knows, from its playlists */
+  if (RAFIND && RAFIND.games) {
+    const ri = el("button", "btn", t("Bring them in"));
+    ri.onclick = async () => {
+      const r = await api("/api/retroarch/import", {});
+      if (!r.ok) return toast(r.data.error || t("Couldn't do that."), true);
+      RAFIND = null; await refresh(true); renderSettings();
+      toast(t("{g} from {f} are on the shelves now.", {g: plural(r.data.games, "game", "games"), f: plural(r.data.folders, "folder", "folders")}));
+    };
+    R(t("Games from RetroArch"), t("RetroArch's playlists on this computer list {n} more for {c}. They stay where they are; their folders are watched.", {n: plural(RAFIND.games, "game", "games"), c: RAFIND.consoles.slice(0, 4).join(", ") + (RAFIND.consoles.length > 4 ? "…" : "")}), ri);
+  }
   const gg = el("button", "btn", "Open"); gg.onclick = openGetGames;
   R("Where to get games", "Copying games you own, free homebrew, and official re-releases.", gg);
   const co = el("button", "btn", "Open"); co.onclick = () => openColls();

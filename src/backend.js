@@ -508,6 +508,56 @@ class Backend extends EventEmitter {
     this.scan();
     return [200, { ok: true, games: this.watchedItems(dir).items.length }];
   }
+  // ---------------------------------------------------------------- importing from RetroArch
+  /** where a RetroArch installed on this computer keeps its playlists (not the one that comes with the app) */
+  retroArchPlaylistDirs() {
+    const home = os.homedir(), env = process.env, dirs = [];
+    if (process.platform === "darwin") dirs.push(path.join(home, "Library", "Application Support", "RetroArch", "playlists"), path.join(home, "Documents", "RetroArch", "playlists"));
+    else if (process.platform === "win32") dirs.push(path.join(env.APPDATA || "", "RetroArch", "playlists"), "C:\\RetroArch-Win64\\playlists", "C:\\RetroArch\\playlists");
+    else dirs.push(path.join(home, ".config", "retroarch", "playlists"), path.join(home, ".var", "app", "org.libretro.RetroArch", "config", "retroarch", "playlists"));
+    const own = this.cfg.retroarch && this.cfg.retroarch.exe;
+    if (own) dirs.push(path.join(path.dirname(own), "playlists"));
+    return [...new Set(dirs)].filter(d => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
+  }
+  /**
+   * The games in those playlists that this app can show: [{path, system}]. A playlist names its console the way the
+   * box art does ("Nintendo - Super Nintendo Entertainment System.lpl"), so no guessing. Games already in the games
+   * folder are left out.
+   */
+  retroArchGames() {
+    const bySys = new Map(), root = path.resolve(this.romsRoot()), out = new Map();
+    for (const [name, s] of Object.entries(this.cfg.systems)) for (const t of asList(s.thumbs)) bySys.set(t.toLowerCase(), name);
+    for (const dir of this.retroArchPlaylistDirs()) {
+      let files = [];
+      try { files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith(".lpl")); } catch {}
+      for (const f of files) {
+        let list;
+        try { list = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); } catch { continue; }
+        for (const it of (list && list.items) || []) {
+          const p = String(it.path || "").split("#")[0], system = bySys.get(String(it.db_name || f).replace(/\.lpl$/i, "").toLowerCase());
+          if (!p || !system || out.has(p) || !path.isAbsolute(p) || !fs.existsSync(p)) continue;
+          if (!path.relative(root, p).startsWith("..")) continue;
+          out.set(p, system);
+        }
+      }
+    }
+    return [...out].map(([p, system]) => ({ path: p, system }));
+  }
+  /** brings them in: the folders they're in become watched folders, and each game goes on its playlist's console */
+  importRetroArch() {
+    const games = this.retroArchGames();
+    if (!games.length) return [404, { error: "No RetroArch playlists with games were found on this computer." }];
+    const hints = this.state.watchSys = this.state.watchSys || {};
+    for (const g of games) hints[g.path] = g.system;
+    // the fewest folders that hold them all
+    const dirs = [...new Set(games.map(g => path.dirname(g.path)))].sort((a, b) => a.length - b.length), keep = [];
+    for (const d of dirs) if (!keep.some(k => !path.relative(k, d).startsWith(".."))) keep.push(d);
+    let added = 0;
+    for (const d of keep) if (this.addWatch(d)[0] === 200) added++;
+    this.saveState(); this.scan();
+    return [200, { ok: true, games: games.length, folders: added }];
+  }
+
   /** watched files whose console couldn't be told from what's in them: [{src, name, choices}] */
   watchUnsure() { return this.watchedDirs().flatMap(d => this.watchedItems(d).unsure); }
   /** your choice of console for one of them */
@@ -1554,6 +1604,8 @@ class Backend extends EventEmitter {
       case "/api/games/search": return j(this.gameSearch(d.q));
       case "/api/game/opts": return j(this.setGameOpts(String(d.id || ""), d.opts));
       case "/api/game/info": return j(this.setGameInfo(String(d.id || ""), d));
+      case "/api/retroarch/find": { const games = this.retroArchGames(); return j([200, { games: games.length, consoles: [...new Set(games.map(g => g.system))] }]); }
+      case "/api/retroarch/import": return j(this.importRetroArch());
       case "/api/watch/add": return j(this.addWatch(String(d.dir || "")));
       case "/api/watch/remove": return j(this.removeWatch(String(d.dir || "")));
       case "/api/watch/unsure": return j([200, { files: this.watchUnsure() }]);

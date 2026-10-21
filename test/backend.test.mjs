@@ -389,3 +389,24 @@ test("a watched folder's games show where they are, each on its console's shelf,
   be.removeWatch(dir);
   assert.equal([...be.games.values()].filter(g => g.watched).length, 0);
 });
+
+test("games from RetroArch's playlists come in on their playlist's console, where they are", () => {
+  const ra = path.join(home, "RetroArch", "playlists"), lib = path.join(home, "roms");
+  fs.mkdirSync(ra, { recursive: true }); fs.mkdirSync(path.join(lib, "md"), { recursive: true }); fs.mkdirSync(path.join(lib, "sfc"), { recursive: true });
+  fs.writeFileSync(path.join(lib, "sfc", "Chrono Trigger (USA).sfc"), "");
+  fs.writeFileSync(path.join(lib, "md", "Streets of Rage 2 (USA).bin"), "");        // .bin: could be several consoles; the playlist says
+  put("snes/Super Metroid (USA).sfc");
+  const item = (p, db) => ({ path: p, label: path.basename(p), core_path: "DETECT", core_name: "DETECT", crc32: "DETECT", db_name: db });
+  fs.writeFileSync(path.join(ra, "Nintendo - Super Nintendo Entertainment System.lpl"), JSON.stringify({ version: "1.5", items: [
+    item(path.join(lib, "sfc", "Chrono Trigger (USA).sfc"), "Nintendo - Super Nintendo Entertainment System.lpl"),
+    item(path.join(lib, "sfc", "Gone (USA).sfc"), "Nintendo - Super Nintendo Entertainment System.lpl"),
+    item(path.join(games, "snes", "Super Metroid (USA).sfc"), "Nintendo - Super Nintendo Entertainment System.lpl")] }));
+  fs.writeFileSync(path.join(ra, "Sega - Mega Drive - Genesis.lpl"), JSON.stringify({ version: "1.5", items: [item(path.join(lib, "md", "Streets of Rage 2 (USA).bin"), "Sega - Mega Drive - Genesis.lpl")] }));
+  be.retroArchPlaylistDirs = () => [ra];
+  assert.deepEqual(be.retroArchGames().map(g => [path.basename(g.path), g.system]).sort(), [["Chrono Trigger (USA).sfc", "SNES"], ["Streets of Rage 2 (USA).bin", "Genesis"]]);
+  const [code, res] = be.importRetroArch();
+  assert.equal(code, 200); assert.deepEqual([res.games, res.folders], [2, 2]);
+  assert.deepEqual([...be.paths.watch].sort(), [path.join(lib, "md"), path.join(lib, "sfc")]);   // just the folders they're in
+  const got = [...be.games.values()].filter(g => g.watched).map(g => [g.title, g.system]).sort();
+  assert.deepEqual(got, [["Chrono Trigger", "SNES"], ["Streets of Rage 2", "Genesis"]]);
+});
