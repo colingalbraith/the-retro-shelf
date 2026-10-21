@@ -68,6 +68,9 @@ jobs:
           rm -rf "dist/The Retro Shelf" && cp -r dist/win-unpacked "dist/The Retro Shelf"
           printf 'The Retro Shelf keeps its games, saves and settings in the Data folder beside it.\r\n' > "dist/The Retro Shelf/portable.txt"
           (cd dist && 7z a -tzip -mx=5 "The-Retro-Shelf-$v-portable-win.zip" "The Retro Shelf" > /dev/null)
+      - name: The portable copy keeps to its folder
+        if: matrix.target == 'win'
+        run: node scripts/portable-test.mjs
 
       # installs it (Windows), opens it with one small test game, and plays it: a build that can't doesn't get released
       - name: Open the app and play a game
