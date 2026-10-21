@@ -182,6 +182,12 @@ function gameMenu(id) {
         click: () => { backend.setGameOpts(g.id, { [k]: v }); send({ cmd: "refresh", focus: g.id }); } })),
     ] })),
     ...(!sys[g.system].emulator && !backend.ownEmu() ? [{ label: "Cheats…", click: () => send({ cmd: "cheats", id: g.id }) }] : []),
+    // how far you are with it, how good it is, and a note
+    { label: "Progress", submenu: [["", "Not Set"], ["backlog", "Backlog"], ["playing", "Playing"], ["beaten", "Beaten"], ["complete", "100%"]].map(([v, label]) => ({ label, type: "radio",
+      checked: (backend.state.progress[g.id] || "") === v, click: () => { backend.setGameInfo(g.id, { progress: v || null }); send({ cmd: "refresh", focus: g.id }); } })) },
+    { label: "Rating", submenu: [0, 5, 4, 3, 2, 1].map(n => ({ label: n ? "★".repeat(n) + "☆".repeat(5 - n) : "No Rating", type: "radio",
+      checked: (backend.state.rating[g.id] || 0) === n, click: () => { backend.setGameInfo(g.id, { rating: n || null }); send({ cmd: "refresh", focus: g.id }); } })) },
+    { label: backend.state.notes[g.id] ? "Edit Note…" : "Add a Note…", click: () => send({ cmd: "note", id: g.id }) },
     { label: "Rename…", click: () => send({ cmd: "rename", id: g.id }) },
     { label: "Find Cover…", click: () => send({ cmd: "find-cover", id: g.id }) },
     { label: "Use My Own Cover…", click: () => pickPicture("cover") },

@@ -347,3 +347,18 @@ test("a game whose name starts with a dot is on the shelf; macOS's ._ files and 
   be.scan();
   assert.deepEqual([...be.games.values()].filter(g => g.system === "PS2").map(g => path.basename(g.path)), [".hack - Infection (USA).iso"]);
 });
+
+test("progress, rating and a note for a game: set, cleared, kept when it moves", async () => {
+  put("snes/Super Metroid (Japan, USA) (En,Ja).sfc"); be.scan();
+  const g = byTitle("Super Metroid");
+  assert.equal((await be.route("POST", "/api/game/info", { id: g.id, progress: "beaten", rating: 5, note: "  Found   every\nmissile  " })).code, 200);
+  let x = be.libraryJson().games.find(y => y.id === g.id);
+  assert.deepEqual([x.progress, x.rating, x.note], ["beaten", 5, "Found every missile"]);
+  assert.equal((await be.route("POST", "/api/game/info", { id: g.id, rating: 9 })).code, 400);
+  assert.equal((await be.route("POST", "/api/game/info", { id: g.id, progress: "abandoned" })).code, 400);
+  await be.route("POST", "/api/game/info", { id: g.id, rating: null });                // just the rating goes
+  x = be.libraryJson().games.find(y => y.id === g.id);
+  assert.deepEqual([x.progress, x.rating], ["beaten", 0]);
+  be.moveStats(g.id, "moved");
+  assert.equal(be.state.progress.moved, "beaten"); assert.equal(be.state.notes.moved, "Found every missile");
+});

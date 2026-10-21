@@ -229,6 +229,9 @@ button{cursor:pointer}
 .bk .fresh u{cursor:pointer}
 .bk .acts button.star{padding:.5em .6em;background:none;color:var(--ink)}
 .bk .ms{display:none;margin:0 0 .6em;font-size:.86em;color:var(--ink2)}
+/* your note on a game: two lines at most */
+.bk .nt{margin:.5em 0 0;font-size:.82em;font-style:italic;line-height:1.25;color:var(--ink2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bk dl .nt{grid-column:1 / 3;margin:.15em 0 0;font-weight:400}
 /* tall and small backs: a shorter picture and the record on one line; the full record shows on wide backs */
 .card:not([data-m=wide]) .bk .in{padding:6% 7% 5%}
 .card:not([data-m=wide]) .bk h4{font-size:1.35em}
@@ -715,6 +718,10 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   </div>
 </div>
 
+<div id="notes" class="over"><div class="slip"><h2 id="notest">Note</h2><p>A line or two for yourself, like where you're stuck. It goes on the back of the box.</p>
+  <input type="text" id="notesq" spellcheck="true" autocomplete="off" maxlength="280" placeholder="Stuck on the water temple">
+  <div class="btns"><button class="btn primary" id="notesok">Save</button><button class="btn" id="notesno">Cancel</button></div></div></div>
+
 <div id="nsh" class="over"><div class="slip"><h2 id="nsht">New shelf</h2><p id="nshp">Name it, like Couch co-op or To finish.</p>
   <input type="text" id="nshname" spellcheck="false" autocomplete="off" maxlength="40"><div class="btns"><button class="btn primary" id="nshok">Make shelf</button><button class="btn" id="nshcancel">Cancel</button></div></div></div>
 
@@ -823,14 +830,20 @@ const SORTS = {
   title: byTitle,
   year: (a, b) => ((parseInt(a.year, 10) || 9999) - (parseInt(b.year, 10) || 9999)) || byTitle(a, b),
   played: (a, b) => (b.last || 0) - (a.last || 0) || byTitle(a, b),
+  rating: (a, b) => (b.rating || 0) - (a.rating || 0) || byTitle(a, b),
 };
+/* how far you are with a game, as you set it (progress), in words, and a rating in stars */
+const PROGRESS = {backlog: "Backlog", playing: "Playing", beaten: "Beaten", complete: "100%"};
+const stars = r => "★".repeat(r) + "☆".repeat(5 - r);
 let SHELVES = [];
-/* Settings → Arrange shelves by: the console (as boxes come), a genre, the decade, or whether you've played them */
-const PLAYED = ["Playing lately", "Played before", "Never played"];
+/* Settings → Arrange shelves by: the console (as boxes come), a genre, the decade, or progress: how far you are, as
+   you set it, or else what the play history says */
+const PLAYED = ["Playing", "Backlog", "Played before", "Beaten", "100%", "Never played"];
 function groupOf(g, how, nowS) {
   if (how === "genre") return g.gg || "Other";
   if (how === "decade") { const y = parseInt(g.year, 10); return y ? Math.floor(y / 10) * 10 + "s" : "Year unknown"; }
-  return g.last && nowS - g.last < 14 * 86400 ? PLAYED[0] : g.plays ? PLAYED[1] : PLAYED[2];
+  if (g.progress) return PROGRESS[g.progress];
+  return g.last && nowS - g.last < 14 * 86400 ? "Playing" : g.plays ? "Played before" : "Never played";
 }
 function groupOrder(how, groups) {
   if (how === "decade") return (a, b) => (parseInt(a, 10) || 9999) - (parseInt(b, 10) || 9999);
@@ -1070,6 +1083,9 @@ function sections() {
     /* games added in the last month, unless the whole library is new */
     const nowS = (Date.now() + offset) / 1000, fresh = v.filter(g => g.added && nowS - g.added < 30 * 86400);
     if (fresh.length && fresh.length < v.length) out.push({key: "new", name: "Just added", face: true, games: fresh.sort((a, b) => b.added - a.added).slice(0, 8)});
+    /* your best: four stars and up */
+    const top = v.filter(g => g.rating >= 4).sort(SORTS.rating);
+    if (top.length >= 2) out.push({key: "top", name: t("Top rated"), face: true, games: top.slice(0, 8)});
   }
   const order = SORTS[UI.sort] || byTitle;
   /* shelves people made come first, each box still dressed for its own console */
@@ -1181,7 +1197,14 @@ function fillBack(c, g) {
   row("Last played", fmtWhen(g.last), !g.last);
   row("Played", played || "Not yet", !played);
   if (g.added) row("Added", fmtWhen(g.added).replace(/, .*$/, m => /\d{4}/.test(m) ? m : ""));
+  if (g.progress) row(t("Progress"), t(PROGRESS[g.progress]));
+  if (g.rating) row(t("Rating"), stars(g.rating));
   inn.appendChild(dl);
+  /* small and tall backs have no room for the record: progress and rating go on its one line */
+  const ms = inn.querySelector(".ms");
+  if (ms && (g.progress || g.rating)) ms.textContent += [g.progress && " · " + t(PROGRESS[g.progress]), g.rating && " · " + stars(g.rating)].filter(Boolean).join("");
+  /* your note: under the record on a wide back, on a line of its own on the others */
+  if (g.note) (c.dataset.m === "wide" ? dl : inn).appendChild(el(c.dataset.m === "wide" ? "dd" : "div", "nt", "“" + g.note + "”"));
   /* numbered saves made from the emulator's menu: start from any of them */
   if (sv.slots && sv.slots.length) {
     const sl = el("div", "slots"); sl.appendChild(document.createTextNode("Saves"));
@@ -1230,7 +1253,9 @@ function fitBack(bk, inn) {
   const who = inn.querySelector(".sub2");
   if (who) { who.remove(); if (shrink(.8)) return; }
   if (pic) { pic.remove(); pic = null; }
-  shrink(.7);
+  if (shrink(.7)) return;
+  const nt = inn.querySelector(".nt");
+  if (nt) { nt.remove(); shrink(.7); }
 }
 function hookSlot(c) {
   c.addEventListener("focus", () => select(c));
@@ -1318,7 +1343,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
@@ -1435,7 +1460,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1662,7 +1687,7 @@ async function loadLibrary(force) {
 /* ---------- a controller (or TV remote setup) reaches everything ----------
    In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
    On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
-const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
+const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
 const topPanel = () => PANELS.find(([id]) => isOpen(id));
@@ -1709,6 +1734,18 @@ function openOpts(sub) {
     $("#optst").textContent = "Put " + g.title + " on a shelf";
     SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast((on ? "Took it off " : "Put it on ") + sh.name + "."); }); });
     item("New shelf…", () => openShelfSlip({id: g.id}));
+  } else if (g && (sub === "progress" || sub === "rating")) {
+    /* how far you are, or how good it is */
+    const set = v => async () => {
+      const r = await api("/api/game/info", {id: g.id, [sub]: v});
+      if (!r.ok) return toast(r.data.error || t("Couldn't save that."), true);
+      await refresh(true); focusById(g.id);
+    };
+    $("#optst").textContent = sub === "progress" ? t("How far are you with {title}?", {title: g.title}) : t("Rate {title}", {title: g.title});
+    if (sub === "progress") Object.entries(PROGRESS).forEach(([k, name]) => item((g.progress === k ? "✓ " : "") + t(name), set(k)));
+    else [5, 4, 3, 2, 1].forEach(n => item((g.rating === n ? "✓ " : "") + stars(n), set(n)));
+    list.appendChild(el("i", "sep"));
+    item(sub === "progress" ? t("Not set") : t("No rating"), set(null));
   } else if (g && (sub === "picture" || sub === "shape")) {
     /* this game's own picture or screen shape, over the one in Settings */
     const own = (g.opts || {})[sub], set = v => async () => {
@@ -1729,6 +1766,9 @@ function openOpts(sub) {
       item(sel.classList.contains("flip") ? "Turn back" : "Turn over", () => flip());
       item(FAV.has(g.id) ? "Remove from favorites" : "Add to favorites", () => toggleFav(g.id));
       item("Put on a shelf…", () => setTimeout(() => openOpts("shelf"), 30));
+      item(g.progress ? t("Progress: {p}…", {p: t(PROGRESS[g.progress])}) : t("Progress…"), () => setTimeout(() => openOpts("progress"), 30));
+      item(g.rating ? t("Rating: {s}…", {s: stars(g.rating)}) : t("Rate it…"), () => setTimeout(() => openOpts("rating"), 30));
+      item(g.note ? t("Edit note…") : t("Add a note…"), () => openNote(g.id));
       item(t("Picture…"), () => setTimeout(() => openOpts("picture"), 30));
       item(t("Screen shape…"), () => setTimeout(() => openOpts("shape"), 30));
       if (cons(g.system).builtin && !PATHS.own) item(g.cheats ? t("Cheats ({n} on)…", {n: g.cheats}) : t("Cheats…"), () => openCheats(g.id));
@@ -1991,6 +2031,24 @@ function leaveScreens(keep) {
   for (const id of ["settings", "getg", "colls", "trophy"]) if (id !== keep && isOpen(id)) { $("#" + id).classList.remove("show"); if (id === "colls" && collIO) collIO.disconnect(); }
 }
 
+/* ---------- a note on a game, for yourself ---------- */
+let noteId = null;
+function openNote(id) {
+  const g = byId.get(id); if (!g) return;
+  noteId = id; $("#notest").textContent = t("Note on {title}", {title: g.title}); $("#notesq").value = g.note || "";
+  blurActive(); $("#notes").classList.add("show"); light(); setTimeout(() => { $("#notesq").focus(); $("#notesq").select(); }, 50);
+}
+function closeNote() { if (!isOpen("notes")) return; $("#notes").classList.remove("show"); noteId = null; focusById(focusId); light(); }
+async function saveNote() {
+  const id = noteId; if (!id) return;
+  closeNote();
+  const r = await api("/api/game/info", {id, note: $("#notesq").value});
+  if (!r.ok) return toast(r.data.error || t("Couldn't save the note."), true);
+  await refresh(true); focusById(id);
+}
+$("#notesok").onclick = saveNote; $("#notesno").onclick = closeNote;
+$("#notesq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); saveNote(); } });
+
 /* ---------- signing in to RetroAchievements: the password goes to the app's memory, and from there to RetroArch once ---------- */
 function openRas() { blurActive(); $("#rasu").value = CHEEVOS.user || CHEEVOS.pending || ""; $("#rasp").value = ""; $("#ras").classList.add("show"); light(); setTimeout(() => ($("#rasu").value ? $("#rasp") : $("#rasu")).focus(), 50); }
 function closeRas() { if (!isOpen("ras")) return; $("#ras").classList.remove("show"); $("#rasp").value = ""; light(); }
@@ -2095,8 +2153,8 @@ function renderSettings() {
 
   H("Shelves");
   R("Shelf style", "Spines fit hundreds of games on a wall. Covers show every box face-out.", seg([["spines", "Spines"], ["covers", "Covers"]], UI.shelf, v => { UI.shelf = v; saveUI(); renderShelves(focusId); }));
-  R("Arrange shelves by", "A shelf for each console, or games grouped by genre, by decade, or by whether you've played them.", seg([["console", "Console"], ["genre", "Genre"], ["decade", "Decade"], ["status", "Played"]], UI.arrange || "console", v => { UI.arrange = v; saveUI(); renderShelves(focusId); }));
-  R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
+  R("Arrange shelves by", "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.", seg([["console", "Console"], ["genre", "Genre"], ["decade", "Decade"], ["status", t("Progress")]], UI.arrange || "console", v => { UI.arrange = v; saveUI(); renderShelves(focusId); }));
+  R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"], ["rating", t("Rating")]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
   rg.oninput = () => { UI.card = +rg.value; applyUI(); fitPlates(); light(); }; rg.onchange = () => { saveUI(); renderShelves(focusId); };
   R("Shelf size", "", rg);
@@ -2505,6 +2563,7 @@ document.addEventListener("keydown", e => {
   if ((k === "Enter" || k === " ") && e.target.closest && e.target.closest("button")) return;
   if (isOpen("opts")) { if (k === "Escape") closeOpts(); else if (arrow) { e.preventDefault(); padNav($("#opts"), arrow); } return; }
   if (isOpen("ras")) { if (k === "Escape") closeRas(); else if (k === "Enter") saveRas(); return; }
+  if (isOpen("notes")) { if (k === "Escape") closeNote(); else if (k === "Enter") saveNote(); return; }
   if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
   if (isOpen("pick")) { if (k === "Escape") closePicker(); else if (k === "Enter" && e.target === $("#pq")) searchCovers(); return; }
@@ -2605,6 +2664,7 @@ APP.onMenu(w => {
   else if (w && w.cmd === "rename") openRename(w.id);
   else if (w && w.cmd === "find-cover") openPicker(w.id);
   else if (w && w.cmd === "cheats") openCheats(w.id);
+  else if (w && w.cmd === "note") openNote(w.id);
   else if (w && w.cmd === "new-shelf") openShelfSlip({id: w.id});
   else if (w && w.cmd === "play") play(byId.get(w.id), {fresh: w.fresh});
 });

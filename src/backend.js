@@ -48,6 +48,9 @@ function jsave(p, obj) {
   fs.writeFileSync(p + ".tmp", JSON.stringify(obj, null, 2));
   fs.renameSync(p + ".tmp", p);
 }
+// how far you are with a game (setGameInfo): not started yet, playing it, beaten, or done everything there is (100%)
+const PROGRESS = ["backlog", "playing", "beaten", "complete"];
+
 // what one game can have of its own (setGameOpts): each setting's choices, with the words menus show for them
 const GAME_CHOICES = {
   picture: [["sharp", "Sharp"], ["smooth", "Smooth"], ["crt", "Old TV"], ["lcd", "Handheld"]],
@@ -171,7 +174,7 @@ class Backend extends EventEmitter {
     this.state = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
     // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}]]) if (!this.state[k]) this.state[k] = v;
+    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}]]) if (!this.state[k]) this.state[k] = v;
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
@@ -415,7 +418,8 @@ class Backend extends EventEmitter {
       if (id === from[0]) { this.moveStats(id, to); continue; }
       st.time[to] = (st.time[to] || 0) + (st.time[id] || 0); st.plays[to] = (st.plays[to] || 0) + (st.plays[id] || 0);
       if ((st.last[id] || 0) > (st.last[to] || 0)) st.last[to] = st.last[id];
-      for (const k of ["time", "plays", "last", "names", "gameOpts", "cheats"]) delete st[k][id];
+      for (const k of ["progress", "rating", "notes"]) if (st[k][id] && !st[k][to]) st[k][to] = st[k][id];
+      for (const k of ["time", "plays", "last", "names", "gameOpts", "cheats", "progress", "rating", "notes"]) delete st[k][id];
       for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(id); if (i >= 0) { st[k].splice(i, 1); if (!st[k].includes(to)) st[k].push(to); } }
       for (const sh of st.shelves) { const i = sh.ids.indexOf(id); if (i >= 0) { sh.ids.splice(i, 1); if (!sh.ids.includes(to)) sh.ids.push(to); } }
       for (const ses of st.sessions) if (ses[0] === id) ses[0] = to;
@@ -588,7 +592,7 @@ class Backend extends EventEmitter {
   /** stats belong to a game's id (its path); when the file moves they move with it */
   moveStats(from, to) {
     const st = this.state;
-    for (const k of ["last", "plays", "time", "names", "gameOpts", "cheats"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
+    for (const k of ["last", "plays", "time", "names", "gameOpts", "cheats", "progress", "rating", "notes"]) if (from in st[k]) { st[k][to] = st[k][from]; delete st[k][from]; }
     for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(from); if (i >= 0) st[k][i] = to; }
     for (const sh of st.shelves) { const i = sh.ids.indexOf(from); if (i >= 0) sh.ids[i] = to; }
     for (const ses of st.sessions) if (ses[0] === from) ses[0] = to;
@@ -697,6 +701,27 @@ class Backend extends EventEmitter {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, cheatFiles.write(chosen));
     return true;
+  }
+
+  /**
+   * What you've noted about a game: how far you are (backlog, playing, beaten, complete: 100%), a rating from 1 to 5,
+   * and a short note. Each can be set alone; null or "" clears it.
+   */
+  setGameInfo(id, d) {
+    if (!this.games.has(id)) return [404, { error: "Unknown game." }];
+    const st = this.state, set = (k, v) => { if (v === null || v === "" || v === 0) delete st[k][id]; else st[k][id] = v; };
+    if ("progress" in d) {
+      if (d.progress && !PROGRESS.includes(d.progress)) return [400, { error: "Not a choice: " + d.progress }];
+      set("progress", d.progress || null);
+    }
+    if ("rating" in d) {
+      const r = d.rating === null ? 0 : Number(d.rating);
+      if (!Number.isInteger(r) || r < 0 || r > 5) return [400, { error: "A rating goes from 1 to 5." }];
+      set("rating", r);
+    }
+    if ("note" in d) set("notes", String(d.note || "").replace(/\s+/g, " ").trim().slice(0, 280));
+    this.saveState();
+    return [200, { ok: true }];
   }
 
   /** the settings a game plays with: the app's, then its own. "By console" pictures become that console's own */
@@ -1348,6 +1373,7 @@ class Backend extends EventEmitter {
         plays: st.plays[g.id] || 0, time: st.time[g.id] || 0, last: st.last[g.id] || 0,
         added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "", gg: pins.genreGroup(g.genre),
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null, cheats: (st.cheats[g.id] || []).length,
+        progress: st.progress[g.id] || "", rating: st.rating[g.id] || 0, note: st.notes[g.id] || "",
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES,
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
@@ -1438,6 +1464,7 @@ class Backend extends EventEmitter {
       case "/api/shelves": return j(this.shelfOp(d));
       case "/api/games/search": return j(this.gameSearch(d.q));
       case "/api/game/opts": return j(this.setGameOpts(String(d.id || ""), d.opts));
+      case "/api/game/info": return j(this.setGameInfo(String(d.id || ""), d));
       case "/api/cheats": return j(await this.cheatList(String(d.id || "")));
       case "/api/cheevos/signin": return j(this.cheevosSignIn(d.user, d.pass));
       case "/api/cheevos/signout": return j(this.cheevosSignOut());
