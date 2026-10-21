@@ -14,12 +14,18 @@
 @property --ly{syntax:"<length>";inherits:true;initial-value:0px}
 :root{
   --wall:#1e1c1a;--wall-hi:#272420;--floor:#141210;
+  /* the shelves' wood, from the dark edge to the lit front and the shadow under it */
+  --w0:#3f2a1a;--w1:#876041;--w2:#8d6644;--w3:#a67b54;--w4:#5f412a;--w5:#573b25;--w6:#24170d;--w7:#4f3622;
   --chalk:#ddd6c8;--dust:#8b8478;
   --paper:#ece6d6;--paper-hi:#f4efe3;--ink:#1c1916;--ink2:#5f584d;
   --acc:rgb(226,88,43);--accf:#fff;--card:170px;
   --disp:"Plex Cond","IBM Plex Sans Condensed","Arial Narrow",sans-serif;
   --mono:"Plex Mono","IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
+/* shelf themes: the wood (walnut by default), and a lighter wall */
+html[data-wood="oak"]{--w0:#6e4f2c;--w1:#c09663;--w2:#c79d68;--w3:#dfbb86;--w4:#a27845;--w5:#94693b;--w6:#46301a;--w7:#8a6236}
+html[data-wood="white"]{--w0:#a29c90;--w1:#e2ddd2;--w2:#e8e4da;--w3:#f8f6f0;--w4:#cfc9bc;--w5:#c4bdaf;--w6:#77726a;--w7:#bcb5a7}
+html[data-wall="light"]{--wall:#cdc4b2;--wall-hi:#dcd4c4;--floor:#b9af9b;--chalk:#2a2520;--dust:#5d554a}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--wall);color:var(--chalk);font:16px/1.4 var(--disp);overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none}
@@ -39,11 +45,11 @@ button{cursor:pointer}
   --A:calc(var(--card) * 1.05 + 40px);--rowh:calc(var(--A) + 58px);
   display:flex;flex-wrap:wrap;align-items:flex-start;column-gap:2px;padding:0 56px;
   background-image:linear-gradient(180deg,
-    transparent var(--A),#3f2a1a var(--A),#3f2a1a calc(var(--A) + 2px),
-    #876041 calc(var(--A) + 2px),#8d6644 calc(var(--A) + 10px),
-    #a67b54 calc(var(--A) + 10px),#a67b54 calc(var(--A) + 11px),
-    #5f412a calc(var(--A) + 11px),#573b25 calc(var(--A) + 33px),
-    #24170d calc(var(--A) + 33px),rgba(0,0,0,.5) calc(var(--A) + 34px),transparent calc(var(--A) + 56px));
+    transparent var(--A),var(--w0) var(--A),var(--w0) calc(var(--A) + 2px),
+    var(--w1) calc(var(--A) + 2px),var(--w2) calc(var(--A) + 10px),
+    var(--w3) calc(var(--A) + 10px),var(--w3) calc(var(--A) + 11px),
+    var(--w4) calc(var(--A) + 11px),var(--w5) calc(var(--A) + 33px),
+    var(--w6) calc(var(--A) + 33px),rgba(0,0,0,.5) calc(var(--A) + 34px),transparent calc(var(--A) + 56px));
   background-size:100% var(--rowh);
 }
 .row.face{column-gap:26px}
@@ -318,7 +324,7 @@ html:not([data-fx="off"]) #launch.show{animation:fade .2s ease}
 html:not([data-fx="off"]) #launch.closing{animation:fadeout .2s ease forwards}
 .lbody{text-align:center;padding:24px;max-width:680px}
 .lart{--card:min(250px,30vh);display:flex;justify-content:center;align-items:flex-end;padding-bottom:22px;margin:0 auto 26px;
-  background:linear-gradient(180deg,#3f2a1a 0 2px,#8d6644 2px 8px,#a67b54 8px 9px,#573b25 9px 28px) bottom/min(440px,80vw) 28px no-repeat}
+  background:linear-gradient(180deg,var(--w0) 0 2px,var(--w2) 2px 8px,var(--w3) 8px 9px,var(--w5) 9px 28px) bottom/min(440px,80vw) 28px no-repeat}
 .lslot{height:var(--h);width:var(--cw);perspective:1400px}
 .lslot .box{top:0;transform:rotateY(-90deg)}
 html:not([data-fx="off"]) #launch.show .lslot{animation:fade .35s ease both}
@@ -379,7 +385,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .tsum b{color:var(--chalk);font:700 44px/1 var(--disp);letter-spacing:-.01em;margin-right:10px;vertical-align:-4px}
 /* the plank: the same wood as the shelves */
 .tshelf{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:34px;margin-top:46px;padding:0 20px 58px;
-  background:linear-gradient(180deg,#3f2a1a 0,#3f2a1a 2px,#876041 2px,#8d6644 10px,#a67b54 10px,#a67b54 11px,#5f412a 11px,#573b25 33px,#24170d 33px,rgba(0,0,0,.5) 34px,transparent 56px) left bottom / 100% 56px no-repeat}
+  background:linear-gradient(180deg,var(--w0) 0,var(--w0) 2px,var(--w1) 2px,var(--w2) 10px,var(--w3) 10px,var(--w3) 11px,var(--w4) 11px,var(--w5) 33px,var(--w6) 33px,rgba(0,0,0,.5) 34px,transparent 56px) left bottom / 100% 56px no-repeat}
 .tro{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;transform:rotate(var(--rz, 0deg));transform-origin:50% 100%}
 .tro .art{position:relative;height:var(--th);box-shadow:0 10px 18px rgba(0,0,0,.55),0 2px 3px rgba(0,0,0,.6)}
 .tro .art img{display:block;height:100%;width:auto}
@@ -431,7 +437,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .colh .lnk{border:0;background:none;padding:0;color:var(--dust);font:500 13px var(--disp);text-decoration:underline;text-underline-offset:3px}
 .colh .lnk:hover{color:var(--chalk)}
 .strip{display:flex;align-items:flex-end;gap:16px;overflow-x:auto;padding:14px 18px 30px;scrollbar-width:thin;scrollbar-color:#3a352f transparent;
-  background:linear-gradient(180deg,#3f2a1a 0,#3f2a1a 2px,#876041 2px,#8d6644 8px,#a67b54 8px,#a67b54 9px,#5f412a 9px,#4f3622 22px,rgba(0,0,0,.45) 23px,transparent 34px) left bottom / 100% 34px no-repeat}
+  background:linear-gradient(180deg,var(--w0) 0,var(--w0) 2px,var(--w1) 2px,var(--w2) 8px,var(--w3) 8px,var(--w3) 9px,var(--w4) 9px,var(--w7) 22px,rgba(0,0,0,.45) 23px,transparent 34px) left bottom / 100% 34px no-repeat}
 .ci{position:relative;flex:none;padding:0;border:0;background:none;cursor:pointer}
 .ci .art{display:block;height:128px;box-shadow:0 8px 14px rgba(0,0,0,.5)}
 .ci img{display:block;height:100%;width:auto;max-width:210px;object-fit:contain}
@@ -448,6 +454,23 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .cmore button{border:0;background:none;padding:0;color:var(--chalk);font:inherit;text-decoration:underline;text-underline-offset:3px}
 .slip.wide{width:560px;max-width:86vw}
 #waddr{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15)}
+/* the screensaver: the shelves drift behind, pictures from your games fade through in front */
+#saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,9,8,.6);opacity:0;visibility:hidden;transition:opacity 1.5s,visibility 1.5s;cursor:none}
+#saver.show{opacity:1;visibility:visible}
+.svpic{position:relative;width:70vw;height:62vh}
+.svpic img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity 2.2s;filter:drop-shadow(0 24px 40px rgba(0,0,0,.75))}
+.svpic img.on{opacity:1}
+.svcap{min-height:1.4em;margin:26px 0 0;font:700 24px var(--disp);color:#ece6d6;text-shadow:0 2px 8px rgba(0,0,0,.8);opacity:0;transition:opacity 1.2s}
+.svcap.on{opacity:1}
+.svcap small{display:block;margin-top:4px;font:600 13px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#b5ad9f}
+/* every key and button, in two columns */
+.kcols{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin:8px 0 14px;max-height:62vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
+.kcols h3{margin:0 0 6px;font:700 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+.kcols dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:13.5px;align-items:baseline}
+.kcols dt{justify-self:start;padding:1px 7px;border:1.5px solid var(--ink);border-radius:4px;font:700 12px var(--mono);white-space:nowrap}
+.kcols dd{margin:0}
+.kcols .kh{grid-column:1/-1;margin-top:8px;font:700 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+@media (max-width:760px){.kcols{grid-template-columns:1fr}}
 /* a month's or a year's play on one card, on its own bit of wall for saving as a picture */
 #recap .rcw{display:flex;flex-direction:column;align-items:center;gap:12px;max-height:100vh;overflow-y:auto;padding:16px}
 .rcnav{display:flex;gap:10px;align-items:center}
@@ -507,7 +530,8 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 #waddr button span{color:var(--ink2);font-size:13px;white-space:nowrap}
 #waddr button:hover,#waddr button:focus-visible{background:rgba(28,25,22,.06);outline:none}
 /* ---------- controller: options menu, on-screen keyboard, and where the focus is ---------- */
-#optl{display:flex;flex-direction:column;margin-top:10px}
+#optl{display:flex;flex-direction:column;margin-top:10px;max-height:calc(100vh - 150px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
+#optl button{flex:none}
 #optl button{padding:11px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.12);background:none;text-align:left;color:var(--ink);font:600 17px var(--disp)}
 #optl button:hover,#optl button:focus{background:rgba(28,25,22,.07);outline:none;padding-left:12px}
 #optl .sep{height:10px}
@@ -794,6 +818,12 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   <p class="cthint" id="cthint"></p>
   <div class="btns"><button class="btn primary" id="ctdone">Done</button></div></div></div>
 
+<div id="saver" aria-hidden="true"><div class="svpic"><img id="sva" alt=""><img id="svb" alt=""></div><p class="svcap" id="svcap"></p></div>
+
+<div id="keys" class="over"><div class="slip wide"><h2>Buttons and keys</h2>
+  <div class="kcols"><div><h3>Keyboard</h3><dl id="kkb"></dl></div><div><h3 id="kpadh">Controller</h3><dl id="kpad"></dl></div></div>
+  <div class="btns"><button class="btn primary" id="keysok">Done</button></div></div></div>
+
 <div id="recap" class="over"><div class="rcw">
   <div class="rcnav"><button class="btn" id="rcprev" aria-label="Earlier">‹</button><div class="seg ctabs" id="rcseg"><button data-k="month">Month</button><button data-k="year">Year</button></div><button class="btn" id="rcnext" aria-label="Later">›</button></div>
   <div class="rcshot" id="rcshot"><div class="tcard rcard" id="rcard"></div></div>
@@ -949,6 +979,7 @@ function applyUI() {
   HTML.dataset.fx = (UI.fx === "full" && rm) ? "reduced" : UI.fx;
   HTML.style.setProperty("--card", UI.card + "px");
   setAcc(hexRgb(UI.accent));
+  HTML.dataset.wood = UI.wood || "walnut"; HTML.dataset.wall = UI.wall || "dark";
   if (UI.hints || UI.tv) { clearTimeout(hintT); $("#hintbar").classList.remove("gone"); }
   applyTv();
 }
@@ -1435,7 +1466,7 @@ function renderShelves(keep) {
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "ctest", "recap", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "ctest", "recap", "keys", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
@@ -1552,7 +1583,7 @@ function placeBox(c, zv, lift, vx, vy) {
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
   const L = $("#light");
-  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("lst") || isOpen("ctest") || isOpen("recap") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
+  if (!sel || LAUNCH.open || isOpen("settings") || isOpen("imp") || isOpen("getg") || isOpen("pick") || isOpen("trophy") || isOpen("colls") || isOpen("wadd") || isOpen("cheat") || isOpen("ras") || isOpen("notes") || isOpen("lst") || isOpen("ctest") || isOpen("recap") || isOpen("keys") || isOpen("opts") || isOpen("ren") || isOpen("nsh") || isOpen("welcome") || isOpen("news") || !document.body.contains(sel)) { L.classList.remove("on"); return; }
   const r = sel.getBoundingClientRect(), b = sel.querySelector(".box");
   L.style.setProperty("--lx", Math.round(r.left + r.width / 2) + "px");
   const fl = sel.classList.contains("flip") && sel._lit;
@@ -1839,7 +1870,7 @@ async function loadLibrary(force) {
 /* ---------- a controller (or TV remote setup) reaches everything ----------
    In any panel the d-pad moves between its controls, A presses, B goes back; text boxes get an on-screen keyboard.
    On the shelf, Select (or O on a keyboard) opens a game's options: everything the right-click menu has, and more */
-const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["ctest", () => closeCtest()], ["lst", () => closeList()], ["recap", () => closeRecap()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
+const PANELS = [["osk", () => closeOsk()], ["cheat", () => closeCheats()], ["ras", () => closeRas()], ["notes", () => closeNote()], ["ctest", () => closeCtest()], ["lst", () => closeList()], ["recap", () => closeRecap()], ["keys", () => closeKeys()], ["imp", () => $("#icancel").click()], ["opts", () => closeOpts()], ["wadd", () => closeWantAdd()],
   ["nsh", () => closeShelfSlip()], ["ren", () => closeRename()], ["welcome", () => closeWelcome()], ["news", () => closeNews()], ["pick", () => closePicker()],
   ["colls", () => closeColls()], ["trophy", () => closeTrophy()], ["getg", () => closeGetGames()], ["settings", () => closeSettings()]];
 const topPanel = () => PANELS.find(([id]) => isOpen(id));
@@ -1955,6 +1986,7 @@ function openOpts(sub) {
       item(t("Let go of the picked games"), () => clearPicks());
     }
     item(t("Surprise me"), () => surprise());
+    item(t("Buttons and keys"), () => openKeys());
     item("Search…", () => { $("#q").focus(); paintQ(); if (Date.now() - padAt < 2000) openOsk($("#q")); });
     item("Collections", () => openColls());
     item("Your play", () => openTrophy());
@@ -2219,6 +2251,188 @@ async function showNews() {
   blurActive(); $("#news").classList.add("show"); light();
 }
 function closeNews() { if (!isOpen("news")) return; $("#news").classList.remove("show"); api("/api/whatsnew/seen", {}); light(); focusById(focusId); offerRecap(); }
+
+/* ---------- the screensaver: in TV mode, after some minutes with nothing pressed ---------- */
+let lastInput = Date.now(), SAVER = null, saverMouse = null;
+const anyScreen = () => !!topPanel() || ["settings", "getg", "colls", "trophy"].some(isOpen);
+function saverPics() {
+  const shots = [], covers = [];
+  for (const g of G) {
+    if (g.hidden) continue;
+    const sv = g.saves || {}, cap = [g.title, g.system];
+    if (sv.resume && sv.rpic && !hardcore()) shots.push(["/state/" + g.id + "/auto?v=" + sv.resume, cap]);
+    else if (g.sv) shots.push(["/snap/" + g.id + "?v=" + g.sv, cap]);
+    if (g.cv) covers.push(["/cover/" + g.id + "?v=" + g.cv, cap]);
+  }
+  const mix = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  /* screens from the games first; boxes when there are few; and with no pictures at all, the names alone */
+  const pics = shots.length >= 4 ? shots : shots.concat(covers);
+  return mix(pics.length ? pics : G.filter(g => !g.hidden).map(g => [null, [g.title, g.system]]));
+}
+function startSaver() {
+  if (SAVER) return;
+  const sh = $("#shelves");
+  SAVER = {top: sh.scrollTop, pics: saverPics(), i: 0, dir: 1, raf: 0, timer: 0, front: $("#sva")};
+  $("#sva").className = $("#svb").className = ""; $("#svcap").className = "svcap"; clear($("#svcap"));
+  $("#saver").classList.add("show");
+  /* the shelves drift down and back up, slowly */
+  let last = performance.now();
+  const drift = now => {
+    if (!SAVER) return;
+    const max = sh.scrollHeight - sh.clientHeight;
+    sh.scrollTop += SAVER.dir * (now - last) * .02; last = now;
+    if (sh.scrollTop >= max - 1) SAVER.dir = -1; else if (sh.scrollTop <= 0) SAVER.dir = 1;
+    SAVER.raf = requestAnimationFrame(drift);
+  };
+  SAVER.raf = requestAnimationFrame(drift);
+  const next = () => {
+    if (!SAVER || !SAVER.pics.length) return;
+    const [src, cap] = SAVER.pics[SAVER.i++ % SAVER.pics.length], back = SAVER.front === $("#sva") ? $("#svb") : $("#sva");
+    const show = () => {
+      if (!SAVER) return;
+      if (src) { back.classList.add("on"); SAVER.front.classList.remove("on"); SAVER.front = back; }
+      const c = $("#svcap"); c.classList.remove("on");
+      setTimeout(() => { if (!SAVER) return; clear(c); c.appendChild(document.createTextNode(cap[0])); c.appendChild(el("small", "", cap[1])); c.classList.add("on"); }, 700);
+    };
+    clearTimeout(SAVER.timer);
+    if (src) { back.onload = show; back.onerror = () => { if (SAVER) SAVER.timer = setTimeout(next, 100); }; back.src = src; } else show();
+    SAVER.timer = setTimeout(next, 8000);
+  };
+  next();
+}
+function stopSaver() {
+  if (!SAVER) return false;
+  cancelAnimationFrame(SAVER.raf); clearTimeout(SAVER.timer);
+  $("#shelves").scrollTop = SAVER.top; SAVER = null;
+  $("#saver").classList.remove("show"); lastInput = Date.now();
+  return true;
+}
+/* anything pressed wakes it, and does nothing else */
+let wokeByClick = false;
+const woke = e => { lastInput = Date.now(); if (stopSaver() && e.cancelable) { e.preventDefault(); e.stopImmediatePropagation(); if (e.type === "mousedown") wokeByClick = true; } };
+for (const type of ["keydown", "mousedown"]) window.addEventListener(type, woke, {capture: true});
+/* scrolling doesn't wait for this: the wheel and touches only wake it */
+for (const type of ["wheel", "touchstart"]) window.addEventListener(type, () => { lastInput = Date.now(); stopSaver(); }, {capture: true, passive: true});
+window.addEventListener("click", e => { if (wokeByClick) { wokeByClick = false; e.preventDefault(); e.stopImmediatePropagation(); } }, {capture: true});
+window.addEventListener("mousemove", e => {
+  /* a nudge of a few pixels (a table bumped) doesn't count */
+  if (saverMouse && Math.abs(e.screenX - saverMouse[0]) + Math.abs(e.screenY - saverMouse[1]) < 8) return;
+  saverMouse = [e.screenX, e.screenY]; lastInput = Date.now(); stopSaver();
+}, {capture: true});
+setInterval(() => {
+  const idle = Date.now() - Math.max(lastInput, padAt);
+  if (SAVER && (STATUS.running || LAUNCH.open || !UI.tv)) stopSaver();
+  else if (!SAVER && UI.tv && UI.saver > 0 && idle > UI.saver * 60000 && !STATUS.running && !LAUNCH.open && !anyScreen() && document.hasFocus()) startSaver();
+}, 5000);
+
+/* ---------- menu music: little tunes the app makes up as it plays them, so there's no recording to license ---------- */
+const MUSIC = {on: false, timer: 0, next: 0, step: 0, loops: 0, tune: null, out: null, seed: Math.floor(Math.random() * 1e9)};
+const MUSIC_VOL = {quiet: .05, medium: .1, loud: .18};
+/* a tune from a number: the same number makes the same tune. Four bars of a chord progression, twice, with a bass,
+   an arpeggio, a melody that leans on the chords' notes, and a soft hi-hat */
+function makeTune(seed) {
+  let x = (seed >>> 0) || 1;
+  const rnd = () => (x = (Math.imul(x, 1103515245) + 12345) >>> 0) / 4294967296, pick = a => a[Math.floor(rnd() * a.length)];
+  const minor = rnd() < .35, scale = minor ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
+  const prog = pick(minor ? [[0, 5, 6, 4], [0, 3, 4, 0], [0, 6, 5, 4], [0, 5, 3, 4]] : [[0, 5, 3, 4], [0, 3, 4, 0], [0, 4, 5, 3], [3, 4, 0, 5], [0, 3, 0, 4]]);
+  const root = 45 + pick([0, 2, 3, 5, 7]), bpm = 88 + Math.floor(rnd() * 36);
+  const note = (deg, oct) => root + 12 * (oct + Math.floor(deg / 7)) + scale[((deg % 7) + 7) % 7];
+  const steps = [];
+  let deg = 7 + prog[0] + pick([0, 2, 4]);
+  const bars = [];
+  for (let b = 0; b < 4; b++) {
+    const ch = prog[b], tones = [ch, ch + 2, ch + 4], bar = [];
+    for (let i = 0; i < 8; i++) {
+      const s = {bass: i % 4 === 0 ? note(ch, 0) : i % 4 === 2 && rnd() < .5 ? note(ch, 1) : null, arp: note(tones[i % 3] + 7, 0), hat: i % 2 === 1, lead: null, len: 1};
+      /* the melody: on the beat a note of the chord, between beats a step up or down; a rest now and then */
+      if (rnd() < (i % 2 ? .55 : .8)) {
+        if (i % 2 === 0) { const c = tones.map(t => t + 7 * Math.round((deg - t) / 7)); deg = c.reduce((a, b) => Math.abs(b - deg) < Math.abs(a - deg) ? b : a); }
+        else deg += pick([-1, 1, 1, -2, 2]);
+        deg = Math.max(5, Math.min(16, deg));
+        s.lead = note(deg, 1); s.len = rnd() < .3 ? 2 : 1;
+      }
+      bar.push(s);
+    }
+    bars.push(bar);
+  }
+  /* bar three answers bar one; the last bar comes home to the first chord's note */
+  bars[2] = bars[2].map((s, i) => i < 4 && bars[0][i].lead ? {...s, lead: bars[0][i].lead} : s);
+  bars[3][6] = {...bars[3][6], lead: note(7 + prog[0], 1), len: 2}; bars[3][7] = {...bars[3][7], lead: null};
+  for (let r = 0; r < 2; r++) for (const bar of bars) for (const s of bar) steps.push(s);
+  return {bpm, steps};
+}
+let DUTY = null;
+function voice(type, midi, t, dur, vol) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  if (type === "pulse") { DUTY = DUTY || AC.createPeriodicWave(...(() => { const n = 24, re = new Float32Array(n), im = new Float32Array(n); for (let k = 1; k < n; k++) im[k] = 2 / (k * Math.PI) * Math.sin(k * Math.PI * .25); return [re, im]; })()); o.setPeriodicWave(DUTY); }
+  else o.type = type;
+  o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(vol * .45, t + dur * .6); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(MUSIC.out); o.start(t); o.stop(t + dur + .02);
+}
+let HAT = null;
+function hat(t) {
+  if (!HAT) {
+    const len = Math.floor(AC.sampleRate * .03), d = (HAT = AC.createBuffer(1, len, AC.sampleRate)).getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  }
+  const src = AC.createBufferSource(), hp = AC.createBiquadFilter(), g = AC.createGain();
+  hp.type = "highpass"; hp.frequency.value = 7000; g.gain.value = .12;
+  src.buffer = HAT; src.connect(hp); hp.connect(g); g.connect(MUSIC.out); src.start(t);
+}
+function musicVolume() { if (MUSIC.out) MUSIC.out.gain.setTargetAtTime(MUSIC.on ? MUSIC_VOL[UI.musicVol] || MUSIC_VOL.medium : 0, AC.currentTime, .4); }
+function newTune() { MUSIC.seed = (MUSIC.seed + 7919) % 1e9; MUSIC.tune = makeTune(MUSIC.seed); MUSIC.step = 0; MUSIC.loops = 0; }
+function startMusic() {
+  try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  if (AC.state === "suspended") AC.resume();
+  if (!MUSIC.out) { const lp = AC.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200; MUSIC.out = AC.createGain(); MUSIC.out.gain.value = 0; MUSIC.out.connect(lp); lp.connect(AC.destination); }
+  if (!MUSIC.tune) newTune();
+  MUSIC.on = true; musicVolume(); MUSIC.next = AC.currentTime + .1;
+  clearInterval(MUSIC.timer);
+  MUSIC.timer = setInterval(() => {
+    /* a little ahead of time, so the notes land on the beat */
+    while (MUSIC.next < AC.currentTime + .25) {
+      const tu = MUSIC.tune, s = tu.steps[MUSIC.step], e = 30 / tu.bpm;
+      if (s.lead) voice("pulse", s.lead, MUSIC.next, e * s.len * .95, .16);
+      if (s.bass) voice("triangle", s.bass, MUSIC.next, e * 1.8, .3);
+      voice("square", s.arp, MUSIC.next, e * .5, .025);
+      if (s.hat) hat(MUSIC.next);
+      MUSIC.next += e;
+      if (++MUSIC.step >= tu.steps.length) { MUSIC.step = 0; if (++MUSIC.loops >= 3) { newTune(); MUSIC.next += e * 4; } }
+    }
+  }, 60);
+}
+function stopMusic() { MUSIC.on = false; musicVolume(); clearInterval(MUSIC.timer); MUSIC.timer = 0; }
+/* on the shelves only: not during a game, and not while the window is behind others */
+function musicTick() {
+  const want = !!UI.music && !STATUS.running && !LAUNCH.open && document.hasFocus();
+  if (want && !MUSIC.on) startMusic(); else if (!want && MUSIC.on) stopMusic();
+}
+setInterval(musicTick, 1000);
+window.addEventListener("blur", musicTick); window.addEventListener("focus", musicTick);
+
+/* ---------- every key and button on one sheet: ? on a keyboard, or Buttons and keys in the options ---------- */
+let keysFrom = null;
+function openKeys() {
+  if (LAUNCH.open) return;
+  const nm = PAD_NAMES[padStyle()], nin = padStyle() === "nintendo", fill = (dl, rows) => { clear(dl); for (const [k, what] of rows) {
+    if (!what) { dl.appendChild(el("div", "kh", k)); continue; }
+    dl.appendChild(el("dt", "", k)); dl.appendChild(el("dd", "", what));
+  } };
+  fill($("#kkb"), [[t("On the shelves")], ["← → ↑ ↓", t("Browse")], ["Enter", t("Play")], [t("Space"), t("Turn the box over")], ["F", t("Favorite")],
+    ["Q  E", t("Previous or next shelf")], ["/", t("Search")], ["O", t("Options for the game")], ["S", t("Settings")], ["R", t("Surprise me")],
+    ["X", t("Pick (to do things to several at once)")], ["?", t("This sheet")], ["Esc", t("Back")],
+    [t("In a game")], ["Esc", t("Back to the shelves")], ["F1", t("The emulator's menu")], [t("Hold R"), t("Rewind")], [t("Hold L"), t("Fast-forward")], ["E  D  E", t("Change discs")]]);
+  $("#kpadh").textContent = t("Controller") + " (" + {xbox: "Xbox", playstation: "PlayStation", nintendo: "Nintendo"}[padStyle()] + ")";
+  fill($("#kpad"), [[t("On the shelves")], [t("D-pad"), t("Browse")], [nm[nin ? 1 : 0], t("Play")], [nm[nin ? 0 : 1], t("Back")], [nm[nin ? 2 : 3], t("Turn the box over")],
+    [nm[nin ? 3 : 2], t("Favorite")], [nm[4] + "  " + nm[5], t("Previous or next shelf")], [nm[8], t("Options, and this sheet")], [nm[9], t("Settings")],
+    [t("In a game")], [t("Hold {b}", {b: nm[9]}), t("Back to the shelves")], [t("Hold {b}", {b: nm[8]}), t("The emulator's menu")],
+    [t("Hold {b}", {b: nm[6]}), t("Rewind")], [t("Hold {b}", {b: nm[7]}), t("Fast-forward")]]);
+  keysFrom = opener(); blurActive(); $("#keys").classList.add("show"); light(); beep(520);
+  setTimeout(() => $("#keysok").focus({preventScroll: true}), 40);
+}
+function closeKeys() { if (!isOpen("keys")) return; $("#keys").classList.remove("show"); backTo(keysFrom); light(); beep(330); }
+$("#keysok").onclick = closeKeys;
 
 /* ---------- a month's or a year's play on one card: offered once when a month starts, and from Your play ---------- */
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -2648,6 +2862,8 @@ function renderSettings() {
 
   H("Shelves");
   R("Shelf style", "Spines fit hundreds of games on a wall. Covers show every box face-out.", seg([["spines", "Spines"], ["covers", "Covers"]], UI.shelf, v => { UI.shelf = v; saveUI(); renderShelves(focusId); }));
+  R(t("Wood"), t("Walnut, honey oak, or shelves painted white."), seg([["walnut", t("Walnut")], ["oak", t("Oak")], ["white", t("Painted white")]], UI.wood || "walnut", v => { UI.wood = v; saveUI(); applyUI(); }));
+  R(t("Wall"), t("A dark wall like a den, or a light one like a living room."), seg([["dark", t("Dark")], ["light", t("Light")]], UI.wall || "dark", v => { UI.wall = v; saveUI(); applyUI(); }));
   R("Arrange shelves by", "A shelf for each console, or games grouped by genre, by decade, or by how far you are with them.", seg([["console", "Console"], ["genre", "Genre"], ["decade", "Decade"], ["status", t("Progress")]], UI.arrange || "console", v => { UI.arrange = v; saveUI(); renderShelves(focusId); }));
   R("Sort by", "The order of the games on each shelf.", seg([["title", "Title"], ["year", "Year"], ["played", "Last played"], ["rating", t("Rating")]], UI.sort || "title", v => { UI.sort = v; saveUI(); renderShelves(focusId); }));
   const rg = document.createElement("input"); rg.type = "range"; rg.min = 110; rg.max = 280; rg.step = 10; rg.value = UI.card;
@@ -2829,7 +3045,15 @@ function renderSettings() {
   H("App");
   R("TV mode", "For a computer hooked up to a TV: opens fullscreen and bigger, and everything works with a controller. Select opens a game's options.", sw(!!UI.tv, v => { UI.tv = v; saveUI(); applyUI(); APP.tvMode(v); }));
   R("Animations", "Choose Reduced or Off on older computers.", seg([["full", "Full"], ["reduced", "Reduced"], ["off", "Off"]], UI.fx, v => { UI.fx = v; applyUI(); saveUI(); }));
+  R(t("Screensaver"), t("In TV mode, after a while with nothing pressed: the shelves drift and pictures from your games fade through. Any button wakes it."),
+    seg([[0, t("Off")], [5, t("5 min")], [10, t("10 min")], [20, t("20 min")]], UI.saver ?? 5, v => { UI.saver = v; saveUI(); }));
   R("Sound", "Short clicks when you move and select.", sw(UI.sound, v => { UI.sound = v; saveUI(); if (v) beep(660); }));
+  const mu = el("div", "btns"), nx = el("button", "btn", t("Another tune"));
+  nx.onclick = () => { newTune(); toast(t("A new tune.")); };
+  mu.appendChild(sw(!!UI.music, v => { UI.music = v; saveUI(); musicTick(); renderSettings(); }));
+  if (UI.music) mu.appendChild(nx);
+  R(t("Menu music"), t("Little chiptunes on the shelves, made up by the app as it plays them. They stop while you play."), mu);
+  if (UI.music) R(t("Music volume"), "", seg([["quiet", t("Quiet")], ["medium", t("Medium")], ["loud", t("Loud")]], UI.musicVol || "medium", v => { UI.musicVol = v; saveUI(); musicVolume(); }));
   R("Always show controls", "Otherwise they show for a few seconds at start.", sw(UI.hints, v => { UI.hints = v; applyUI(); saveUI(); if (!v) showHintsBriefly(); }));
   const fs = el("button", "btn", "Go fullscreen"); fs.onclick = () => { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else HTML.requestFullscreen && HTML.requestFullscreen(); };
   R("Fullscreen", mac ? "Or press Ctrl ⌘ F." : "Or press F11.", fs);
@@ -3115,6 +3339,7 @@ document.addEventListener("keydown", e => {
   if (isOpen("ctest")) { if (k === "Escape") closeCtest(); return; }
   if (LISTEN && k === "Escape") { LISTEN(null); return; }
   if (isOpen("lst")) { if (k === "Escape") closeList(); else if (arrow) { e.preventDefault(); padNav($("#lst"), arrow); } return; }
+  if (isOpen("keys")) { if (k === "Escape" || k === "Enter" || k === "?") closeKeys(); return; }
   if (isOpen("recap")) { if (k === "Escape") closeRecap(); else if (arrow) { e.preventDefault(); padNav($("#recap"), arrow); } return; }
   if (isOpen("cheat")) { if (k === "Escape") closeCheats(); else if (arrow && e.target !== $("#cheatq")) { e.preventDefault(); padNav($("#cheat"), arrow); } return; }
   if (isOpen("imp")) { if (k === "Escape") $("#icancel").click(); return; }
@@ -3149,6 +3374,7 @@ document.addEventListener("keydown", e => {
   else if (k === "Enter") activate();
   else if ((k === "f" || k === "F") && selGame()) toggleFav(selGame().id);
   else if (k === "r" || k === "R") surprise();
+  else if (k === "?") openKeys();
   else if (k === "o" || k === "O" || k === "ContextMenu") { e.preventDefault(); openOpts(); }
 });
 
@@ -3193,6 +3419,7 @@ setInterval(() => {
   const n = {l: bt(14) || gp.axes[0] < -.6, r: bt(15) || gp.axes[0] > .6, u: bt(12) || gp.axes[1] < -.6, d: bt(13) || gp.axes[1] > .6,
     a: bt(nin ? 1 : 0), b: bt(nin ? 0 : 1), x: bt(nin ? 3 : 2), y: bt(nin ? 2 : 3), lb: bt(4), rb: bt(5), sel: bt(8), st: bt(9), raw: gp.buttons.map(b => b.pressed)};
   if (!document.hasFocus()) { pad = n; for (const k of ["l", "r", "u", "d"]) if (n[k]) padHeld[k] = Infinity; return; }
+  if (SAVER && n.raw.some((on, i) => on && !(pad.raw || [])[i])) { stopSaver(); pad = n; return; }
   const any = Object.keys(n).some(k => k !== "raw" && n[k]); if (any) { padAt = Date.now(); setKb(true); if (!padOn) { padOn = true; renderHints(); showHintsBriefly(); } }
   const press = k => n[k] && !pad[k];
   /* the d-pad repeats when held: once, then after a moment every tenth of a second */
@@ -3238,6 +3465,7 @@ APP.onMenu(w => {
   if (LAUNCH.open) return;
   if (w === "add-games") { closeSettings(); addGames(); }
   else if (w === "get-games") openGetGames();
+  else if (w === "keys") openKeys();
   else if (w === "your-play") { closeSettings(); openTrophy(); }
   else if (w === "collections") { closeSettings(); openColls(); }
   else if (w && w.cmd === "rename") openRename(w.id);

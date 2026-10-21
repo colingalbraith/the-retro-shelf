@@ -32,7 +32,7 @@ const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
                      fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false, rewind: true, lessLag: true, hardcore: false,
-                     picture: "auto", sort: "title", buttons: "auto", arrange: "console" };
+                     picture: "auto", sort: "title", buttons: "auto", arrange: "console", wood: "walnut", wall: "dark", saver: 5, music: false, musicVol: "medium" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -70,13 +70,17 @@ function cleanUi(d) {
   if (["full", "reduced", "off"].includes(d.fx)) out.fx = d.fx;
   if (["spines", "covers"].includes(d.shelf)) out.shelf = d.shelf;
   if (["cover", "printed"].includes(d.spine)) out.spine = d.spine;
+  else if (["art", "color"].includes(d.spine)) out.spine = "cover";
   if (["auto", "sharp", "smooth", "crt", "lcd"].includes(d.picture)) out.picture = d.picture;
-  if (["title", "year", "played"].includes(d.sort)) out.sort = d.sort;
+  if (["title", "year", "played", "rating"].includes(d.sort)) out.sort = d.sort;
+  if (["walnut", "oak", "white"].includes(d.wood)) out.wood = d.wood;
+  if (["dark", "light"].includes(d.wall)) out.wall = d.wall;
+  if ([0, 5, 10, 20].includes(d.saver)) out.saver = d.saver;
+  if (["quiet", "medium", "loud"].includes(d.musicVol)) out.musicVol = d.musicVol;
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
   if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
   if (Array.isArray(d.hiddenSeries)) out.hiddenSeries = d.hiddenSeries.map(String).slice(0, 1000);
-  else if (["art", "color"].includes(d.spine)) out.spine = "cover";
-  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "beta", "tv", "rewind", "lessLag", "hardcore", "autoBackup"]) if (typeof d[k] === "boolean") out[k] = d[k];
+  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "beta", "tv", "rewind", "lessLag", "hardcore", "autoBackup", "music"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
   if (Array.isArray(d.hidden)) out.hidden = d.hidden.map(String).slice(0, 100);
   return out;

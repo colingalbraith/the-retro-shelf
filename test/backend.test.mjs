@@ -568,3 +568,12 @@ test("a month's and a year's recap, and last month's offered once when a new mon
     assert.deepEqual([be.recapDue().year, be.recapDue().month], [2026, null]);
   } finally { Date.now = realNow; }
 });
+
+test("display settings are kept as chosen: sort by rating, the shelves' wood and wall, the screensaver and music", async () => {
+  await be.route("POST", "/api/settings", { ui: { sort: "rating", wood: "oak", wall: "light", saver: 10, music: true, musicVol: "quiet" } });
+  const ui = be.ui;
+  assert.deepEqual([ui.sort, ui.wood, ui.wall, ui.saver, ui.music, ui.musicVol], ["rating", "oak", "light", 10, true, "quiet"]);
+  await be.route("POST", "/api/settings", { ui: { sort: "nope", wood: "pine", saver: 7 } });
+  const back = be.ui;
+  assert.deepEqual([back.sort, back.wood, back.saver], ["title", "walnut", 5]);
+});

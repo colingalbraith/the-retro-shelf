@@ -130,7 +130,7 @@ function menu() {
       { role: "togglefullscreen" }, { type: "separator" }, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" },
       ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
     { role: "windowMenu" },
-    { role: "help", submenu: [{ label: "Where to Get Games…", click: () => win && win.webContents.send("menu", "get-games") }, { label: "Licenses", click: openLicenses }] },
+    { role: "help", submenu: [{ label: "Buttons and Keys", click: () => win && win.webContents.send("menu", "keys") }, { label: "Where to Get Games…", click: () => win && win.webContents.send("menu", "get-games") }, { label: "Licenses", click: openLicenses }] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(tpl));
 }

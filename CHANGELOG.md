@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0-beta.9
+
+- **Shelf themes:** Settings → Shelves → Wood (walnut, oak or painted white) and Wall (dark or light).
+- **Screensaver:** in TV mode, after 5 minutes with nothing pressed, the shelves drift slowly and pictures from your
+  games fade through. Any button wakes it, and it never comes on during a game. Settings → App → Screensaver.
+- **Buttons and keys:** press ? (or choose Buttons and keys in a game's options, or Help) for every key and controller
+  button on one sheet, with your controller's own button names.
+- **Menu music:** little chiptunes the app makes up as it plays them, so there's no recording to license. Off at
+  first: Settings → App → Menu music, with a volume and "Another tune". They stop while you play.
+- Sort by rating is remembered after a restart.
+- The options menu scrolls when the window is short, so its last items can be reached.
+
 ## 0.4.0-beta.8
 
 - **Recaps:** a card for any month or year of play: time played, sittings, days, games (and how many were new), your
