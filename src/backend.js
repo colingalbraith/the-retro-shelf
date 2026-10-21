@@ -117,7 +117,7 @@ function cleanUi(d) {
   if ([0, 5, 10, 20].includes(d.saver)) out.saver = d.saver;
   if ([100, 115, 130].includes(d.textSize)) out.textSize = d.textSize;
   if ([0, 2, 3, 4].includes(d.ffSpeed)) out.ffSpeed = d.ffSpeed;
-  if (["auto", "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"].includes(d.lang)) out.lang = d.lang;
+  if (["auto", "en", "es", "fr", "de", "it", "pl", "pt", "ru", "ja", "ko", "zh", "zh-Hant"].includes(d.lang)) out.lang = d.lang;
   if (["quiet", "medium", "loud"].includes(d.musicVol)) out.musicVol = d.musicVol;
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
   if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
@@ -1968,7 +1968,7 @@ class Backend extends EventEmitter {
       // the menu music and its list (src/music)
       const music = /^\/music\/([\w-]+)\.(ogg|wav|json)$/.exec(pathname);
       if (music) return this.file(path.join(this.dirs.app, "music", music[1] + "." + music[2]), { ogg: "audio/ogg", wav: "audio/wav", json: "application/json; charset=utf-8" }[music[2]], music[2] === "json" ? undefined : "public, max-age=31536000, immutable");
-      const words = /^\/words\/(es|fr|de|it|pt|ru|ja|ko|zh)\.json$/.exec(pathname);
+      const words = /^\/words\/(es|fr|de|it|pl|pt|ru|ja|ko|zh|zh-Hant)\.json$/.exec(pathname);
       if (words) return this.file(path.join(this.dirs.app, "words", words[1] + ".json"), "application/json; charset=utf-8");
       if (pathname === "/api/library") return { code: 200, body: this.libraryJson() };
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };

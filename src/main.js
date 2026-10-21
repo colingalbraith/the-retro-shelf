@@ -95,10 +95,10 @@ const TESTING = process.env.RETRO_SHELF_TEST === "1";
 
 // the app's words in the chosen language (src/words/<lang>.json, keyed by the English) for the menus and dialogs made
 // here; the page translates its own. The language is the one chosen in Settings, or the computer's
-const LANGUAGES = ["es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"];
+const LANGUAGES = ["es", "fr", "de", "it", "pl", "pt", "ru", "ja", "ko", "zh", "zh-Hant"];
 let chosenLang = null, words = {}, wordsLang = "";
 function tm(text, vars) {
-  const pick = chosenLang || (backend && backend.ui.lang) || "auto", lang = pick === "auto" ? (/^zh-(hant|tw|hk|mo)/i.test(app.getLocale()) ? "en" : app.getLocale().slice(0, 2).toLowerCase()) : pick;
+  const pick = chosenLang || (backend && backend.ui.lang) || "auto", lang = pick === "auto" ? (/^zh-(hant|tw|hk|mo)/i.test(app.getLocale()) ? "zh-Hant" : app.getLocale().slice(0, 2).toLowerCase()) : pick;
   if (lang !== wordsLang) { wordsLang = lang; try { words = LANGUAGES.includes(lang) ? JSON.parse(fs.readFileSync(path.join(__dirname, "words", lang + ".json"), "utf8")) : {}; } catch { words = {}; } }
   const out = words[text] || text;
   return vars ? out.replace(/\{(\w+)\}/g, (m, k) => k in vars ? String(vars[k]) : m) : out;

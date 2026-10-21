@@ -51,8 +51,9 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 - **Saves are safe:** a backup every week by itself, saves shared between computers through iCloud Drive, Dropbox or
   OneDrive, and the BIOS files each console has.
 - **Extras:** cheats, RetroAchievements, games on several discs, and menu music.
-- **Ten languages:** English, plus Español, Français, Deutsch, Italiano, Português, Русский, 日本語, 한국어 and 简体中文
-  (drafts, in beta). Text size and screen reader labels too.
+- **Twelve languages:** English, plus Español, Français, Deutsch, Italiano, Polski, Português, Русский, 日本語, 한국어,
+  简体中文 and 繁體中文 (drafts, in beta: [help improve them](docs/translating.md)). Text size and screen reader
+  labels too.
 - **Updates itself** in the background.
 - **Private:** no account, no tracking.
 
