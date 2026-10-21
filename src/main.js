@@ -4,7 +4,7 @@
 const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu, screen, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
-const { Backend } = require("./backend");
+const { Backend, GAME_CHOICES } = require("./backend");
 const { Updater } = require("./updater");
 const { zipFolder, unzipInto, filesIn } = require("./zip");
 
@@ -161,6 +161,13 @@ function gameMenu(id) {
       ...(backend.state.shelves.length ? [{ type: "separator" }] : []),
       { label: "New Shelf…", click: () => send({ cmd: "new-shelf", id: g.id }) },
     ] },
+    // this game's own picture and screen shape, over the ones in Settings
+    ...Object.entries({ picture: "Picture", shape: "Screen Shape" }).map(([k, label]) => ({ label, submenu: [
+      { label: "Same as Settings", type: "radio", checked: !(backend.state.gameOpts[g.id] || {})[k], click: () => { backend.setGameOpts(g.id, { [k]: null }); send({ cmd: "refresh", focus: g.id }); } },
+      { type: "separator" },
+      ...GAME_CHOICES[k].map(([v, name]) => ({ label: name, type: "radio", checked: (backend.state.gameOpts[g.id] || {})[k] === v,
+        click: () => { backend.setGameOpts(g.id, { [k]: v }); send({ cmd: "refresh", focus: g.id }); } })),
+    ] })),
     { label: "Rename…", click: () => send({ cmd: "rename", id: g.id }) },
     { label: "Find Cover…", click: () => send({ cmd: "find-cover", id: g.id }) },
     { label: "Use My Own Cover…", click: () => pickPicture("cover") },

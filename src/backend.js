@@ -46,8 +46,12 @@ function jsave(p, obj) {
   fs.writeFileSync(p + ".tmp", JSON.stringify(obj, null, 2));
   fs.renameSync(p + ".tmp", p);
 }
-// what one game can have of its own (setGameOpts), and the choices for each
-const GAME_OPTS = { picture: ["sharp", "smooth", "crt", "lcd"] };
+// what one game can have of its own (setGameOpts): each setting's choices, with the words menus show for them
+const GAME_CHOICES = {
+  picture: [["sharp", "Sharp"], ["smooth", "Smooth"], ["crt", "Old TV"], ["lcd", "Handheld"]],
+  shape: [["core", "As the console showed it"], ["4:3", "4:3"], ["pixel", "Pixel-perfect"], ["stretch", "Stretch to fill"]],
+};
+const GAME_OPTS = Object.fromEntries(Object.entries(GAME_CHOICES).map(([k, v]) => [k, v.map(c => c[0])]));
 
 function cleanUi(d) {
   const out = { ...DEFAULT_UI, hidden: [] };
@@ -1137,7 +1141,7 @@ class Backend extends EventEmitter {
         added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "", gg: pins.genreGroup(g.genre),
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null,
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
-      fav: [...st.fav], systems: Object.keys(this.cfg.systems),
+      fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES,
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
       // how each console's games look on the shelf: the kind of box, its short name, packaging and the color of its pile
       consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null }])),
@@ -1302,4 +1306,4 @@ function flatPng(b) {
   } catch { return false; }
 }
 
-module.exports = { Backend, cleanTitle, regionTag, norm, pick, flatPng };
+module.exports = { Backend, cleanTitle, regionTag, norm, pick, flatPng, GAME_CHOICES };

@@ -69,6 +69,10 @@ function enforced(ra, dirs, opts) {
     // --set-shader)
     video_smooth: opts.picture === "smooth" ? "true" : "false",
     video_shader_enable: opts.picture === "crt" || opts.picture === "lcd" ? "true" : "false",
+    // the screen's shape: as the console showed it (22 in RetroArch's list), 4:3 (0), whole-pixel steps, or the whole
+    // screen (24)
+    aspect_ratio_index: String({ "4:3": 0, stretch: 24 }[opts.shape] ?? 22),
+    video_scale_integer: opts.shape === "pixel" ? "true" : "false",
     // a picture with every save, shown on the back of the box
     savestate_thumbnail_enable: "true",
     autosave_interval: "10",

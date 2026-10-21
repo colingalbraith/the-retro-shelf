@@ -716,7 +716,7 @@ const el = (t, c, x) => { const e = document.createElement(t); if (c) e.classNam
 const clear = n => { while (n.firstChild) n.removeChild(n.firstChild); };
 const HTML = document.documentElement;
 
-let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {};
+let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {}, GAMECHOICES = {};
 let UI = {accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines"};
 let PATHS = {}, STATUS = {running: null, covers: {}}, APPINFO = {};
 let q = "", sel = null, focusId = null, firstPaint = true;
@@ -1012,7 +1012,7 @@ function spineTitle(c, g) {
 
 /* ---------- data ---------- */
 function ingest(d) {
-  G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; CONS = d.consoles || {}; SHELVES = d.shelves || [];
+  G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; CONS = d.consoles || {}; GAMECHOICES = d.gameChoices || {}; SHELVES = d.shelves || [];
   if (!uiEdits) UI = d.settings.ui;
   PATHS = d.settings.paths; APPINFO = d.settings.app || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
   applyUI();
@@ -1662,6 +1662,17 @@ function openOpts(sub) {
     $("#optst").textContent = "Put " + g.title + " on a shelf";
     SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast((on ? "Took it off " : "Put it on ") + sh.name + "."); }); });
     item("New shelf…", () => openShelfSlip({id: g.id}));
+  } else if (g && (sub === "picture" || sub === "shape")) {
+    /* this game's own picture or screen shape, over the one in Settings */
+    const own = (g.opts || {})[sub], set = v => async () => {
+      const r = await api("/api/game/opts", {id: g.id, opts: {[sub]: v}});
+      if (!r.ok) return toast(r.data.error || t("Couldn't save that."), true);
+      await refresh(true); focusById(g.id); toast(v ? t("Saved for {title}.", {title: g.title}) : t("{title} uses Settings again.", {title: g.title}));
+    };
+    $("#optst").textContent = (sub === "picture" ? t("Picture for {title}", {title: g.title}) : t("Screen shape for {title}", {title: g.title}));
+    item((own ? "" : "✓ ") + t("Same as Settings"), set(null));
+    list.appendChild(el("i", "sep"));
+    (GAMECHOICES[sub] || []).forEach(([v, name]) => item((own === v ? "✓ " : "") + t(name), set(v)));
   } else {
     $("#optst").textContent = g ? g.title : "The Retro Shelf";
     if (g) {
@@ -1671,6 +1682,8 @@ function openOpts(sub) {
       item(sel.classList.contains("flip") ? "Turn back" : "Turn over", () => flip());
       item(FAV.has(g.id) ? "Remove from favorites" : "Add to favorites", () => toggleFav(g.id));
       item("Put on a shelf…", () => setTimeout(() => openOpts("shelf"), 30));
+      item(t("Picture…"), () => setTimeout(() => openOpts("picture"), 30));
+      item(t("Screen shape…"), () => setTimeout(() => openOpts("shape"), 30));
       item("Find cover…", () => openPicker(g.id));
       item("Rename…", () => openRename(g.id));
       item(g.hidden ? "Show on shelves" : "Hide from shelves", async () => { await api("/api/game/hide", {id: g.id, hidden: !g.hidden}); refresh(true); });

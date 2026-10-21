@@ -57,4 +57,9 @@ test("the picture setting picks sharp pixels, smoothing, or the old-TV or handhe
   assert.deepEqual(look("smooth"), ["true", "false"]);
   assert.deepEqual(look("crt"), ["false", "true"]);
   assert.deepEqual(look("lcd"), ["false", "true"]);
+  const shape = s => { const e = ra.enforced(emu, dirs, { shape: s }); return [e.aspect_ratio_index, e.video_scale_integer]; };
+  assert.deepEqual(shape(undefined), ["22", "false"]);
+  assert.deepEqual(shape("4:3"), ["0", "false"]);
+  assert.deepEqual(shape("pixel"), ["22", "true"]);
+  assert.deepEqual(shape("stretch"), ["24", "false"]);
 });
