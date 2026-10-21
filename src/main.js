@@ -4,7 +4,7 @@
 const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, Menu, screen, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
-const { Backend, GAME_CHOICES } = require("./backend");
+const { Backend, GAME_CHOICES, within } = require("./backend");
 const { Updater } = require("./updater");
 const { zipFolder, zipFiles, unzipInto, filesIn } = require("./zip");
 
@@ -180,7 +180,7 @@ function gameMenu(id) {
     const r = await dialog.showOpenDialog(win, { title: tm("Choose a picture"), buttonLabel: tm("Use Picture"), properties: ["openFile"],
       filters: [{ name: tm("Pictures"), extensions: ["png", "jpg", "jpeg", "webp"] }] });
     if (r.canceled || !r.filePaths[0]) return;
-    const [code, res] = backend.setArt(g.id, kind, r.filePaths[0]);
+    const [code, res] = await backend.setArt(g.id, kind, r.filePaths[0]);
     send(code === 200 ? { cmd: "refresh", focus: g.id } : { cmd: "error", text: res.error });
   };
   const ext = path.extname(g.path).toLowerCase(), sys = backend.cfg.systems;
@@ -263,6 +263,8 @@ function ipc() {
   ipcMain.handle("backup-folder", async () => {
     const r = await dialog.showOpenDialog(win, { title: tm("Where should backups go?"), buttonLabel: tm("Back Up Here"), properties: ["openDirectory", "createDirectory"] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
+    // backups kept among the saves would each hold the ones before, growing every week
+    if (within(r.filePaths[0], backend.folders.saves)) return { ok: false, error: "That's inside the saves folder: choose a folder outside it." };
     backend.paths.backup_dir = r.filePaths[0]; backend.saveSettings();
     return { ok: true, dir: r.filePaths[0] };
   });
@@ -320,7 +322,9 @@ function ipc() {
     const r = await dialog.showSaveDialog(win, { title: tm("Export saves"), buttonLabel: tm("Export"),
       defaultPath: path.join(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
-    const list = files.flatMap(s => [s.file, ...(s.pic ? [s.file + ".png"] : [])]).map(f => ({ name: path.basename(f), full: f }));
+    // laid out like a backup (Saves/<emulator>/…, Saves/States/…), so Restore can put it back
+    const list = files.flatMap(s => [s.file, ...(s.pic ? [s.file + ".png"] : [])])
+      .map(f => ({ name: "Saves/" + path.relative(backend.folders.saves, f).split(path.sep).join("/"), full: f }));
     try { return { ok: true, count: await zipFiles(list, r.filePath) }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
   });
   // a folder of games to show where it is, without copying
@@ -385,10 +389,11 @@ app.whenReady().then(() => {
     const dir = backend.backupDir();
     try {
       fs.mkdirSync(dir, { recursive: true });
-      await zipFolder(saves, path.join(dir, `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`));
+      await zipFolder(saves, path.join(dir, `Retro Shelf saves ${new Date().toISOString().slice(0, 10)} (weekly).zip`));
     } catch { return; }
     backend.state.lastAutoBackup = Math.floor(Date.now() / 1000); backend.saveState(); backend.event("backup");
-    const mine = fs.readdirSync(dir).filter(f => /^Retro Shelf saves \d{4}-\d{2}-\d{2}\.zip$/.test(f)).map(f => path.join(dir, f))
+    // only the weekly ones are pruned: a backup made by hand into the same folder stays
+    const mine = fs.readdirSync(dir).filter(f => /^Retro Shelf saves \d{4}-\d{2}-\d{2} \(weekly\)\.zip$/.test(f)).map(f => path.join(dir, f))
       .sort((x, y) => fs.statSync(y).mtimeMs - fs.statSync(x).mtimeMs);
     for (const f of mine.slice(5)) await shell.trashItem(f).catch(() => {});
   };

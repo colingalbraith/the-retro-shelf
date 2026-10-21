@@ -54,12 +54,17 @@ test("moving a disc game takes its tracks along and keeps its play history", () 
   assert.equal(be.state.plays[res.id], 7);
 });
 
-test("choosing the cover that's already next to the game keeps it", () => {
+test("choosing the cover that's already next to the game keeps it, and one it replaces isn't deleted", async () => {
   put("nes/Tetris.nes"); const pic = put("nes/Tetris.png", "PNGDATA");
   be.scan();
-  const [code] = be.setArt(byTitle("Tetris").id, "cover", pic);
+  const [code] = await be.setArt(byTitle("Tetris").id, "cover", pic);
   assert.equal(code, 200);
   assert.equal(fs.readFileSync(pic, "utf8"), "PNGDATA");
+  // someone's own picture, replaced by a new one: to the Trash (here, with none, renamed aside)
+  const mine = put("nes/Tetris.jpg", "MY SCAN"), other = put("elsewhere/new.png", "NEW");
+  await be.setArt(byTitle("Tetris").id, "cover", other);
+  assert.equal(fs.readFileSync(pic, "utf8"), "NEW");
+  assert.equal(fs.readFileSync(mine + ".replaced", "utf8"), "MY SCAN");
 });
 
 test("discs listed in an .m3u show once, even from a subfolder", () => {

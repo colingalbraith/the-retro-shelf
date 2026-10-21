@@ -1166,7 +1166,7 @@ class Backend extends EventEmitter {
   }
 
   /** use a picture of your own as a game's cover, logo or screenshot: saved next to the game, where it wins */
-  setArt(id, kind, src) {
+  async setArt(id, kind, src) {
     const g = this.games.get(id);
     if (!g || !["cover", "logo", "snap"].includes(kind)) return [404, { error: "Unknown game." }];
     const ext = path.extname(src).toLowerCase();
@@ -1174,9 +1174,14 @@ class Backend extends EventEmitter {
     const stem = path.parse(g.path).name, dir = path.dirname(g.path), name = kind === "cover" ? stem : `${stem}.${kind}`;
     const dest = path.join(dir, name + ext), tmp = dest + ".part";
     try {
-      // copied first: the picture chosen may be one of the ones it replaces
+      // copied first: the picture chosen may be one of the ones it replaces. The ones it replaces may be someone's own
+      // (a scan of their box): they go to the Trash, or failing that are renamed aside, never deleted
       fs.copyFileSync(src, tmp);
-      for (const e of IMG) fs.rmSync(path.join(dir, name + e), { force: true });
+      for (const e of IMG) {
+        const old = path.join(dir, name + e);
+        if (!fs.existsSync(old)) continue;
+        try { await this.trash(old); } catch { fs.renameSync(old, old + ".replaced"); }
+      }
       fs.renameSync(tmp, dest);
     } catch (e) {
       fs.rmSync(tmp, { force: true });
@@ -1494,7 +1499,7 @@ class Backend extends EventEmitter {
     if (!f) return [404, { error: "That cover isn't available." }];
     // next to the game, like a picture of your own, so it wins over any image already there or in _covers; in the
     // app's covers folder when the games folder can't be written to
-    if (this.setArt(id, "cover", f)[0] !== 200) { this.saveArt(g, "cover", fs.readFileSync(f)); this.event("cover"); }
+    if ((await this.setArt(id, "cover", f))[0] !== 200) { this.saveArt(g, "cover", fs.readFileSync(f)); this.event("cover"); }
     return [200, { ok: true }];
   }
 

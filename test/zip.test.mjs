@@ -25,7 +25,7 @@ function unzip(file) {
   return out;
 }
 
-test("saves are zipped under their folder's name and come back out intact", async () => {
+test("saves are zipped under one Saves folder and come back out intact", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-zip-"));
   try {
     const saves = path.join(dir, "Saves");
@@ -68,10 +68,10 @@ test("restoring puts saves back, keeps ones newer than the backup, and never wri
     fs.mkdirSync(evil);
     fs.writeFileSync(path.join(evil, "x.srm"), "x");
     await zipFolder(evil, ez);
-    // same length as "evil/x.srm", so the zip stays valid and only the path is the problem
-    fs.writeFileSync(ez, Buffer.from(fs.readFileSync(ez).toString("latin1").replaceAll("evil/x.srm", "../../x.sr"), "latin1"));
+    // same length as "Saves/x.srm", so the zip stays valid and only the path is the problem
+    fs.writeFileSync(ez, Buffer.from(fs.readFileSync(ez).toString("latin1").replaceAll("Saves/x.srm", "../../x.srm"), "latin1"));
     assert.deepEqual(await unzipInto(ez, saves), { restored: 0, kept: 0, skipped: 1, failed: 0 });
-    assert.ok(!fs.existsSync(path.join(dir, "x.sr")) && !fs.existsSync(path.join(path.dirname(dir), "x.sr")));
+    assert.ok(!fs.existsSync(path.join(dir, "x.srm")) && !fs.existsSync(path.join(path.dirname(dir), "x.srm")));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -89,5 +89,44 @@ test("a save that can't be written doesn't stop the rest from coming back", asyn
     assert.deepEqual(await unzipInto(zip, to), { restored: 2, kept: 0, skipped: 0, failed: 1 });
     assert.equal(fs.readFileSync(path.join(to, "Z (USA).srm"), "utf8"), "z");
     assert.ok(!fs.readdirSync(to).some(f => f.endsWith(".part")));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a backup of saves kept in a cloud folder restores into the saves, and a zip that isn't a backup restores nothing", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-zip-"));
+  try {
+    const cloud = path.join(dir, "The Retro Shelf Saves"), out = path.join(dir, "b.zip"), back = path.join(dir, "back");
+    fs.mkdirSync(path.join(cloud, "Snes9x"), { recursive: true });
+    fs.writeFileSync(path.join(cloud, "Snes9x", "Game.srm"), "SAVE");
+    fs.writeFileSync(path.join(cloud, "old backup.zip"), "not a save");
+    assert.equal(await zipFolder(cloud, out), 1);                                    // the zip among them isn't one
+    assert.deepEqual(Object.keys(unzip(out)), ["Saves/Snes9x/Game.srm"]);
+    fs.mkdirSync(back);
+    assert.equal((await unzipInto(out, back)).restored, 1);
+    assert.equal(fs.readFileSync(path.join(back, "Snes9x", "Game.srm"), "utf8"), "SAVE");
+    // a game's zip (no one top folder) isn't a backup
+    const { zipFiles } = require("../src/zip.js"), game = path.join(dir, "game.zip");
+    fs.writeFileSync(path.join(dir, "Game.sfc"), "ROM"); fs.writeFileSync(path.join(dir, "readme.txt"), "hi");
+    await zipFiles([{ name: "Game.sfc", full: path.join(dir, "Game.sfc") }, { name: "readme.txt", full: path.join(dir, "readme.txt") }], game);
+    await assert.rejects(unzipInto(game, back), /isn't a backup/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a file dated past 2107 doesn't stop a backup, and an entry can't unpack past the size it claims", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-zip-"));
+  try {
+    const saves = path.join(dir, "Saves"), out = path.join(dir, "b.zip");
+    fs.mkdirSync(saves); fs.writeFileSync(path.join(saves, "far.srm"), "x");
+    fs.utimesSync(path.join(saves, "far.srm"), new Date(2200, 0, 1), new Date(2200, 0, 1));
+    assert.equal(await zipFolder(saves, out), 1);
+    // a "bomb": a megabyte of zeros claiming to be 10 bytes
+    const big = zlib.deflateRawSync(Buffer.alloc(1048576)), name = Buffer.from("Saves/bomb.srm"), crc = zlib.crc32(Buffer.alloc(1048576));
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(big.length, 18); lh.writeUInt32LE(10, 22); lh.writeUInt16LE(name.length, 26);
+    const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(8, 10); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(big.length, 20); cd.writeUInt32LE(10, 24); cd.writeUInt16LE(name.length, 28);
+    const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(1, 8); end.writeUInt16LE(1, 10); end.writeUInt32LE(46 + name.length, 12); end.writeUInt32LE(30 + name.length + big.length, 16);
+    const bomb = path.join(dir, "bomb.zip"); fs.writeFileSync(bomb, Buffer.concat([lh, name, big, cd, name, end]));
+    const back = path.join(dir, "back"); fs.mkdirSync(back);
+    const r = await unzipInto(bomb, back);
+    assert.deepEqual([r.restored, r.skipped], [0, 1]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

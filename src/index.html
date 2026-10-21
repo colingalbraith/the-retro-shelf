@@ -3005,7 +3005,7 @@ function renderSettings() {
     R("Back up saves", "Puts all your saves and resume points in one .zip file, or puts them back from one. A save newer than the backup is never replaced.", bb);
     /* a backup every week, by itself */
     const ab2 = el("div", "btns"), abf = el("button", "btn", t("Folder…"));
-    abf.onclick = async () => { const r = await APP.backupFolder(); if (r && r.ok) { await refresh(true); renderSettings(); } };
+    abf.onclick = async () => { const r = await APP.backupFolder(); if (r && r.ok) { await refresh(true); renderSettings(); } else if (r && r.error) toast(t(r.error), true); };
     ab2.appendChild(abf); ab2.appendChild(sw(!!UI.autoBackup, v => { UI.autoBackup = v; saveUI(); renderSettings(); }));
     R(t("Back up by itself"), t("Every week, a backup of all your saves in {dir}. The last five are kept.", {dir: PATHS.backup_dir || ""}) + (PATHS.last_backup ? " " + t("The last one: {when}.", {when: fmtWhen(PATHS.last_backup)}) : ""), ab2);
     R("BIOS files", t("Copied from your own consoles. Drop them on this window and they go in the right place.") + (BIOSST ? "" : " " + t("Checking…")), null);
