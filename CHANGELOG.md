@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0-beta.6
+
+- **Saves for each game:** in its options or on the back of its box. See its own save, where you left off and the
+  numbered saves with their pictures; start from any of them, export them, or move one to the Trash.
+- **Back up by itself:** every week, a backup of all your saves in a folder you choose, keeping the last five.
+- **Saves on more than one computer:** put them in an iCloud Drive, Dropbox or OneDrive folder and point your other
+  computers at it. If a game is open on another computer, you're told before playing it here.
+- **Move the games to another drive:** every game copied and checked, play history kept, and the old copy goes to the
+  Trash only if you say.
+
 ## 0.4.0-beta.5
 
 - **Progress, ratings and notes:** mark a game backlog, playing, beaten or 100%, give it one to five stars, and write
