@@ -141,8 +141,9 @@ for (const [folder, file, make] of GAMES) {
   fs.writeFileSync(path.join(home, "The Retro Shelf", "Games", folder, file), make());
 }
 fs.mkdirSync(path.join(home, "data"), { recursive: true });
-// the old-TV picture, so the graphics driver has to be one that runs its shader; no update checks, this is about the build
-fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: { picture: "crt", welcomed: true, updates: false } }));
+// pictures by console (old TV, or a handheld's screen for Game Boy and GBA), so the graphics driver has to be one that
+// runs those shaders; no update checks, this is about the build
+fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: { picture: "auto", welcomed: true, updates: false } }));
 
 let app = null, failed = false;
 try {
@@ -181,11 +182,12 @@ try {
       continue;
     }
     if (!st.running) throw new Error(`${system}: the game closed by itself` + (st.exit && st.exit.error ? ": " + st.exit.error : ""));
-    if (!/\[Slang\] Compiling shader/.test(ra)) throw new Error(`${system}: the game runs, but without the old-TV picture (see its retroarch log)`);
+    const look = /Game Boy|GBA/.test(system) ? "handheld" : "old-TV", shader = look === "handheld" ? "zfast_lcd" : "zfast_crt";
+    if (!new RegExp(`\\[Slang\\] Compiling shader: "[^"]*${shader}`).test(ra)) throw new Error(`${system}: the game runs, but without the ${look} picture (see its retroarch log)`);
     await page.evaluate(`api("/api/stop", {})`);
     const ex = await until(`${system}: the game didn't close when asked`, () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
     if (ex.error) throw new Error(`${system}: the game closed with: ${ex.error}`);
-    step(`${system}: running with the old-TV picture, closed after ${Math.round(ex.dt)} s`);
+    step(`${system}: running with the ${look} picture, closed after ${Math.round(ex.dt)} s`);
   }
 
   if (page.errors.length) throw new Error("the page had errors:\n  " + page.errors.join("\n  "));
