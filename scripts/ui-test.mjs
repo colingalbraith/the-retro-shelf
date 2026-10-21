@@ -112,11 +112,37 @@ const PANEL = `(() => { const out = [], vis = e => e.offsetWidth && getComputedS
   for (const e of root.querySelectorAll("button,h2,h3,b,.tplate,label,kbd")) {
     if (!vis(e) || e.closest(".strip,#pgrid")) continue;
     const r = e.getBoundingClientRect(), name = (e.textContent || e.id || e.tagName).trim().slice(0, 30);
+    /* below the window, with nothing to scroll it into view */
+    let sc = e.parentElement; while (sc && sc !== root && !(/(auto|scroll)/.test(getComputedStyle(sc).overflowY) && sc.scrollHeight > sc.clientHeight)) sc = sc.parentElement;
+    if (r.top > innerHeight - 4 && (!sc || sc === root) && !/(auto|scroll)/.test(getComputedStyle(root).overflowY)) out.push(name + " below the window");
     if (r.right > innerWidth + 1 || r.left < -1) out.push(name + " off the side");
     else if (e.scrollWidth > e.clientWidth + 2 && getComputedStyle(e).overflow !== "visible") out.push(name + " cut off");
   }
   if (document.documentElement.scrollWidth > innerWidth + 1) out.push("the window scrolls sideways");
   return out; })()`;
+/* text straight on the wall or a panel's own color, too faint to read: under 3:1 against what's behind it. Text over
+   pictures and patterns (box art, spines, wood) is left out */
+const CONTRAST = `(() => {
+  const rgb = s => (s.match(/[\\d.]+/g) || []).map(Number), out = new Set();
+  const lum = c => { const f = v => (v /= 255) <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
+  const css = getComputedStyle(document.documentElement), wall = rgb(css.getPropertyValue("--wall").trim().replace(/^#(..)(..)(..)$/, (_, a, b, c) => [a, b, c].map(h => parseInt(h, 16)).join(",")));
+  const bgOf = e => {
+    for (let n = e; n; n = n.parentElement) {
+      if (["app", "shelves", "trophy", "colls"].includes(n.id) || n === document.body) return wall;
+      const cs = getComputedStyle(n); if (cs.backgroundImage !== "none") return null;
+      const c = rgb(cs.backgroundColor); if (c.length === 3 || c[3] > .85) return c;
+    }
+    return wall;
+  };
+  const root = [...document.querySelectorAll("#settings,#getg,#colls,#trophy,.over")].find(e => e.classList.contains("show")) || document.getElementById("app");
+  for (const e of root.querySelectorAll("*")) {
+    if (![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) || !e.offsetWidth) continue;
+    const cs = getComputedStyle(e); if (cs.visibility === "hidden" || +cs.opacity < .5 || e.closest(".card,.cv,.ci,.tro,.svpic,svg")) continue;
+    const bg = bgOf(e), fg = rgb(cs.color); if (!bg) continue;
+    const [a, b] = [lum(fg), lum(bg)].sort((x, y) => y - x), ratio = (a + .05) / (b + .05);
+    if (ratio < 3) out.add(e.textContent.trim().slice(0, 30) + " (" + ratio.toFixed(1) + ":1)");
+  }
+  return [...out]; })()`;
 const SCREENS = [
   ["settings", "openSettings()", "closeSettings()"],
   ["settings-end", "openSettings(); setTimeout(() => { $('#spanel').scrollTop = 1e6; }, 100)", "closeSettings()"],
@@ -141,6 +167,8 @@ const SCREENS = [
       longest: {id: long[0].id, time: 8000, at: now}, busiest: {day: now, time: 12000}, first: 1,
       pins: ["first", "sampler", "hours10", "multi", "onemore", "streak3", "weekend", "lunch", "friday", "sunday", "quick", "sessions25"]};
     renderRecap(RC).then(() => $("#recap").classList.add("show")); })()`, "closeRecap()"],
+  ["keys", "openKeys()", "closeKeys()"],
+  ["screensaver", "UI.tv = true; startSaver()", "stopSaver(); UI.tv = false"],
   ["what-counts", "openColls('series'); setTimeout(() => openCounts(COLL.series[0].name), 700)", "closeList(); closeColls()"],
 ];
 
@@ -193,6 +221,25 @@ try {
     }
     console.log(`· screens at ${w}×${h} done`);
   }
+
+  // every wood and wall: the shelves, box backs and the screens that sit on the wall, readable and fitting
+  await p.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  for (const [wood, wall] of [["walnut", "dark"], ["oak", "dark"], ["white", "dark"], ["walnut", "light"], ["white", "light"]]) {
+    await p.ev(`(HTML.dataset.wood = "${wood}", HTML.dataset.wall = "${wall}", 1)`); await sleep(500);
+    const theme = `${wood} wood, ${wall} wall`;
+    for (const r of await p.ev(CONTRAST)) problems.push(`${theme}, the shelves: ${r} is hard to read`);
+    const shot = await p.send("Page.captureScreenshot", { format: "jpeg", quality: 70 });
+    fs.writeFileSync(path.join(OUT, `theme-${wood}-${wall}.jpg`), Buffer.from(shot.result.data, "base64"));
+    for (const [name, open, close] of SCREENS.filter(([n]) => ["settings", "collections", "your-play", "recap", "keys", "get-games"].includes(n))) {
+      await p.ev(open + "; 1"); await sleep(1300);
+      for (const b of await p.ev(PANEL)) problems.push(`${name}, ${theme}: ${b}`);
+      for (const r of await p.ev(CONTRAST)) problems.push(`${name}, ${theme}: ${r} is hard to read`);
+      if (wall === "light") { const sh = await p.send("Page.captureScreenshot", { format: "jpeg", quality: 70 }); fs.writeFileSync(path.join(OUT, `theme-${wood}-${wall}-${name}.jpg`), Buffer.from(sh.result.data, "base64")); }
+      await p.ev(close + "; 1"); await sleep(400);
+    }
+    console.log(`· ${theme} done`);
+  }
+  await p.ev(`(HTML.dataset.wood = "walnut", HTML.dataset.wall = "dark", 1)`);
 
   // a controller through every panel: Select opens options, each panel opens from there, B closes it
   await p.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
