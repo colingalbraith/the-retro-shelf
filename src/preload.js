@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("arcade", {
   restoreSaves: () => ipcRenderer.invoke("restore-saves"),
   copyReport: () => ipcRenderer.invoke("copy-report"),
   savePicture: (rect, name, quick) => ipcRenderer.invoke("save-picture", rect, String(name || ""), !!quick),
-  tvMode: on => ipcRenderer.invoke("tv-mode", !!on),
+  tvMode: (on, size) => ipcRenderer.invoke("tv-mode", !!on, Number(size) || 100),
+  setLang: code => ipcRenderer.invoke("lang", String(code || "auto")),
+  textSize: (tv, size) => ipcRenderer.invoke("text-size", !!tv, Number(size) || 100),
   onMenu: fn => ipcRenderer.on("menu", (_, what) => fn(what)),
 });

@@ -63,16 +63,34 @@ function onScreen(b) {
   return seen ? b : { width: Math.min(b.width, area.width), height: Math.min(b.height, area.height) };
 }
 
-/** TV mode: everything a quarter bigger, and fullscreen */
-function tvMode(on) {
+/** how big everything is: a quarter bigger in TV mode, times the text size from Settings */
+function setZoom(tv, size) {
   if (!win || win.isDestroyed()) return;
-  win.webContents.setZoomFactor(on ? 1.25 : 1);
+  win.webContents.setZoomFactor((tv ? 1.25 : 1) * ([100, 115, 130].includes(size) ? size : 100) / 100);
+}
+/** TV mode: everything a quarter bigger, and fullscreen */
+function tvMode(on, size) {
+  if (!win || win.isDestroyed()) return;
+  setZoom(on, size);
   if (win.isFullScreen() !== on) win.setFullScreen(on);
 }
 
 // the app's own tests (scripts/*-test.mjs) open it without taking focus, almost all off the bottom right of the
 // screen, so they keep out of the way of whoever is using the computer while they run
 const TESTING = process.env.RETRO_SHELF_TEST === "1";
+
+// the app's words in the chosen language (src/words/<lang>.json, keyed by the English) for the menus and dialogs made
+// here; the page translates its own. The language is the one chosen in Settings, or the computer's
+const LANGUAGES = ["es", "fr", "de", "pt", "ja"];
+let chosenLang = null, words = {}, wordsLang = "";
+function tm(text, vars) {
+  const pick = chosenLang || (backend && backend.ui.lang) || "auto", lang = pick === "auto" ? app.getLocale().slice(0, 2).toLowerCase() : pick;
+  if (lang !== wordsLang) { wordsLang = lang; try { words = LANGUAGES.includes(lang) ? JSON.parse(fs.readFileSync(path.join(__dirname, "words", lang + ".json"), "utf8")) : {}; } catch { words = {}; } }
+  const out = words[text] || text;
+  return vars ? out.replace(/\{(\w+)\}/g, (m, k) => k in vars ? String(vars[k]) : m) : out;
+}
+/** a menu with each label in the chosen language (names of shelves and consoles aren't in the word list, so stay) */
+const trMenu = items => items.map(i => ({ ...i, ...(i.label ? { label: tm(i.label) } : {}), ...(Array.isArray(i.submenu) ? { submenu: trMenu(i.submenu) } : {}) }));
 function testBounds() {
   const area = screen.getPrimaryDisplay().workArea;
   return { x: area.x + area.width - 48, y: area.y + area.height - 48, width: 1280, height: 820 };
@@ -97,7 +115,7 @@ function createWindow() {
   if (saved.fullscreen && !TESTING) win.setFullScreen(true);
   win.once("ready-to-show", () => {
     if (TESTING) { win.setBounds(testBounds()); win.showInactive(); return; }
-    win.show(); if (backend && backend.ui.tv) tvMode(true);
+    win.show(); if (backend && backend.ui.tv) tvMode(true, backend.ui.textSize); else if (backend) setZoom(false, backend.ui.textSize);
   });
   for (const ev of ["resize", "move", "enter-full-screen", "leave-full-screen"]) win.on(ev, () => { clearTimeout(win._st); win._st = setTimeout(saveBounds, 500); });
   win.on("close", saveBounds);
@@ -132,13 +150,13 @@ function menu() {
     { role: "windowMenu" },
     { role: "help", submenu: [{ label: "Buttons and Keys", click: () => win && win.webContents.send("menu", "keys") }, { label: "Where to Get Games…", click: () => win && win.webContents.send("menu", "get-games") }, { label: "Licenses", click: openLicenses }] },
   ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(tpl));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(trMenu(tpl)));
 }
 
 let licWin = null;
 function openLicenses() {
   if (licWin) return licWin.focus();
-  licWin = new BrowserWindow({ width: 760, height: 720, title: "The Retro Shelf · Licenses", backgroundColor: "#ece6d6", parent: win || undefined, autoHideMenuBar: true,
+  licWin = new BrowserWindow({ width: 760, height: 720, title: tm("The Retro Shelf · Licenses"), backgroundColor: "#ece6d6", parent: win || undefined, autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, sandbox: true } });
   licWin.setMenuBarVisibility(false);
   licWin.on("closed", () => { licWin = null; });
@@ -151,8 +169,8 @@ function gameMenu(id) {
   if (!g || !win) return;
   const send = what => win.webContents.send("menu", what), title = backend.state.names[g.id] || g.title;
   const pickPicture = async kind => {
-    const r = await dialog.showOpenDialog(win, { title: "Choose a picture", buttonLabel: "Use Picture", properties: ["openFile"],
-      filters: [{ name: "Pictures", extensions: ["png", "jpg", "jpeg", "webp"] }] });
+    const r = await dialog.showOpenDialog(win, { title: tm("Choose a picture"), buttonLabel: tm("Use Picture"), properties: ["openFile"],
+      filters: [{ name: tm("Pictures"), extensions: ["png", "jpg", "jpeg", "webp"] }] });
     if (r.canceled || !r.filePaths[0]) return;
     const [code, res] = backend.setArt(g.id, kind, r.filePaths[0]);
     send(code === 200 ? { cmd: "refresh", focus: g.id } : { cmd: "error", text: res.error });
@@ -202,8 +220,8 @@ function gameMenu(id) {
     { label: process.platform === "darwin" ? "Show in Finder" : "Show in Folder", click: () => shell.showItemInFolder(g.path) },
     { type: "separator" },
     { label: "Move to Trash…", click: async () => {
-      const r = await dialog.showMessageBox(win, { type: "warning", buttons: ["Move to Trash", "Cancel"], defaultId: 1, cancelId: 1,
-        message: `Move “${title}” to the Trash?`, detail: "You can get it back from the Trash. Its saves stay where they are." });
+      const r = await dialog.showMessageBox(win, { type: "warning", buttons: [tm("Move to Trash"), tm("Cancel")], defaultId: 1, cancelId: 1,
+        message: tm("Move “{title}” to the Trash?", { title }), detail: tm("You can get it back from the Trash. Its saves stay where they are.") });
       if (r.response !== 0) return;
       // the game's own files: a disc game's tracks too, and its whole folder when nothing else is in it
       try {
@@ -213,14 +231,14 @@ function gameMenu(id) {
       backend.scan(); send({ cmd: "refresh" });
     } },
   ];
-  Menu.buildFromTemplate(tpl).popup({ window: win });
+  Menu.buildFromTemplate(trMenu(tpl)).popup({ window: win });
 }
 
 function ipc() {
   ipcMain.handle("pick-games", async () => {
     const props = ["openFile", "multiSelections"];
     if (process.platform === "darwin") props.push("openDirectory");
-    const r = await dialog.showOpenDialog(win, { title: "Add games", buttonLabel: "Add", properties: props });
+    const r = await dialog.showOpenDialog(win, { title: tm("Add games"), buttonLabel: tm("Add"), properties: props });
     return r.canceled ? [] : r.filePaths;
   });
   ipcMain.handle("open-folder", (_, which) => {
@@ -235,7 +253,7 @@ function ipc() {
   ipcMain.handle("open-url", (_, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
   // where automatic backups go
   ipcMain.handle("backup-folder", async () => {
-    const r = await dialog.showOpenDialog(win, { title: "Where should backups go?", buttonLabel: "Back Up Here", properties: ["openDirectory", "createDirectory"] });
+    const r = await dialog.showOpenDialog(win, { title: tm("Where should backups go?"), buttonLabel: tm("Back Up Here"), properties: ["openDirectory", "createDirectory"] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
     backend.paths.backup_dir = r.filePaths[0]; backend.saveSettings();
     return { ok: true, dir: r.filePaths[0] };
@@ -244,7 +262,7 @@ function ipc() {
   ipcMain.handle("move-saves", async (_, home) => {
     let dir = "";
     if (!home) {
-      const r = await dialog.showOpenDialog(win, { title: "Share saves through a cloud folder", message: "Choose a folder in iCloud Drive, Dropbox or OneDrive.", buttonLabel: "Keep Saves Here", properties: ["openDirectory", "createDirectory"] });
+      const r = await dialog.showOpenDialog(win, { title: tm("Share saves through a cloud folder"), message: tm("Choose a folder in iCloud Drive, Dropbox or OneDrive."), buttonLabel: tm("Keep Saves Here"), properties: ["openDirectory", "createDirectory"] });
       if (r.canceled || !r.filePaths[0]) return { ok: false };
       dir = r.filePaths[0];
     }
@@ -253,12 +271,12 @@ function ipc() {
   });
   // the games to another drive; then the old copy to the Trash, if you say so
   ipcMain.handle("move-library", async () => {
-    const r = await dialog.showOpenDialog(win, { title: "Move the games to…", buttonLabel: "Move Them Here", properties: ["openDirectory", "createDirectory"] });
+    const r = await dialog.showOpenDialog(win, { title: tm("Move the games to…"), buttonLabel: tm("Move Them Here"), properties: ["openDirectory", "createDirectory"] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
     const [code, res] = await backend.moveLibrary(r.filePaths[0]);
     if (code !== 200) return { ok: false, error: res.error };
-    const a = await dialog.showMessageBox(win, { type: "question", buttons: ["Move to Trash", "Keep It"], defaultId: 0, cancelId: 1,
-      message: `Moved ${res.files} files to ${res.to}.`, detail: `The old copy is still in ${res.from}. Move it to the Trash? Nothing is deleted for good: it stays in the Trash until you empty it.` });
+    const a = await dialog.showMessageBox(win, { type: "question", buttons: [tm("Move to Trash"), tm("Keep It")], defaultId: 0, cancelId: 1,
+      message: tm("Moved {n} files to {to}.", { n: res.files, to: res.to }), detail: tm("The old copy is still in {from}. Move it to the Trash? Nothing is deleted for good: it stays in the Trash until you empty it.", { from: res.from }) });
     if (a.response === 0) await shell.trashItem(res.from).catch(() => {});
     return { ok: true, ...res, trashed: a.response === 0 };
   });
@@ -279,7 +297,7 @@ function ipc() {
       file = path.join(dir, safe + ".png");
       for (let i = 2; fs.existsSync(file); i++) file = path.join(dir, `${safe} ${i}.png`);
     } else {
-      const out = await dialog.showSaveDialog(win, { title: "Save as a picture", defaultPath: path.join(app.getPath("pictures"), safe + ".png"), filters: [{ name: "PNG picture", extensions: ["png"] }] });
+      const out = await dialog.showSaveDialog(win, { title: tm("Save as a picture"), defaultPath: path.join(app.getPath("pictures"), safe + ".png"), filters: [{ name: tm("PNG picture"), extensions: ["png"] }] });
       if (out.canceled || !out.filePath) return { ok: false };
       file = out.filePath;
     }
@@ -291,15 +309,15 @@ function ipc() {
     if (!g) return { ok: false, error: "Unknown game." };
     const files = backend.gameSaves(g);
     if (!files.length) return { ok: false, error: "This game has no saves yet." };
-    const r = await dialog.showSaveDialog(win, { title: "Export saves", buttonLabel: "Export",
-      defaultPath: path.join(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves.zip`), filters: [{ name: "Zip archive", extensions: ["zip"] }] });
+    const r = await dialog.showSaveDialog(win, { title: tm("Export saves"), buttonLabel: tm("Export"),
+      defaultPath: path.join(app.getPath("documents"), `${g.title.replace(/[\\/:*?"<>|]/g, "")} saves.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
     const list = files.flatMap(s => [s.file, ...(s.pic ? [s.file + ".png"] : [])]).map(f => ({ name: path.basename(f), full: f }));
     try { return { ok: true, count: await zipFiles(list, r.filePath) }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
   });
   // a folder of games to show where it is, without copying
   ipcMain.handle("watch-folder", async () => {
-    const r = await dialog.showOpenDialog(win, { title: "Watch a folder of games", buttonLabel: "Watch", properties: ["openDirectory"] });
+    const r = await dialog.showOpenDialog(win, { title: tm("Watch a folder of games"), buttonLabel: tm("Watch"), properties: ["openDirectory"] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
     const [code, res] = backend.addWatch(r.filePaths[0]);
     return code === 200 ? { ok: true, games: res.games } : { ok: false, error: res.error };
@@ -310,8 +328,8 @@ function ipc() {
     let any = false;
     try { any = filesIn(saves).length > 0; } catch {}
     if (!any) return { ok: false, error: "There are no saves to back up yet." };
-    const r = await dialog.showSaveDialog(win, { title: "Back up saves", buttonLabel: "Back Up",
-      defaultPath: path.join(app.getPath("documents"), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: "Zip archive", extensions: ["zip"] }] });
+    const r = await dialog.showSaveDialog(win, { title: tm("Back up saves"), buttonLabel: tm("Back Up"),
+      defaultPath: path.join(app.getPath("documents"), `Retro Shelf saves ${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePath) return { ok: false };
     try { const count = await zipFolder(saves, r.filePath); backend.event("backup"); return { ok: true, count, path: r.filePath }; }
     catch (e) { return { ok: false, error: "Couldn't make the backup: " + e.message }; }
@@ -319,12 +337,15 @@ function ipc() {
   ipcMain.handle("restore-saves", async () => {
     // a running game would write its save over the restored one when it closes
     if (backend.running && backend.running.alive) return { ok: false, error: "Close the game first, then restore." };
-    const r = await dialog.showOpenDialog(win, { title: "Restore saves", buttonLabel: "Restore", properties: ["openFile"], filters: [{ name: "Zip archive", extensions: ["zip"] }] });
+    const r = await dialog.showOpenDialog(win, { title: tm("Restore saves"), buttonLabel: tm("Restore"), properties: ["openFile"], filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
     try { fs.mkdirSync(backend.folders.saves, { recursive: true }); return { ok: true, ...(await unzipInto(r.filePaths[0], backend.folders.saves)) }; }
     catch (e) { return { ok: false, error: "Couldn't restore from that file: " + e.message }; }
   });
-  ipcMain.handle("tv-mode", (_, on) => tvMode(!!on));
+  ipcMain.handle("tv-mode", (_, on, size) => tvMode(!!on, size));
+  ipcMain.handle("text-size", (_, tv, size) => setZoom(!!tv, size));
+  // a new language from Settings: the menus follow
+  ipcMain.handle("lang", (_, code) => { chosenLang = ["auto", "en", ...LANGUAGES].includes(code) ? code : "auto"; menu(); });
   ipcMain.handle("copy-report", () => { clipboard.writeText(backend.report(app.getVersion())); return true; });
   ipcMain.handle("update", (_, what) => {
     if (what === "check") return updater.check(true);
@@ -379,8 +400,8 @@ app.whenReady().then(() => {
   menu();
   createWindow();
   if (backend.setupError) {
-    win.once("ready-to-show", () => dialog.showMessageBox(win, { type: "warning", message: "The Retro Shelf couldn't set up its games folder",
-      detail: `It needs to create "The Retro Shelf" in your Documents folder (${backend.setupError}). Check that it's allowed to use Documents: on a Mac in System Settings → Privacy & Security → Files and Folders, on Windows under Virus & threat protection → Controlled folder access.` }));
+    win.once("ready-to-show", () => dialog.showMessageBox(win, { type: "warning", message: tm("The Retro Shelf couldn't set up its games folder"),
+      detail: tm("It needs to create “The Retro Shelf” in your Documents folder ({error}). Check that it's allowed to use Documents: on a Mac in System Settings → Privacy & Security → Files and Folders, on Windows under Virus & threat protection → Controlled folder access.", { error: backend.setupError }) }));
   }
   if (backend.ui.autoCovers) backend.coverJob([...backend.games.keys()]);
   updater = new Updater();

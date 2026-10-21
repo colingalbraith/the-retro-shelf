@@ -25,20 +25,24 @@ const SERIES = [["Pokémon", "Gotta Catch 'Em All", "◓"], ["The Legend of Zeld
   ["Street Fighter", "World Warrior", "✊"], ["Metal Gear", "Tactical Espionage", "!"], ["Streets of Rage", "Back Alley Brawler", "✶"], ["Star Fox", "Barrel Roll", "↯"],
   ["Phantasy Star", "Algol Explorer", "✺"], ["Crash Bandicoot", "Wumpa Collector", "✹"], ["Spyro", "Dragon Keeper", "✣"], ["Tetris", "Line Clear", "▙"]];
 
-/* a pin per console for 5 games played, 25 hours and 100 hours, shown once that console is on your shelves */
+/* a pin per console for 5 games played, 25 hours and 100 hours, shown once that console is on your shelves. Their
+   words are made from a pattern with the console's name in it (tpl), so they can be translated */
+const fill = (text, v) => text.replace(/\{(\w+)\}/g, (m, k) => v[k]);
+const made = (title, desc, v) => ({ title: fill(title, v), desc: fill(desc, v), tpl: { title, desc, v } });
 function consolePins(systems) {
   return systems.flatMap(s => [
-    { key: "c5:" + s, title: s + " Fan", desc: "Play 5 different " + s + " games.", tier: "bronze", icon: "5", cat: "consoles", show: c => c.systems.has(s),
+    { key: "c5:" + s, ...made("{console} Fan", "Play 5 different {console} games.", { console: s }), tier: "bronze", icon: "5", cat: "consoles", show: c => c.systems.has(s),
       test: c => [(c.perSystem.get(s) || { played: 0 }).played, 5] },
-    { key: "c25:" + s, title: s + " Devotee", desc: "Play " + s + " games for 25 hours.", tier: "silver", icon: "25", cat: "consoles", show: c => c.systems.has(s),
+    { key: "c25:" + s, ...made("{console} Devotee", "Play {console} games for 25 hours.", { console: s }), tier: "silver", icon: "25", cat: "consoles", show: c => c.systems.has(s),
       test: c => [Math.floor(((c.perSystem.get(s) || { time: 0 }).time) / H), 25] },
-    { key: "c100:" + s, title: s + " Master", desc: "Play " + s + " games for 100 hours.", tier: "gold", icon: "♛", cat: "consoles", show: c => c.systems.has(s),
+    { key: "c100:" + s, ...made("{console} Master", "Play {console} games for 100 hours.", { console: s }), tier: "gold", icon: "♛", cat: "consoles", show: c => c.systems.has(s),
       test: c => [Math.floor(((c.perSystem.get(s) || { time: 0 }).time) / H), 100] },
   ]);
 }
+/* a famous series' pin keeps its name in every language (they're nicknames); what earns it is translated */
 function seriesPins() {
   return SERIES.map(([name, title, icon]) => ({
-    key: "s:" + name, title, desc: "Have every " + name + " game.", tier: "gold", icon, cat: "series",
+    key: "s:" + name, title, desc: fill("Have every {series} game.", { series: name }), tpl: { title, desc: "Have every {series} game.", v: { series: name } }, tier: "gold", icon, cat: "series",
     show: c => c.seriesByName.has(name), test: c => { const s = c.seriesByName.get(name); return s ? [s.have, s.total] : [0, 1]; },
   }));
 }

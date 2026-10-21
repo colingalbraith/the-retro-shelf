@@ -199,6 +199,10 @@ try {
   if (!(await p.ev(`isOpen("news") && $$("#nlist li").length`))) problems.push("What's new didn't show for an update");
   for (const r of await p.ev(PANEL)) problems.push("What's new: " + r);
   await p.ev(`closeNews(), 1`);
+  /* HARVEST_WORDS=1: also note every piece of text the screens show, for scripts/words.mjs (a made-up language, so
+     every piece goes through the translator, which notes it) */
+  const harvest = !!process.env.HARVEST_WORDS;
+  if (harvest) await p.ev(`(async () => { HARVEST = new Set(); await setLang("xx"); return 1; })()`);
 
   for (const [w, h] of [[720, 520], [1000, 650], [1600, 1000]]) {
     await p.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile: false });
@@ -241,6 +245,24 @@ try {
   }
   await p.ev(`(HTML.dataset.wood = "walnut", HTML.dataset.wall = "dark", 1)`);
 
+  // German, the longest words: every screen still fits at the smallest window (and the language comes back)
+  if (!harvest && fs.existsSync(path.join(ROOT, "src", "words", "de.json"))) {
+    await p.ev(`(async () => { await setLang("de"); renderHints(); renderShelves(focusId); return 1; })()`); await sleep(800);
+    await p.send("Emulation.setDeviceMetricsOverride", { width: 720, height: 520, deviceScaleFactor: 1, mobile: false }); await sleep(600);
+    const bad = await p.ev(BACKS);
+    for (const b of bad) problems.push(`German, 720×520: ${b}`);
+    for (const [name, open, close] of SCREENS) {
+      await p.ev(open + "; 1"); await sleep(1300);
+      for (const b of await p.ev(PANEL)) problems.push(`${name} in German at 720×520: ${b}`);
+      const shot = await p.send("Page.captureScreenshot", { format: "jpeg", quality: 70 });
+      fs.writeFileSync(path.join(OUT, `de-${name}-720x520.jpg`), Buffer.from(shot.result.data, "base64"));
+      await p.ev(close + "; 1"); await sleep(400);
+    }
+    await p.ev(`(async () => { await setLang("en"); renderHints(); renderShelves(focusId); return 1; })()`); await sleep(500);
+    await p.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    console.log("· German done");
+  }
+
   // a controller through every panel: Select opens options, each panel opens from there, B closes it
   await p.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await p.ev(`(() => { document.hasFocus = () => true;
@@ -269,6 +291,11 @@ try {
   await tap("b"); await sleep(400);
   console.log("· controller walk done");
 
+  if (harvest) {
+    const seen = await p.ev(`JSON.stringify({seen: [...HARVEST], titles: G.map(g => g.title), systems: SYSTEMS})`);
+    fs.mkdirSync(path.join(ROOT, "dist"), { recursive: true }); fs.writeFileSync(path.join(ROOT, "dist", "words-seen.json"), seen);
+    console.log("· noted " + JSON.parse(seen).seen.length + " pieces of text in dist/words-seen.json");
+  }
   for (const e of p.errors) problems.push("page error: " + e);
   p.ws.close();
 } catch (e) {

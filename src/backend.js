@@ -32,7 +32,7 @@ const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
                      fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false, rewind: true, lessLag: true, hardcore: false,
-                     picture: "auto", sort: "title", buttons: "auto", arrange: "console", wood: "walnut", wall: "dark", saver: 5, music: false, musicVol: "medium" };
+                     picture: "auto", sort: "title", buttons: "auto", arrange: "console", wood: "walnut", wall: "dark", saver: 5, music: false, musicVol: "medium", textSize: 100, lang: "auto" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -76,6 +76,8 @@ function cleanUi(d) {
   if (["walnut", "oak", "white"].includes(d.wood)) out.wood = d.wood;
   if (["dark", "light"].includes(d.wall)) out.wall = d.wall;
   if ([0, 5, 10, 20].includes(d.saver)) out.saver = d.saver;
+  if ([100, 115, 130].includes(d.textSize)) out.textSize = d.textSize;
+  if (["auto", "en", "es", "fr", "de", "pt", "ja"].includes(d.lang)) out.lang = d.lang;
   if (["quiet", "medium", "loud"].includes(d.musicVol)) out.musicVol = d.musicVol;
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
   if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
@@ -1815,6 +1817,8 @@ class Backend extends EventEmitter {
     if (method === "GET") {
       if (pathname === "/" || pathname === "/index.html") return this.file(path.join(this.dirs.app, "index.html"), "text/html; charset=utf-8");
       if (pathname === "/licenses.html") return this.file(path.join(this.dirs.app, "licenses.html"), "text/html; charset=utf-8");
+      const words = /^\/words\/(es|fr|de|pt|ja)\.json$/.exec(pathname);
+      if (words) return this.file(path.join(this.dirs.app, "words", words[1] + ".json"), "application/json; charset=utf-8");
       if (pathname === "/api/library") return { code: 200, body: this.libraryJson() };
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };
       if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.state.sessions, now: now() } };
