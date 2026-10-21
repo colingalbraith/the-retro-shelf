@@ -70,9 +70,12 @@ Grab the latest version from [Releases](https://github.com/colingalbraith/the-re
 - **Mac with Apple silicon** (M1 and newer): `mac-arm64.dmg`. **Mac with Intel**: `mac-x64.dmg`. Open it and drag
   The Retro Shelf into Applications. Not sure which Mac you have? Apple menu → About This Mac: "Chip" means
   Apple silicon, "Processor" means Intel.
-- **Windows** 10 and 11: run the `Setup .exe`.
+- **Windows** 10 and 11: run the `Setup .exe`. Or, to keep everything on a USB stick, unzip `portable-win.zip`
+  and open The Retro Shelf in it: games, saves and settings stay in its Data folder.
+- **Linux** (64-bit, including Steam Deck): `linux-x86_64.AppImage`. Make it runnable (right-click → Properties →
+  Allow executing, or `chmod +x` it) and open it. On a Steam Deck, see [Steam Deck](docs/steam-deck.md).
 
-After that it updates itself.
+After that it updates itself (the portable copy tells you when there's a new version instead).
 
 The app isn't signed by Apple or Microsoft, so the first launch needs an extra step. After that it opens normally,
 updates included.
@@ -96,8 +99,10 @@ these under **Help → Where to Get Games**.
 
 ## Supported consoles
 
-NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Genesis / Mega Drive, Master System, Game Gear, PC Engine,
-Atari 2600, N64, DS, PlayStation, PSP, Dreamcast, GameCube, Wii and Arcade. Their emulators come with the app.
+33 of them: NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Genesis / Mega Drive, Sega CD, 32X, Saturn,
+Master System, Game Gear, SG-1000, PC Engine, Atari 2600, 7800 and Lynx, ColecoVision, Intellivision, Vectrex, MSX,
+N64, DS, PlayStation, PSP, Dreamcast, GameCube, Wii, 3DO, Neo Geo CD and Pocket, WonderSwan, Virtual Boy,
+Pokémon Mini and Arcade. Their emulators come with the app; PlayStation 2 works with PCSX2 installed separately.
 
 <details>
 <summary>Which emulator runs each one</summary>

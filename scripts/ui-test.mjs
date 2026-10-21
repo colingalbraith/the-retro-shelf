@@ -245,6 +245,20 @@ try {
   }
   await p.ev(`(HTML.dataset.wood = "walnut", HTML.dataset.wall = "dark", 1)`);
 
+  // a Steam Deck in TV mode: 1280×800, a quarter bigger, so the page has 1024×640
+  await p.ev(`(UI.tv = true, applyTv(), 1)`);
+  await p.send("Emulation.setDeviceMetricsOverride", { width: 1024, height: 640, deviceScaleFactor: 1.25, mobile: false }); await sleep(800);
+  for (const b of await p.ev(BACKS)) problems.push(`Steam Deck (TV mode): ${b}`);
+  for (const [name, open, close] of SCREENS) {
+    await p.ev(open + "; 1"); await sleep(1300);
+    for (const b of await p.ev(PANEL)) problems.push(`${name} on a Steam Deck (TV mode): ${b}`);
+    const shot = await p.send("Page.captureScreenshot", { format: "jpeg", quality: 70 });
+    fs.writeFileSync(path.join(OUT, `deck-${name}.jpg`), Buffer.from(shot.result.data, "base64"));
+    await p.ev(close + "; 1"); await sleep(400);
+  }
+  await p.ev(`(UI.tv = false, applyTv(), 1)`);
+  console.log("· Steam Deck (TV mode) done");
+
   // German, the longest words: every screen still fits at the smallest window (and the language comes back)
   if (!harvest && fs.existsSync(path.join(ROOT, "src", "words", "de.json"))) {
     await p.ev(`(async () => { await setLang("de"); renderHints(); renderShelves(focusId); return 1; })()`); await sleep(800);
