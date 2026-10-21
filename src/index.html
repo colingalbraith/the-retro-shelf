@@ -1816,6 +1816,8 @@ function backTo(e) {
   const p = topPanel(), f = p && focusables($("#" + p[0]))[0];
   if (f) f.focus({preventScroll: true}); else focusById(focusId);
 }
+/* back to a box after something finished, unless a panel or the playing screen has come up meanwhile */
+function focusFree(id) { if (!topPanel() && !LAUNCH.open) focusById(id); }
 function focusById(id) {
   const c = id && (sel && sel.dataset.id === id && document.getElementById("shelves").contains(sel) ? sel : document.querySelector('#shelves .card[data-id="' + id + '"]'))
     || document.querySelector("#shelves .card");
@@ -1836,6 +1838,12 @@ function updatePill() {
   paintUpd();
 }
 
+function paintUpdRow() {
+  const row = $("#updrow"); if (!row) return renderSettings();
+  const d = row.querySelector(".rl span"), b = row.querySelector("button");
+  if (d) d.textContent = updText();
+  if (b) { b.textContent = t({ready: "Restart now", manual: "Download"}[UPD.status] || "Check now"); b.classList.toggle("primary", UPD.status === "ready"); b.disabled = UPD.status === "checking" || UPD.status === "downloading"; }
+}
 /* ---------- updates: the app checks GitHub for a new version and puts it in place when it quits ---------- */
 let UPD = {status: "idle", version: "", progress: 0, error: ""};
 function paintUpd() {
@@ -1845,13 +1853,15 @@ function paintUpd() {
 }
 function updText() {
   const v = UPD.version;
-  return {checking: "Checking…", current: "You have the latest version.",
-    downloading: "Downloading version " + v + "… " + (UPD.progress || 0) + "%",
+  return {checking: t("Checking…"), current: t("You have the latest version."),
+    downloading: t("Downloading version {v}… {p}%", {v, p: UPD.progress || 0}),
     ready: t("Version {v} is ready. It goes in when you quit, or now with Restart.", {v}),
     manual: t("Version {v} is out. Download it from the releases page.", {v}) + (APP.platform === "darwin" ? " " + t("(Kept in your Applications folder, The Retro Shelf updates itself.)") : ""),
     error: UPD.error}[UPD.status] || t("Version {v}", {v: APPINFO.version || ""});
 }
 function updAction() {
+  /* not while games are being added or moved: quitting would cut the copying short */
+  if (UPD.status === "ready" && (STATUS.moving || (STATUS.import && STATUS.import.running))) return toast(t("The new version goes in once the games are copied."));
   if (UPD.status === "ready") APP.update("restart");
   else if (UPD.status === "manual") APP.update("page");
   else APP.update("check");
@@ -1972,6 +1982,11 @@ function padNav(root, dir) {
   const cur = all.includes(document.activeElement) ? document.activeElement : null;
   if (!cur) { all[0].focus({preventScroll: true}); all[0].scrollIntoView({block: "nearest"}); return; }
   if (cur.type === "range" && (dir === "l" || dir === "r")) { dir === "l" ? cur.stepDown() : cur.stepUp(); cur.dispatchEvent(new Event("input")); cur.dispatchEvent(new Event("change")); return; }
+  /* a list to choose from (the language): left and right go through it, round and round */
+  if (cur.tagName === "SELECT" && (dir === "l" || dir === "r") && cur.options.length) {
+    cur.selectedIndex = (cur.selectedIndex + (dir === "l" ? -1 : 1) + cur.options.length) % cur.options.length;
+    cur.dispatchEvent(new Event("change")); beep(440, .03, .02); return;
+  }
   const at = e => { const b = (e.closest(".sw") || e).getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
   const [cx, cy] = at(cur), [dx, dy] = {l: [-1, 0], r: [1, 0], u: [0, -1], d: [0, 1]}[dir];
   let best = null, bs = Infinity;
@@ -2004,7 +2019,7 @@ function openOpts(sub) {
   const item = (label, fn, cls, own) => { const b = el("button", cls || "", label); if (own) b.translate = false; b.onclick = () => { closeOpts(true); fn(); }; list.appendChild(b); };
   if (g && sub === "shelf") {
     $("#optst").textContent = t("Put {title} on a shelf", {title: g.title});
-    SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusById(g.id); toast(on ? t("Took it off {shelf}.", {shelf: sh.name}) : t("Put it on {shelf}.", {shelf: sh.name})); }, "", true); });
+    SHELVES.forEach(sh => { const on = sh.ids.includes(g.id); item((on ? "✓ " : "") + sh.name, async () => { await api("/api/shelves", {op: on ? "remove" : "add", name: sh.name, id: g.id}); await refresh(true); focusFree(g.id); toast(on ? t("Took it off {shelf}.", {shelf: sh.name}) : t("Put it on {shelf}.", {shelf: sh.name})); }, "", true); });
     item("New shelf…", () => openShelfSlip({id: g.id}));
   } else if (sub === "shelfMany" || sub === "progressMany") {
     /* the same thing for every picked game */
@@ -2028,7 +2043,7 @@ function openOpts(sub) {
     const set = v => async () => {
       const r = await api("/api/game/info", {id: g.id, [sub]: v});
       if (!r.ok) return toast(r.data.error || t("Couldn't save that."), true);
-      await refresh(true); focusById(g.id);
+      await refresh(true); focusFree(g.id);
     };
     $("#optst").textContent = sub === "progress" ? t("How far are you with {title}?", {title: g.title}) : t("Rate {title}", {title: g.title});
     if (sub === "progress") Object.entries(PROGRESS).forEach(([k, name]) => item((g.progress === k ? "✓ " : "") + t(name), set(k)));
@@ -2040,7 +2055,7 @@ function openOpts(sub) {
     const own = (g.opts || {})[sub], set = v => async () => {
       const r = await api("/api/game/opts", {id: g.id, opts: {[sub]: v}});
       if (!r.ok) return toast(r.data.error || t("Couldn't save that."), true);
-      await refresh(true); focusById(g.id); toast(v ? t("Saved for {title}.", {title: g.title}) : t("{title} uses Settings again.", {title: g.title}));
+      await refresh(true); focusFree(g.id); toast(v ? t("Saved for {title}.", {title: g.title}) : t("{title} uses Settings again.", {title: g.title}));
     };
     $("#optst").textContent = (sub === "picture" ? t("Picture for {title}", {title: g.title}) : t("Screen shape for {title}", {title: g.title}));
     item((own ? "" : "✓ ") + t("Same as Settings"), set(null));
@@ -2126,6 +2141,12 @@ function applyTv() { HTML.classList.toggle("tv", !!UI.tv); }
 
 /* ---------- collections: series (which of their games you have) and the ones you make, with games you want ---------- */
 let COLL = null, collTab = "series", showHiddenSeries = false, collIO = null;
+/* Collections fetched again in place (a game added or taken off): where you are in the list stays */
+async function reloadColls(tab) {
+  if (tab) collTab = tab;
+  const r = await api("/api/collections");
+  if (r.ok && isOpen("colls")) { COLL = r.data; renderColls(); }
+}
 async function openColls(tab) {
   if (LAUNCH.open) return;
   if (tab) collTab = tab;
@@ -2161,7 +2182,7 @@ function collItem(it, list) {
       e.stopPropagation();
       const r = await api("/api/shelves", {op: "unwant", name: list, system: it.system, look: it.look});
       if (!r.ok) return toast(r.data.error || "Couldn't take it off.", true);
-      if (isOpen("colls")) openColls();
+      if (isOpen("colls")) reloadColls();
     };
     b.appendChild(x);
   }
@@ -2215,12 +2236,12 @@ function openCounts(name) {
 $$("#ctabs button").forEach(b => { b.onclick = () => { collTab = b.dataset.t; renderColls(); beep(520); }; });
 
 /* adding a game to one of your collections: search every game the app knows */
-let waddList = null, waddT = 0;
+let waddList = null, waddT = 0, waddFrom = null;
 function openWantAdd(name) {
-  waddList = name; $("#waddt").textContent = t("Add a game to {name}", {name}); $("#waddq").value = ""; clear($("#waddr"));
+  waddList = name; waddFrom = opener(); $("#waddt").textContent = t("Add a game to {name}", {name}); $("#waddq").value = ""; clear($("#waddr"));
   $("#wadd").classList.add("show"); setTimeout(() => $("#waddq").focus(), 50);
 }
-function closeWantAdd() { if (!isOpen("wadd")) return; $("#wadd").classList.remove("show"); waddList = null; if (isOpen("colls")) openColls(); }
+function closeWantAdd() { if (!isOpen("wadd")) return; $("#wadd").classList.remove("show"); waddList = null; if (isOpen("colls")) reloadColls(); backTo(waddFrom); }
 $("#waddq").addEventListener("input", () => { clearTimeout(waddT); waddT = setTimeout(async () => {
   const q = $("#waddq").value, out = $("#waddr"); if (!q.trim()) return clear(out);
   const r = await api("/api/games/search", {q}); if (!r.ok || $("#waddq").value !== q) return;
@@ -2273,7 +2294,7 @@ async function pickCover(x) {
   const id = pickId; if (!id) return;
   busy(true); const r = await api("/api/covers/pick", {id, thumb: x.thumb, name: x.name}); busy(false);
   if (!r.ok) return toast(r.data.error || "Couldn't use that cover.", true);
-  closePicker(); await refresh(); focusById(id); toast("New cover saved.");
+  closePicker(); await refresh(); focusFree(id); toast(t("New cover saved."));
 }
 $("#pclose").onclick = closePicker;
 $("#pgo").onclick = searchCovers;
@@ -2281,27 +2302,27 @@ $("#pick").addEventListener("mousedown", e => { if (e.target === $("#pick")) clo
 
 /* ---------- your own shelves: make one from a game's right-click menu, rename or delete it in Settings ---------- */
 let nsh = null;   // {id} making a shelf with this game on it, or {from} renaming that shelf
+let nshFrom = null;
 function openShelfSlip(o) {
-  nsh = o; const ren = !!o.from;
+  nsh = o; const ren = !!o.from; nshFrom = opener();
   $("#nsht").textContent = ren ? "Rename shelf" : "New shelf";
   $("#nshp").textContent = ren ? "The name on its plate." : "Name it, like Couch co-op or To finish.";
   $("#nshok").textContent = ren ? "Save" : "Make shelf";
   $("#nshname").value = ren ? o.from : "";
-  if (isOpen("settings")) $("#settings").classList.remove("show");
   $("#nsh").classList.add("show"); light();
   setTimeout(() => { $("#nshname").focus(); $("#nshname").select(); }, 50);
 }
-function closeShelfSlip() { if (!isOpen("nsh")) return; $("#nsh").classList.remove("show"); nsh = null; focusById(focusId); light(); }
+function closeShelfSlip() { if (!isOpen("nsh")) return; $("#nsh").classList.remove("show"); nsh = null; backTo(nshFrom); light(); }
 async function saveShelfSlip() {
   const o = nsh, name = $("#nshname").value.trim(); if (!o) return;
-  if (!name) return toast("Give the shelf a name.", true);
+  if (!name) return toast(t("Give the shelf a name."), true);
   const r = await api("/api/shelves", o.from ? {op: "rename", name: o.from, to: name} : {op: "create", name, id: o.id || (o.ids || [])[0]});
-  if (!r.ok) return toast(r.data.error || "Couldn't save the shelf.", true);
+  if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't save the shelf."), true);
   /* a new shelf for picked games: all of them go on it */
   if (o.ids) { for (const id of o.ids.slice(1)) await api("/api/shelves", {op: "add", name, id}); clearPicks(); }
   closeShelfSlip(); await refresh(true);
-  if (o.id) focusById(o.id);
-  if (isOpen("colls")) openColls("mine");
+  if (o.id && !topPanel()) focusById(o.id);
+  if (isOpen("colls")) reloadColls("mine");
   toast(o.from ? t("Shelf renamed.") : t("Made the shelf “{name}”.", {name}));
 }
 $("#nshok").onclick = saveShelfSlip;
@@ -2320,7 +2341,7 @@ async function saveRename() {
   closeRename();
   const r = await api("/api/game/rename", {id, title: $("#rname").value});
   if (!r.ok) return toast(r.data.error || "Couldn't rename it.", true);
-  await refresh(true); focusById(id);
+  await refresh(true); focusFree(id);
 }
 
 /* ---------- first visit ---------- */
@@ -2492,9 +2513,12 @@ async function offerRecap() {
   const r = await api("/api/recap/due", {});
   if (r.ok && r.data.recap && !LAUNCH.open && !topPanel()) openRecap(r.data.recap.year, r.data.recap.month, true);
 }
+let recapSeq = 0;
 async function openRecap(year, month, offered) {
   if (LAUNCH.open) return;
-  const r = await api("/api/recap", {year, month}); if (!r.ok) return;
+  /* an answer that comes after the recap was closed, or after another month was asked for, is let go */
+  const my = ++recapSeq, wasOpen = isOpen("recap");
+  const r = await api("/api/recap", {year, month}); if (!r.ok || my !== recapSeq || (wasOpen && !isOpen("recap"))) return;
   if (offered) api("/api/recap/seen", {year, month});
   await renderRecap(RC = r.data);
   if (!isOpen("recap")) { rcFrom = opener(); blurActive(); $("#recap").classList.add("show"); light(); beep(520); setTimeout(() => $("#rcdone").focus({preventScroll: true}), 40); }
@@ -2653,7 +2677,7 @@ function openButtons(system) {
       const p = physFor(target);
       listRow(list, name, t("Your controller's {b}", {b: nm[STD_TO_RP.indexOf(p)] || "?"}), [[t("Change"), () => {
         if (!connectedPads().length) return toast(t("Plug in a controller first."), true);
-        $("#lstp").textContent = t("Press the button you want for {name}… (Esc to stop)", {name});
+        $("#lstp").textContent = t("Press the button you want for {name}… (hold B or press Esc to stop)", {name});
         LISTEN = async i => {
           LISTEN = null; $("#lstp").textContent = t("Which of your controller's buttons does each of the console's. Choose one, then press the button you want for it.");
           if (i === null) return;
@@ -2674,8 +2698,13 @@ function openButtonConsoles() {
 }
 
 /* choosing a folder of games with only a controller: the places to start, then folder by folder */
+/* a list opened after a wait (a slow folder, the saves): not if it was closed meanwhile, or something else was asked for */
+let listSeq = 0;
+const listTicket = () => { const my = ++listSeq, wasOpen = isOpen("lst"); return () => my === listSeq && !(wasOpen && !isOpen("lst")) && !LAUNCH.open; };
 async function openBrowse(dir) {
+  const still = listTicket();
   const r = await api("/api/browse", {dir: dir || ""});
+  if (!still()) return;
   if (!r.ok) return toast(r.data.error || t("That folder can't be opened."), true);
   const d = r.data, name = p => p.split(/[\\/]/).filter(Boolean).pop() || p;
   openList(d.dir ? name(d.dir) : t("Choose a folder of games"), d.dir || t("Its games show on the shelves where they are, and new ones appear by themselves."), list => {
@@ -2690,13 +2719,15 @@ async function openBrowse(dir) {
       for (const f of d.folders) listRow(list, f.name, f.games ? plural(f.games, "game", "games") : "", [[t("Open"), () => openBrowse(f.path)]], null, true);
       if (!d.folders.length) list.appendChild(el("p", "", t("No folders inside this one.")));
     } else for (const p of d.places) listRow(list, t(p.label), p.path, [[t("Open"), () => openBrowse(p.path)]]);
-  }, () => d.dir && d.folders.length ? $$("#lstl .lrow button")[2] : null);
+  }, () => d.dir && d.folders.length ? $$("#lstl .lrow button")[2] : null, !!d.dir);
 }
 
 /* ---------- a list of games, each with something to do: hidden games, copies of one game ---------- */
 let listFill = null, listFrom = null;
-function openList(title, about, fill, first) {
+function openList(title, about, fill, first, ownTitle) {
   if (!isOpen("lst")) listFrom = opener();
+  /* ownTitle: the title is a name (a folder's), not translated */
+  $("#lstt").translate = !ownTitle;
   listFill = fill; $("#lstt").textContent = title; $("#lstp").textContent = about;
   clear($("#lstl")); fill($("#lstl"));
   blurActive(); $("#lst").classList.add("show"); light(); beep(520);
@@ -2718,7 +2749,8 @@ function listRow(list, label, sub, buttons, pic, name) {
 }
 /* watched files whose console couldn't be told: you choose */
 async function openUnsure() {
-  const r = await api("/api/watch/unsure", {}); if (!r.ok) return;
+  const still = listTicket();
+  const r = await api("/api/watch/unsure", {}); if (!r.ok || !still()) return;
   let files = r.data.files;
   openList(t("Which console?"), t("These files could be for more than one console, and what's in them doesn't say. Choose for each."), list => {
     if (!files.length) list.appendChild(el("p", "", t("All sorted.")));
@@ -2734,7 +2766,9 @@ async function openSaves(id) {
   const g = byId.get(id); if (!g) return;
   let saves = [];
   const load = async () => { const r = await api("/api/saves/list", {id}); saves = r.ok ? r.data.saves : []; };
+  const still = listTicket();
   await load();
+  if (!still()) return;
   const trash = s => async () => {
     const r = await api("/api/saves/trash", {id, file: s.file});
     if (!r.ok) return toast(r.data.error || t("Couldn't move it to the Trash."), true);
@@ -2806,14 +2840,15 @@ async function saveNote() {
   closeNote();
   const r = await api("/api/game/info", {id, note: $("#notesq").value});
   if (!r.ok) return toast(r.data.error || t("Couldn't save the note."), true);
-  await refresh(true); focusById(id);
+  await refresh(true); focusFree(id);
 }
 $("#notesok").onclick = saveNote; $("#notesno").onclick = closeNote;
 /* Enter in the note box saves it: the keyboard handler below does that (once) */
 
 /* ---------- signing in to RetroAchievements: the password goes to the app's memory, and from there to RetroArch once ---------- */
-function openRas() { blurActive(); $("#rasu").value = CHEEVOS.user || CHEEVOS.pending || ""; $("#rasp").value = ""; $("#ras").classList.add("show"); light(); setTimeout(() => ($("#rasu").value ? $("#rasp") : $("#rasu")).focus(), 50); }
-function closeRas() { if (!isOpen("ras")) return; $("#ras").classList.remove("show"); $("#rasp").value = ""; light(); }
+let rasFrom = null;
+function openRas() { rasFrom = opener(); blurActive(); $("#rasu").value = CHEEVOS.user || CHEEVOS.pending || ""; $("#rasp").value = ""; $("#ras").classList.add("show"); light(); setTimeout(() => ($("#rasu").value ? $("#rasp") : $("#rasu")).focus(), 50); }
+function closeRas() { if (!isOpen("ras")) return; $("#ras").classList.remove("show"); $("#rasp").value = ""; backTo(rasFrom); light(); }
 async function saveRas() {
   const r = await api("/api/cheevos/signin", {user: $("#rasu").value, pass: $("#rasp").value});
   $("#rasp").value = "";
@@ -2862,7 +2897,7 @@ async function closeCheats() {
   if (!c || !c.list.length) return;
   const r = await api("/api/cheats/set", {id: c.id, on: [...c.on]});
   if (!r.ok) return toast(r.data.error || t("Couldn't save the cheats."), true);
-  await refresh(true); focusById(c.id);
+  await refresh(true); focusFree(c.id);
   toast(r.data.count ? t("{n} on, from the next time you play.", {n: plural(r.data.count, "cheat", "cheats")}) : t("Cheats off."));
 }
 $("#cheatok").onclick = () => closeCheats();
@@ -3125,7 +3160,7 @@ function renderSettings() {
 
   const ub = el("button", "btn" + (UPD.status === "ready" ? " primary" : ""), {ready: "Restart now", manual: "Download"}[UPD.status] || "Check now");
   ub.disabled = UPD.status === "checking" || UPD.status === "downloading"; ub.onclick = updAction;
-  R("Updates", updText(), ub);
+  R("Updates", updText(), ub).id = "updrow";
   R("Check for updates by itself", "Looks for a new version on GitHub every few hours. Nothing about you or your games is sent.", sw(UI.updates !== false, v => { UI.updates = v; saveUI(); }));
   R("Get test versions", "Try new features before they're finished, as test versions come out. They can have bugs; your games and saves stay as they are.", sw(!!UI.beta, v => { UI.beta = v; saveUI(); if (v) setTimeout(() => APP.update("check").then(s => { if (s) { UPD = s; paintUpd(); } }), 900); }));
   const pb = el("div", "btns"), cp = el("button", "btn", "Copy info"), is = el("button", "btn", "Report a problem");
@@ -3521,7 +3556,17 @@ setInterval(() => {
   const now = Date.now(), rep = k => { if (!n[k]) return false; if (!pad[k]) { padHeld[k] = now + 380; return true; } if (now >= padHeld[k]) { padHeld[k] = now + 110; return true; } return false; };
   const panel = topPanel();
   if (panel && panel[0] === "ctest") { if (n.b && pad.b && now - (padHeld.bDown || now) > 1200) closeCtest(); else if (n.b && !pad.b) padHeld.bDown = now; pad = n; return; }
-  if (LISTEN) { const i = n.raw.findIndex((on, k) => k < 16 && on && !(pad.raw || [])[k]); pad = n; if (i >= 0) LISTEN(i); return; }
+  /* choosing a button: the one pressed and let go is it (the d-pad isn't one to choose); B held down stops choosing */
+  if (LISTEN) {
+    const down = n.raw.findIndex((on, k) => k < 12 && on && !(pad.raw || [])[k]);
+    if (down >= 0 && padHeld.listen == null) { padHeld.listen = down; padHeld.listenAt = now; }
+    if (padHeld.listen != null) {
+      const k = padHeld.listen, held = now - padHeld.listenAt;
+      if (!n.raw[k]) { padHeld.listen = null; if (held < 800) LISTEN(k); }
+      else if (held >= 800 && k === (nin ? 0 : 1)) { padHeld.listen = null; LISTEN(null); }
+    }
+    pad = n; return;
+  }
   if (panel && !LAUNCH.open) {
     const root = $("#" + panel[0]);
     for (const k of ["l", "r", "u", "d"]) if (rep(k)) padNav(root, k);
@@ -3559,7 +3604,8 @@ document.addEventListener("drop", e => {
   importPaths(Array.prototype.map.call(e.dataTransfer.files, f => APP.pathFor(f)).filter(Boolean));
 });
 APP.onMenu(w => {
-  if (w && w.cmd === "update") { UPD = w.state; paintUpd(); if (isOpen("settings")) renderSettings(); return; }
+  /* only the Updates row changes as a download goes: the rest of Settings (a path half typed) stays as it is */
+  if (w && w.cmd === "update") { UPD = w.state; paintUpd(); if (isOpen("settings")) paintUpdRow(); return; }
   if (w && w.cmd === "refresh") { refresh(true).then(() => { if (w.focus) focusById(w.focus); }); return; }
   if (w && w.cmd === "error") { toast(w.text, true); return; }
   if (LAUNCH.open) return;
