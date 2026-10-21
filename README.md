@@ -29,7 +29,7 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 ## Features
 
 - **A real shelf:** every console has its own box style, with spine art and logos from the game's cover. Walnut, oak
-  or painted white wood, on a dark or light wall.
+  or cherry wood, or painted white or black, on a dark, light, green or blue wall.
 - **Pull a box out to play,** or turn it over to see last played, playtime, your saves and a note of your own.
 - **Drag-and-drop import** that works out which console each file is for, or **watch a folder** and new games appear
   by themselves.
@@ -39,11 +39,11 @@ keyboard or controller. RetroArch and its cores come inside the app, so there's 
 - **Art and details are automatic:** covers, logos, year, publisher and genre for 38,000+ games. Wrong cover? Pick
   the right one from a list.
 - **Shelves your way:** arrange by console, genre, decade or progress; make your own like "Couch co-op"; sort by
-  title, year, last played or rating. Search forgives spelling: try "snes rpg" or "90s".
+  title, year, last played, most played or rating. Search forgives spelling: try "snes rpg" or "90s".
 - **Collections:** every series your games belong to, with the ones you don't have yet standing faded, and wishlists
   of your own.
 - **Your play:** mark games backlog, playing, beaten or 100% and give them stars. A trophy shelf, a time card, monthly
-  and yearly recaps to save as pictures, and 208 pins to earn, no account needed.
+  and yearly recaps to save as pictures, and 216 pins to earn, no account needed.
 - **TV mode and Steam Deck:** fullscreen and bigger, everything works from a controller, with an on-screen keyboard
   and a screensaver.
 - **Controllers just work:** Xbox, PlayStation, Switch Pro and more, with a button test, your own layout for each

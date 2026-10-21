@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.2
+
+- **Fast-forward your way:** a speed for one game of its own, in its options or right-click menu, and Settings →
+  While you play → Fast-forward on the trigger: hold it, or press it once to switch fast-forward on and again to switch
+  it off.
+- **Sort by most played,** in Settings → Shelves.
+- **More looks:** cherry wood and shelves painted black, and deep green and blue walls.
+- **A list of your games:** Settings → Library → A list of your games saves every game with its console, year,
+  progress, rating and time played, as a spreadsheet file for Excel, Numbers or Google Sheets.
+- **Open when the computer starts:** Settings → App, for a computer hooked up to a TV (in TV mode if that's on).
+- **Eight new pins** for making the app yours: redecorating, saving a picture, looking at a recap, choosing a
+  fast-forward speed, watching a folder, saving your list, keeping saves in a cloud folder and choosing a language.
+  216 in all.
+- **More of the app in every language:** the corkboard's headings, the genre shelves' names and some pins were still
+  in English everywhere.
+
 ## 0.4.1
 
 - **Two more languages (beta):** Polski and 繁體中文 (Traditional Chinese). Computers set to Traditional Chinese

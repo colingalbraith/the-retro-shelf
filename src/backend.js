@@ -32,7 +32,7 @@ const repoOf = thumb => thumb.replace(/ /g, "_");
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
                      fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false, rewind: true, lessLag: true, hardcore: false,
-                     picture: "auto", sort: "title", buttons: "auto", arrange: "console", wood: "walnut", wall: "dark", saver: 5, music: false, musicVol: "medium", textSize: 100, lang: "auto", ffSpeed: 3 };
+                     picture: "auto", sort: "title", buttons: "auto", arrange: "console", wood: "walnut", wall: "dark", saver: 5, music: false, musicVol: "medium", textSize: 100, lang: "auto", ffSpeed: 3, ffTrigger: "hold" };
 const REGIONS = ["usa", "europe", "japan", "world", "germany", "france", "spain", "italy", "australia", "korea", "brazil", "china"];
 // standalone emulators named in config.json, and where their installers usually put them
 const KNOWN_APPS = {
@@ -99,6 +99,7 @@ const PROGRESS = ["backlog", "playing", "beaten", "complete"];
 const GAME_CHOICES = {
   picture: [["sharp", "Sharp"], ["smooth", "Smooth"], ["crt", "Old TV"], ["lcd", "Handheld"]],
   shape: [["core", "As the console showed it"], ["4:3", "4:3"], ["pixel", "Pixel-perfect"], ["stretch", "Stretch to fill"]],
+  ffSpeed: [["2", "2×"], ["3", "3×"], ["4", "4×"], ["max", "Fastest"]],
 };
 const GAME_OPTS = Object.fromEntries(Object.entries(GAME_CHOICES).map(([k, v]) => [k, v.map(c => c[0])]));
 
@@ -111,12 +112,13 @@ function cleanUi(d) {
   if (["cover", "printed"].includes(d.spine)) out.spine = d.spine;
   else if (["art", "color"].includes(d.spine)) out.spine = "cover";
   if (["auto", "sharp", "smooth", "crt", "lcd"].includes(d.picture)) out.picture = d.picture;
-  if (["title", "year", "played", "rating"].includes(d.sort)) out.sort = d.sort;
-  if (["walnut", "oak", "white"].includes(d.wood)) out.wood = d.wood;
-  if (["dark", "light"].includes(d.wall)) out.wall = d.wall;
+  if (["title", "year", "played", "most", "rating"].includes(d.sort)) out.sort = d.sort;
+  if (["walnut", "oak", "cherry", "white", "black"].includes(d.wood)) out.wood = d.wood;
+  if (["dark", "light", "green", "blue"].includes(d.wall)) out.wall = d.wall;
   if ([0, 5, 10, 20].includes(d.saver)) out.saver = d.saver;
   if ([100, 115, 130].includes(d.textSize)) out.textSize = d.textSize;
   if ([0, 2, 3, 4].includes(d.ffSpeed)) out.ffSpeed = d.ffSpeed;
+  if (["hold", "toggle"].includes(d.ffTrigger)) out.ffTrigger = d.ffTrigger;
   if (["auto", "en", "es", "fr", "de", "it", "pl", "pt", "ru", "ja", "ko", "zh", "zh-Hant"].includes(d.lang)) out.lang = d.lang;
   if (["quiet", "medium", "loud"].includes(d.musicVol)) out.musicVol = d.musicVol;
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
@@ -251,6 +253,25 @@ class Backend extends EventEmitter {
     this.checkPins();
     // a new install starts with the welcome card, not a list of changes it never had
     if (!this.state.seenVersion && !this.ui.welcomed) { this.state.seenVersion = this.dirs.version; this.saveState(); }
+  }
+
+  /**
+   * Every game as a row of a spreadsheet (CSV, which Excel, Numbers and Google Sheets open): its name, console, year,
+   * progress, rating and play. UTF-8 with a mark at the start, so Excel reads accents right; a cell starting with = + -
+   * or @ gets a ' in front, so a spreadsheet never runs one as a formula
+   */
+  listCsv() {
+    const st = this.state, fav = new Set(st.fav || []);
+    const cell = v => { let s = String(v ?? ""); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const day = t => t ? new Date(t * 1000).toISOString().slice(0, 10) : "";
+    const rows = [["Title", "Console", "Year", "Publisher", "Genre", "Progress", "Rating", "Favorite", "Times played", "Hours played", "Last played", "Hidden", "Note", "File"]];
+    const games = [...this.games.values()].map(g => ({ g, title: st.names[g.id] || g.title }))
+      .sort((a, b) => a.g.system.localeCompare(b.g.system) || a.title.localeCompare(b.title));
+    for (const { g, title } of games) rows.push([title, g.system, g.year || "", g.pub || "", g.genre || "",
+      { backlog: "Backlog", playing: "Playing", beaten: "Beaten", complete: "100%" }[st.progress[g.id]] || "", st.rating[g.id] || "",
+      fav.has(g.id) ? "Yes" : "", st.plays[g.id] || 0, ((st.time[g.id] || 0) / 3600).toFixed(1), day(st.last[g.id]),
+      st.hidden.includes(g.id) ? "Yes" : "", st.notes[g.id] || "", path.basename(g.path)]);
+    return "\ufeff" + rows.map(r => r.map(cell).join(",")).join("\r\n") + "\r\n";
   }
 
   /**
@@ -573,6 +594,7 @@ class Backend extends EventEmitter {
     if (list.some(d => inside(dir, d) || inside(d, dir))) return [409, { error: "That folder, or one around it, is watched already." }];
     this.paths.watch = [...list, dir]; this.saveSettings();
     this.scan();
+    this.event("watch");
     return [200, { ok: true, games: this.watchedItems(dir).items.length }];
   }
   /**
@@ -672,6 +694,7 @@ class Backend extends EventEmitter {
     this.paths.saves_dir = dir ? to : "";
     this.folders.saves = to; this.folders.states = path.join(to, "States");
     this.saveSettings();
+    if (dir) this.event("cloud");
     return [200, { ok: true, copied, to }];
   }
   /** saves shared between computers: which one has a game open. A note in the saves folder, gone when the game closes */
@@ -895,7 +918,7 @@ class Backend extends EventEmitter {
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
       const play = this.playOpts(g);
       const cheevos = this.raPending || (this.state.cheevos.user ? { user: this.state.cheevos.user } : null);
-      const triggers = play.freeTriggers ? ra.triggerProfiles(this.ra, dirs.private) : null;
+      const triggers = play.freeTriggers ? ra.triggerProfiles(this.ra, dirs.private, play.ffTrigger === "toggle") : null;
       ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null), pads: opts.pads, triggers }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
@@ -1160,6 +1183,8 @@ class Backend extends EventEmitter {
     const o = { ...this.ui, ...(this.state.gameOpts[g.id] || {}) };
     const s = this.cfg.systems[g.system] || {};
     if (o.picture === "auto") o.picture = s.picture || "sharp";
+    // a game's own fast-forward speed is kept as a word ("max" for as fast as it goes)
+    if (typeof o.ffSpeed === "string") o.ffSpeed = o.ffSpeed === "max" ? 0 : parseInt(o.ffSpeed, 10);
     return { ...o, light: !!s.light, freeTriggers: !!s.freeTriggers };
   }
 
@@ -1794,10 +1819,14 @@ class Backend extends EventEmitter {
 
   applySettings(data) {
     if (data.ui && typeof data.ui === "object") {
-      const before = this.ownEmu();
+      const before = this.ownEmu(), was = this.ui;
       this.ui = cleanUi({ ...this.ui, ...data.ui });
       this.saveSettings();
       if (this.ui.arrange !== "console") this.event("arrange");
+      // firsts, for pins
+      if (this.ui.wood !== was.wood || this.ui.wall !== was.wall) this.event("theme");
+      if (this.ui.ffSpeed !== was.ffSpeed) this.event("ffspeed");
+      if (this.ui.lang !== was.lang && this.ui.lang !== "auto") this.event("lang");
       if (before !== this.ownEmu() && this.ownEmu() && !this.exeOk()) this.autodetect();
     }
     const p = data.paths;
@@ -2043,7 +2072,10 @@ class Backend extends EventEmitter {
       case "/api/recap": {
         const y = parseInt(d.year, 10), m = d.month === null || d.month === undefined ? null : parseInt(d.month, 10);
         if (!(y > 1970 && y < 3000) || (m !== null && !(m >= 0 && m <= 11))) return j([400, { error: "Choose a month or a year." }]);
-        return j([200, this.recap(y, m)]);
+        // looked at, for its pin (after: a recap doesn't list the pin it just earned)
+        const r = this.recap(y, m);
+        this.event("recap");
+        return j([200, r]);
       }
       case "/api/recap/due": return j([200, { recap: this.recapDue() }]);
       case "/api/recap/seen": { const y = parseInt(d.year, 10), m = d.month === null || d.month === undefined ? null : parseInt(d.month, 10); this.state.recapSeen = recapKey(y, m); this.saveState(); return j([200, { ok: true }]); }

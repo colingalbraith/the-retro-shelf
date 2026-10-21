@@ -12,7 +12,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = f => fs.readFileSync(path.join(ROOT, f), "utf8");
 const require = createRequire(import.meta.url);
-const keys = new Set(), add = s => { if (typeof s === "string" && s.trim()) keys.add(s.trim()); };
+// folder paths shown as examples (~/Library/…, C:\\…) are the same in every language
+const keys = new Set(), add = s => { if (typeof s === "string" && s.trim() && !/^(~\/|\/|[A-Z]:\\)/.test(s.trim())) keys.add(s.trim()); };
 const unq = s => JSON.parse('"' + s + '"');
 
 // what the screens showed
@@ -46,6 +47,8 @@ const main = read("src/main.js");
 for (const m of main.matchAll(new RegExp(`(?:label: |tm\\()${str}`, "g"))) add(unq(m[1]));
 for (const m of main.matchAll(/\[\s*"[^"]*", "([A-Z][^"]*)"\]/g)) add(m[1]);
 for (const m of main.matchAll(new RegExp(`error: ${str}`, "g"))) add(unq(m[1]));
+// the right-click menu's own choices for a game ({ picture: "Picture", shape: "Screen Shape", … })
+for (const m of main.matchAll(/\{ picture: "([^"]+)", shape: "([^"]+)"[^}]*?ffSpeed: "([^"]+)"/g)) m.slice(1).forEach(add);
 
 // the backend's messages (the ones without blanks filled in by code)
 const backend = read("src/backend.js");
@@ -96,7 +99,8 @@ const templates = [...keys].filter(k => /\{\w+\}/.test(k)).map(k => new RegExp("
 const code = page + main + backend + read("src/pins.js") + read("src/config.json");
 const joined = k => [...keys].some(a => a !== k && /[.!?…]$/.test(a) && k.startsWith(a + " ") && keys.has(k.slice(a.length + 1)));
 // written in the app's own code, so words even when a game has the same name ("Dark", "X")
-const inCode = k => [page, main, backend].some(c => c.includes(`"${k}"`) || c.includes(`>${k}<`));
+const pinsCode = read("src/pins.js");
+const inCode = k => [page, main, backend, pinsCode].some(c => c.includes(`"${k}"`) || c.includes(`>${k}<`));
 const out = [...keys].filter(k => {
   if (/\{\w+\}/.test(k) && !code.includes(k)) return false;
   if (joined(k)) return false;
