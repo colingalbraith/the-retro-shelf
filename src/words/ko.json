@@ -1135,5 +1135,7 @@
  "Your trophy shelf": "트로피 선반",
  "yours": "보유",
  "Yours": "내 컬렉션",
- "Zip archive": "Zip 압축 파일"
+ "Zip archive": "Zip 압축 파일",
+ "Couldn't move their saves to the new name.": "세이브를 새 이름으로 옮기지 못했어요.",
+ "Your saves folder isn't there right now. Open iCloud Drive, Dropbox or OneDrive so it's back, then try again.": "세이브 폴더가 지금 없어요. iCloud Drive, Dropbox, OneDrive를 열어 다시 나타나게 한 다음 다시 해 보세요."
 }

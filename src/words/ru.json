@@ -1145,5 +1145,7 @@
  "days|few": "дня",
  "cheats|few": "чита",
  "BIOS files|few": "файла BIOS",
- "stars|few": "звезды"
+ "stars|few": "звезды",
+ "Couldn't move their saves to the new name.": "Не удалось перенести сохранения под новое имя.",
+ "Your saves folder isn't there right now. Open iCloud Drive, Dropbox or OneDrive so it's back, then try again.": "Папки сохранений сейчас нет. Откройте iCloud Drive, Dropbox или OneDrive, чтобы она появилась, и попробуйте ещё раз."
 }

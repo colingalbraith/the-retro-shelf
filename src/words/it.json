@@ -1135,5 +1135,7 @@
  "Your trophy shelf": "Il tuo scaffale dei trofei",
  "yours": "tuo",
  "Yours": "Le tue",
- "Zip archive": "Archivio zip"
+ "Zip archive": "Archivio zip",
+ "Couldn't move their saves to the new name.": "Impossibile spostare i suoi salvataggi sul nuovo nome.",
+ "Your saves folder isn't there right now. Open iCloud Drive, Dropbox or OneDrive so it's back, then try again.": "La tua cartella dei salvataggi al momento non c'è. Apri iCloud Drive, Dropbox o OneDrive perché torni, poi riprova."
 }

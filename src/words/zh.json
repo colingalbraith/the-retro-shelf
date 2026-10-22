@@ -1135,5 +1135,7 @@
  "Your trophy shelf": "你的奖杯架",
  "yours": "已拥有",
  "Yours": "我的",
- "Zip archive": "Zip 压缩包"
+ "Zip archive": "Zip 压缩包",
+ "Couldn't move their saves to the new name.": "无法把存档移到新名字下。",
+ "Your saves folder isn't there right now. Open iCloud Drive, Dropbox or OneDrive so it's back, then try again.": "存档文件夹现在不在。请打开 iCloud Drive、Dropbox 或 OneDrive 让它回来，然后再试一次。"
 }

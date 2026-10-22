@@ -469,17 +469,18 @@ class Backend extends EventEmitter {
       // apart from the state, which can come back from its .bak): a journal under this computer's name with a code it
       // never wrote was written by another computer (two Steam Decks are both "steamdeck", so names can't tell)
       const marks = jload(this.files.journalMarks, {}), mine = Array.isArray(marks[file]) ? marks[file] : [];
-      if (st.journalLast && mine.length) {
-        let cur = null;
-        try { cur = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
-        if (cur && cur.machine === this.machine() && cur.nonce && !mine.includes(cur.nonce)) return this.splitMachine();
-      }
+      let cur = null;
+      try { cur = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
+      if (st.journalLast && mine.length && cur && cur.machine === this.machine() && cur.nonce && !mine.includes(cur.nonce)) return this.splitMachine();
       const at = Math.floor(now()), j = sync.minus(sync.journal(st, this.keysKnown(), this.machine(), this.hostName(), at), st.journalBase);
       j.nonce = crypto.randomBytes(6).toString("hex");
-      // remembered before the journal's written: a write that's cut short leaves only a code that's known
-      marks[file] = [...mine, j.nonce].slice(-6);
+      // remembered before the journal's written: a write that's cut short leaves only a code that's known. The code of
+      // the one there now is always kept (writes that never reach it can't push it out)
+      const there = cur && cur.nonce && mine.includes(cur.nonce) ? [cur.nonce] : [];
+      marks[file] = [...mine.filter(x => !there.includes(x)).slice(-5), ...there, j.nonce];
       jsave(this.files.journalMarks, marks);
-      if (!sync.writeJournal(file, j)) return false;
+      // nothing new to write (the play's the same): its code is forgotten again
+      if (!sync.writeJournal(file, j)) { marks[file] = mine; jsave(this.files.journalMarks, marks); return false; }
       st.journalLast = { at, games: sync.totals(j) };
       this.saveState(true);
       return true;
@@ -583,8 +584,14 @@ class Backend extends EventEmitter {
     this.people = { active: list.some(x => x.id === p.active) ? p.active : "p1", list };
     // each person's folder name (for their saves and their journal), given once and kept with them: who else is on the
     // list never changes it. Their name as other computers know it, or with their number when that's taken here
+    // (given for the first time, it's where their saves and journal already are: their name's key, or with their number
+    // when someone else here has a name of that key)
     let named = false;
-    for (const x of list) if (typeof x.folder !== "string" || !/^[a-z0-9-]+$/.test(x.folder)) { x.folder = this.freeFolder(x, x.name); named = true; }
+    for (const x of list) if (typeof x.folder !== "string" || !/^[a-z0-9-]+$/.test(x.folder)) {
+      const k = sync.personKey(x.name), was = list.some(o => o.id !== x.id && sync.personKey(o.name) === k) ? k + "-" + x.id : k;
+      x.folder = list.some(o => o.id !== x.id && o.folder === was) ? k + "-" + x.id : was;
+      named = true;
+    }
     // (with one person, nothing is written: their folder is their name's, worked out each time)
     if (named && list.length > 1) { try { this.savePeople(); } catch {} }
   }
@@ -636,14 +643,14 @@ class Backend extends EventEmitter {
   }
   /** a folder's saves brought into another: what it hasn't got, and where both have a file, the newer one (the older
       going to the Trash first; kept where it can't). File times kept; nothing in src changes */
-  async mergeInto(src, dest) {
+  async mergeInto(src, dest, opts = {}) {
     for (const rel of zip.filesIn(src)) {
       const a = path.join(src, ...rel.split("/")), b = path.join(dest, ...rel.split("/"));
       let sb = null;
       try { sb = fs.statSync(b); } catch {}
       if (sb) {
         const sa = fs.statSync(a);
-        if (sa.size === sb.size && fs.readFileSync(a).equals(fs.readFileSync(b))) continue;
+        if (opts.keep || (sa.size === sb.size && fs.readFileSync(a).equals(fs.readFileSync(b)))) continue;
         if (!(sa.mtimeMs > sb.mtimeMs + 1000)) continue;
         try { await this.trash(b); } catch { continue; }
       }
@@ -800,16 +807,24 @@ class Backend extends EventEmitter {
     if (this.people.list.some(x => x !== p && sync.personKey(x.name) === sync.personKey(name))) return [409, { error: "There's someone with that name already." }];
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
     if (this.busy) return [409, { error: "Wait for the saves or games to finish moving, then play." }];
+    // a cloud folder that isn't there right now: their saves couldn't go along to the new name
+    if (this.syncOn() && !fs.existsSync(this.savesRoot())) return [409, { error: "Your saves folder isn't there right now. Open iCloud Drive, Dropbox or OneDrive so it's back, then try again." }];
+    // (no game starts and no saves move meanwhile)
+    return this.busyWith("saves", () => this.renameNow(p, name));
+  }
+  async renameNow(p, name) {
+    const id = p.id;
     // their saves folder (not the first person's: theirs is the saves folder itself) and this computer's journal of
     // their play go by the new name. The saves are moved, or brought into a folder of that name already there (newer
-    // wins), or copied from one shared with other computers, where the old name's may still be in use
+    // wins; where another computer has someone of that name, theirs stay), or copied from one shared with other
+    // computers, where the old name's may still be in use
     const journal = this.journalFileOf(p), saves = this.personFolder(id), was = [p.name, p.folder];
     p.name = name; p.folder = this.freeFolder(p, name);
     const journal2 = this.journalFileOf(p), saves2 = this.personFolder(id);
     if (id !== "p1" && saves !== saves2 && fs.existsSync(saves)) {
       try {
         if (!this.syncOn() && !fs.existsSync(saves2)) { fs.mkdirSync(path.dirname(saves2), { recursive: true }); fs.renameSync(saves, saves2); }
-        else await this.mergeInto(saves, saves2);
+        else await this.mergeInto(saves, saves2, { keep: this.othersUse(this.savesRoot(), p.folder) });
       } catch { [p.name, p.folder] = was; return [500, { error: "Couldn't move their saves to the new name." }]; }
     }
     if (journal !== journal2) {
@@ -1420,7 +1435,7 @@ class Backend extends EventEmitter {
     // boxes with any, everyone's file saved once, not once a box)
     const moved = this._base.sheetMoved = this._base.sheetMoved || {}, carry = hiddenBy.filter(([id, to]) => !moved[id] && found.has(to));
     if (carry.length) {
-      const has = (st, id) => ["plays", "time", "last", "names", "gameOpts", "cheats", "progress", "rating", "notes"].some(k => st[k] && id in st[k]) || (st.fav || []).includes(id) || (st.sessions || []).some(x => x[0] === id);
+      const has = (st, id) => ["plays", "time", "last", "names", "gameOpts", "cheats", "progress", "rating", "notes"].some(k => st[k] && id in st[k]) || (st.fav || []).includes(id) || (st.sessions || []).some(x => x[0] === id) || (st.shelves || []).some(sh => sh.ids.includes(id));
       const apply = st => { for (const [id, to] of carry) if (has(st, id)) this.moveStats(id, to, st, { keepHidden: true }); };
       if (carry.some(([id]) => has(this.state, id))) apply(this.state);
       // the others' only when someone else plays here at all
@@ -1900,12 +1915,14 @@ class Backend extends EventEmitter {
   /** move a game to another console's folder (its disc files and pictures go with it) */
   moveTo(id, system) {
     const g = this.games.get(id), s = this.cfg.systems[system];
-    if (!g || !s) return [404, { error: "Unknown game or system." }];
+    // (only to a console that plays that kind of file, as the menu offers: elsewhere it would leave the shelf)
+    if (!g || !s || !(s.exts || []).includes(path.extname(g.path).toLowerCase())) return [404, { error: "Unknown game or system." }];
     if (this.moving) return [409, { error: "The games are being moved. Try again when that's done." }];
     if (this.launching || (this.running && this.running.alive && this.running.id === id)) return [409, { error: "Close the game first." }];
     // a game in a watched folder stays where it is in that folder: only which console it's for changes (its history
     // stays, as it's known by its path)
     if (g.watched) {
+      this.carrySaves(g, system);
       this.state.watchSys = this.state.watchSys || {}; this.state.watchSys[g.path] = system;
       for (const c of (this._watched || new Map()).values()) c.dirty = true;
       this.saveState(); this.scan();

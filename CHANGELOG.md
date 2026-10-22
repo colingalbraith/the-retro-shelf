@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.5.0
+
+- **Everyone gets their own play:** Settings → Your play → People. Each person who plays on this computer gets their
+  own play history, pins, favorites, shelves, recaps, RetroAchievements sign-in and saves; the games and Settings stay
+  shared. With more than one person, the app asks who's playing when it opens. One person sees no change.
+- **Your play follows you between computers:** with your saves in an iCloud Drive, Dropbox or OneDrive folder (Settings
+  → Saves & BIOS), play history, ratings, progress, notes and favorites go along too. Time played adds up across
+  computers, and the shelves update by themselves when another computer plays. Two computers set up from one
+  (Migration Assistant, or two Steam Decks) tell themselves apart, and play from before counts once.
+- **Play from another app:** Settings → Library → Play from another app brings in favorites, play counts, play time,
+  ratings and finished games from EmulationStation (RetroPie, Batocera, ES-DE) or LaunchBox, for the games that are
+  here too. You see what comes in first, and bringing the same list in again adds nothing.
+- **PlayStation 2, built in:** PS2 games play with an emulator that comes with the app (LRPS2), so there's nothing else
+  to install. They still need a BIOS copied from your own PS2: drop it on the window and it goes in the right place.
+  Each game gets its own memory card in your Saves folder. If you have PCSX2, Settings → While you play → PlayStation 2
+  games lets you keep using it.
+- **Your screenshots on the box:** press F8 in a game and the newest screenshot goes on the back of its box.
+  Screenshots… in a game's options shows them all, each to find in its folder or put in the Trash.
+- **Game Gear, Master System and SG-1000 games have their own saves,** instead of sharing one with a Genesis game of
+  the same name. Your saves move over by themselves, and a game moved between these consoles takes its saves along.
+- **Your saves, kept safe:** a save the app replaces is never deleted: the older one goes to the Trash. Restoring a
+  backup never writes over a save, sharing saves through a cloud folder another computer already uses keeps that
+  computer's saves, and a full disk can no longer wipe your play history.
+- **Stop game on Windows saves first,** so Continue picks up where you stopped. Continue is only offered when it will
+  pick up where you left off, and a game that fails to start no longer counts as played.
+- **GameCube and Wii saves show up** in Continue, save slots and the saves list. So do Vectrex and Intellivision saves
+  on Linux and the Steam Deck.
+- **Multi-disc games:** Dreamcast and PC Engine games on several discs no longer vanish from the shelf, separate discs
+  you add become one box, and a Sega CD or Saturn game with a .cue and an .iso shows once.
+- **Controllers and keyboard:** a box that comes out lands in the right place, never a row up or off the screen, and
+  clearing a search goes back to where you were. Buttons that open the web browser or Finder say they need a mouse,
+  hints name your controller's own buttons, and putting saves or screenshots in the Trash takes a second press.
+- **RetroAchievements** signs in as whoever's playing, and a sign-in made in RetroArch's own menu is kept. Cheats you
+  made in RetroArch's menu are never deleted.
+- **The portable copy** keeps your play history when the USB stick comes back as another drive letter.
+- **Looks and words:** Settings fits in German and Polish, 3DO boxes have their black-and-gold look, spine titles are
+  readable on every color, trophies fit their shelf, and more of the app is in your language.
+
 ## 0.5.0-beta.7
 
 A new test acts out thousands of days of use at random: adding games, playing, people coming and going, moving games
