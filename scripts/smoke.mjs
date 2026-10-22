@@ -210,9 +210,10 @@ try {
     const ex = await until(`${system}: the game didn't close when asked`, () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
     if (ex.error) throw new Error(`${system}: the game closed with: ${ex.error}`);
     // asked to stop, RetroArch closes itself (saving where you left off); one that's still there after 5 s is made to
-    // stop, without saving. Counted from the asking (the first game can take a while to start on a slow machine)
+    // stop. On Windows that's by force, without saving, so it mustn't come to that there (on Mac and Linux it's the
+    // signal RetroArch takes as quitting, and it saves). Counted from the asking
     const took = (Date.now() - asked) / 1000;
-    if (took > 4.8) throw new Error(`${system}: RetroArch didn't close when asked (it was stopped by force after ${took.toFixed(1)} s, so nothing was saved)`);
+    if (process.platform === "win32" && took > 4.8) throw new Error(`${system}: RetroArch didn't close when asked (it was stopped by force after ${took.toFixed(1)} s, so nothing was saved)`);
     step(`${system}: running with the ${look} picture, closed after ${Math.round(ex.dt)} s`);
   }
 
@@ -245,7 +246,7 @@ try {
     await page.evaluate(`api("/api/stop", {})`);
     await until("NES: the game didn't close when asked", () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
     // Stop closes RetroArch the way it closes itself (so it saves first), not by force after waiting
-    if ((Date.now() - asked) / 1000 > 4.8) throw new Error("NES: RetroArch didn't close when asked, and was made to");
+    if (process.platform === "win32" && (Date.now() - asked) / 1000 > 4.8) throw new Error("NES: RetroArch didn't close when asked, and was made to");
     if (button) {
       const shots = await page.evaluate(`api("/api/library").then(r => (r.data.games.find(g => g.title === "Smoke Test") || {}).shots || 0)`);
       if (!shots) throw new Error("NES: the screenshot isn't on its box (not found in Screenshots/NES)");
