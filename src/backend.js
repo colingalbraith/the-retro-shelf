@@ -16,6 +16,8 @@ const pins = require("./pins");
 const { compare, isTest } = require("./version");
 const cheatFiles = require("./cheats");
 const zip = require("./zip");
+const sync = require("./sync");
+const playImport = require("./playimport");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
 const SHEETS = [".cue", ".gdi", ".m3u"];
@@ -98,7 +100,7 @@ const PROGRESS = ["backlog", "playing", "beaten", "complete"];
 // What each person who plays on this computer has of their own; everything else in the state (games' names and
 // settings, button layouts, watched folders, the backup clock) is the computer's. The first person's is in state.json
 // with the rest, as it always was, so one person sees no change; others' are in people/<id>.json
-const PERSONAL = ["fav", "last", "plays", "time", "sessions", "events", "pins", "progress", "rating", "notes", "shelves", "cheevos", "recapSeen"];
+const PERSONAL = ["fav", "last", "plays", "time", "sessions", "events", "pins", "progress", "rating", "notes", "shelves", "cheevos", "recapSeen", "edited", "imported"];
 const STATE_DEFAULTS = [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}], ["notCounted", {}]];
 
 // what one game can have of its own (setGameOpts): each setting's choices, with the words menus show for them
@@ -315,7 +317,7 @@ class Backend extends EventEmitter {
     let series = [], bios = false;
     try { series = this.collections()[1].series; } catch {}
     try { bios = biosStatus(this.folders.bios, null, this.cfg.systems).some(c => c.state === "ok" || c.state === "partial"); } catch {}
-    const res = pins.evaluate(pins.context([...this.games.values()], st, series, pins.genreGroup, { bios, now: now() }), Object.keys(this.cfg.systems));
+    const res = pins.evaluate(pins.context([...this.games.values()], this.withRemote(), series, pins.genreGroup, { bios, now: now() }), Object.keys(this.cfg.systems));
     // a pin added in a newer version that was already earned also counts as earned earlier, without popping up
     const known = new Set(st.pinKeys || []), fresh = [];
     let changed = first || res.length !== known.size;
@@ -393,11 +395,68 @@ class Backend extends EventEmitter {
   }
 
   saveState() {
+    this.journalSoon();
     if (this.state === this._base) return jsave(this.files.state, this._base);
     // someone other than the first person: the computer's part goes to state.json, theirs to their own file
     for (const [k, v] of Object.entries(this.state)) if (!PERSONAL.includes(k)) this._base[k] = v;
     jsave(this.files.state, this._base);
     jsave(this.personFile(this.people.active), Object.fromEntries(PERSONAL.filter(k => this.state[k] !== undefined).map(k => [k, this.state[k]])));
+  }
+
+  // ---------------------------------------------------------------- play on more than one computer
+  /** with saves in a cloud folder, play goes along too (sync.js): this computer's journal there, the others' read */
+  syncOn() { return !!this.paths.saves_dir; }
+  journalFile() {
+    const p = this.people.list.find(x => x.id === this.people.active);
+    return path.join(sync.journalDir(this.savesRoot(), p ? p.name : "player"), this.machine() + ".json");
+  }
+  /** written a moment after a change (a burst of changes is one write) */
+  journalSoon() {
+    if (!this.syncOn() || !this.people) return;
+    clearTimeout(this._journalT);
+    this._journalT = setTimeout(() => this.writeJournalNow(), 3000);
+    if (this._journalT.unref) this._journalT.unref();
+  }
+  writeJournalNow() {
+    clearTimeout(this._journalT); this._journalT = null;
+    if (!this.syncOn() || !this.people) return false;
+    try { return sync.writeJournal(this.journalFile(), sync.journal(this.state, this.games.values(), this.machine(), os.hostname(), Math.floor(now()))); } catch { return false; }
+  }
+  /**
+   * What the other computers add for whoever's playing (cached a little while): play totals by game, sittings, and
+   * which computers. What they set later than this one (a rating, progress) is taken into this one's state
+   */
+  remote(fresh) {
+    if (!this.syncOn() || !this.people) return { add: new Map(), sessions: [], hosts: [] };
+    const dir = path.dirname(this.journalFile());
+    if (!fresh && this._remote && this._remote.dir === dir && Date.now() - this._remote.t < 20000) return this._remote.v;
+    const v = sync.combine(sync.readJournals(dir, this.machine()), this.games.values());
+    this._remote = { dir, t: Date.now(), v };
+    if (sync.adopt(this.state, v.set)) { this.saveState(); try { this.checkPins(); } catch {} }
+    return v;
+  }
+  /** when another computer last wrote down its play (0 without a shared saves folder): the page shows the shelves again
+      when it changes. A look at a folder of a few files, every second or two */
+  farAt() {
+    if (!this.syncOn() || !this.people) return 0;
+    const dir = path.dirname(this.journalFile()), mine = this.machine() + ".json";
+    let at = 0;
+    try { for (const n of fs.readdirSync(dir)) if (n.endsWith(".json") && n !== mine) at = Math.max(at, fs.statSync(path.join(dir, n)).mtimeMs); } catch {}
+    if (this._remote && at > this._remote.t) this._remote = null;
+    return Math.floor(at);
+  }
+  /** every sitting, this computer's and the others' */
+  allSessions() {
+    const r = this.remote();
+    return r.sessions.length ? [...this.state.sessions, ...r.sessions].sort((a, b) => a[1] - b[1]) : this.state.sessions;
+  }
+  /** the state with the other computers' play added: what pins and recaps count */
+  withRemote() {
+    const r = this.remote();
+    if (!r.add.size && !r.sessions.length) return this.state;
+    const st = this.state, plays = { ...st.plays }, time = { ...st.time }, last = { ...st.last };
+    for (const [id, a] of r.add) { plays[id] = (plays[id] || 0) + a.plays; time[id] = (time[id] || 0) + a.time; last[id] = Math.max(last[id] || 0, a.last); }
+    return { ...st, plays, time, last, sessions: this.allSessions() };
   }
 
   // ---------------------------------------------------------------- people
@@ -444,8 +503,10 @@ class Backend extends EventEmitter {
     this.saveState();
     this.people.active = id;
     this.savePeople();
+    this.writeJournalNow();
     this.state = id === "p1" ? this._base : this.personState(id);
     this.applyFolders();
+    this._remote = null;
     this.raPending = null;
     this.newPins = [];
     try { this.checkPins(); } catch {}
@@ -813,6 +874,8 @@ class Backend extends EventEmitter {
     this.paths.saves_dir = dir ? to : "";
     this.applyFolders();
     this.saveSettings();
+    this._remote = null;
+    this.writeJournalNow();
     if (dir) this.event("cloud");
     return [200, { ok: true, copied, to }];
   }
@@ -1288,7 +1351,7 @@ class Backend extends EventEmitter {
    */
   setGameInfo(id, d) {
     if (!this.games.has(id)) return [404, { error: "Unknown game." }];
-    const st = this.state, set = (k, v) => { if (v === null || v === "" || v === 0) delete st[k][id]; else st[k][id] = v; };
+    const st = this.state, set = (k, v) => { if (v === null || v === "" || v === 0) delete st[k][id]; else st[k][id] = v; (st.edited = st.edited || {})[k + ":" + id] = Math.floor(now()); };
     if ("progress" in d) {
       if (d.progress && !PROGRESS.includes(d.progress)) return [400, { error: "Not a choice: " + d.progress }];
       set("progress", d.progress || null);
@@ -1472,6 +1535,7 @@ class Backend extends EventEmitter {
   toggleFav(id) {
     const f = this.state.fav, i = f.indexOf(id);
     i >= 0 ? f.splice(i, 1) : f.push(id);
+    (this.state.edited = this.state.edited || {})["fav:" + id] = Math.floor(now());
     this.saveState();
     this.checkPins();
     return [200, { fav: [...f] }];
@@ -1657,7 +1721,7 @@ class Backend extends EventEmitter {
    */
   recap(year, month) {
     const from = new Date(year, month ?? 0, 1).getTime() / 1000, to = (month == null ? new Date(year + 1, 0, 1) : new Date(year, month + 1, 1)).getTime() / 1000;
-    const all = this.state.sessions, firstOf = new Map();
+    const all = this.allSessions(), firstOf = new Map();
     for (const [id, start] of all) if (!firstOf.has(id) || start < firstOf.get(id)) firstOf.set(id, start);
     const ses = all.filter(s => s[1] >= from && s[1] < to), perGame = new Map(), perDay = new Map();
     let total = 0, longest = null;
@@ -1935,6 +1999,8 @@ class Backend extends EventEmitter {
       roms_dir: this.paths.roms_dir || root, exe: r.exe || "", cores_dir: r.cores_dir || "", args: (r.args || ["-f"]).join(" "),
       roms_ok: fs.existsSync(root), exe_ok: this.exeOk(), cores_ok: this.coresOk(),
       pcsx2: !!(this.cfg.systems.PS2 && this.cfg.systems.PS2.emulator && this.resolveApp(this.cfg.systems.PS2.emulator[0])),
+      // the other computers sharing the saves folder, with when each last wrote down its play
+      others: this.syncOn() ? this.remote().hosts : [],
       builtin: this.ra ? { version: this.ra.version, systems } : null, own: this.ownEmu(),
       folders: { games: root, saves: this.savesRoot(), bios: this.folders.bios },
       saves_dir: this.paths.saves_dir || "", backup_dir: this.backupDir(), last_backup: this.state.lastAutoBackup || 0,
@@ -1977,7 +2043,7 @@ class Backend extends EventEmitter {
   statusJson() {
     const r = this.running, live = !!(r && r.alive);
     return { running: live ? { id: r.id, since: r.since } : null, now: now(), covers: { ...this.cov },
-             import: { ...this.imp }, exit: this.lastExit, newPins: this.newPins || [], moving: this.moving || null };
+             import: { ...this.imp }, exit: this.lastExit, newPins: this.newPins || [], moving: this.moving || null, far: this.farAt() };
   }
 
   artVer(p) {
@@ -2078,10 +2144,11 @@ class Backend extends EventEmitter {
   }
 
   libraryJson() {
-    const st = this.state, dirCache = {};
+    // play on other computers too (with saves in a cloud folder)
+    const far = this.remote().add, st = this.state, dirCache = {};
     return {
       games: [...this.games.values()].map(g => ({ id: g.id, title: g.title, tag: g.tag, system: g.system, cv: this.artVer(g.cover), lv: this.artVer(g.logo),
-        plays: st.plays[g.id] || 0, time: st.time[g.id] || 0, last: st.last[g.id] || 0,
+        plays: (st.plays[g.id] || 0) + ((far.get(g.id) || {}).plays || 0), time: (st.time[g.id] || 0) + ((far.get(g.id) || {}).time || 0), last: Math.max(st.last[g.id] || 0, (far.get(g.id) || {}).last || 0),
         added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "", gg: pins.genreGroup(g.genre),
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null, cheats: (st.cheats[g.id] || []).length,
         progress: st.progress[g.id] || "", rating: st.rating[g.id] || 0, note: st.notes[g.id] || "",
@@ -2128,7 +2195,7 @@ class Backend extends EventEmitter {
       if (pathname === "/api/library") return { code: 200, body: this.libraryJson() };
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };
       if (pathname === "/api/people") return { code: 200, body: this.peopleJson() };
-      if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.state.sessions, now: now() } };
+      if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.allSessions(), now: now() } };
       if (pathname === "/api/collections") return { code: 200, body: this.collections()[1] };
       if (pathname === "/api/whatsnew") return { code: 200, body: { version: this.dirs.version, changes: this.whatsNew() } };
       if (pathname === "/api/pins") { const res = this.checkPins(); return { code: 200, body: { pins: pins.catalog(Object.keys(this.cfg.systems)), cats: pins.CATS, state: res, earned: this.state.pins } }; }
@@ -2206,6 +2273,16 @@ class Backend extends EventEmitter {
       }
       case "/api/recap/due": return j([200, { recap: this.recapDue() }]);
       case "/api/people/use": return j(this.usePerson(String(d.id || "")));
+      // play from EmulationStation or LaunchBox (playimport.js): what would come in, then bringing it in
+      case "/api/play-import": {
+        const lists = playImport.findLists((Array.isArray(d.paths) ? d.paths : []).map(String));
+        const p = playImport.plan(lists, [...this.games.values()]), s = playImport.summary(p);
+        if (!d.apply) return j([200, s]);
+        const n = playImport.apply(this.state, p);
+        this.saveState();
+        try { this.checkPins(); } catch {}
+        return j([200, { ...s, added: n }]);
+      }
       case "/api/people/add": return j(this.addPerson(d.name));
       case "/api/people/rename": return j(this.renamePerson(String(d.id || ""), d.name));
       case "/api/people/remove": return j(await this.removePerson(String(d.id || "")));

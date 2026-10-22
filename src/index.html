@@ -1929,6 +1929,7 @@ function onExit(prev) {
 
 /* ---------- polling + refresh ---------- */
 let lastFound = 0, lastRun = false, lastRunning = null;
+let lastFar = 0;
 async function poll() {
   const r = await api("/api/status"); if (!r.ok) return;
   const s = r.data; offset = s.now * 1000 - Date.now();
@@ -1944,7 +1945,9 @@ async function poll() {
   else if (!s.running && launched && s.exit && s.exit.id === launched.id && s.exit.at >= launched.since - 1) { const l = launched; launched = null; onExit(l); }
   if (!prev && s.running && !LAUNCH.open) showLaunch(byId.get(s.running.id));
   const c = s.covers;
-  if (c.found !== lastFound || (lastRun && !c.running)) refresh();
+  /* another computer wrote down new play (saves shared through a cloud folder): the shelves show it */
+  const farNew = s.far && s.far !== lastFar; lastFar = s.far || 0;
+  if (c.found !== lastFound || (lastRun && !c.running) || farNew) refresh();
   lastFound = c.found; lastRun = c.running;
   updateCoverUI(); updatePill();
 }
@@ -2561,6 +2564,28 @@ $("#keysok").onclick = closeKeys;
 
 /* ---------- a month's or a year's play on one card: offered once when a month starts, and from Your play ---------- */
 let RC = null, rcFrom = null;
+/* what play from another app would bring in, and bringing it in */
+function openPlayImport(paths, s) {
+  const about = !s.lists ? t("There's no EmulationStation or LaunchBox list there.")
+    : s.games ? t("{games} with play in those lists are here (games are matched by file name).", {games: plural(s.games, "game", "games")})
+    : t("None of the games with play in those lists are here. Games are matched by file name.");
+  openList(t("Play from another app"), about, list => {
+    if (!s.games) return;
+    const lines = [s.favs && t("Favorites: {n}", {n: s.favs}), s.plays && t("Plays: {n}", {n: s.plays.toLocaleString(LOCALE)}), s.time && t("Time played: {time}", {time: fmtDur(s.time)}),
+      s.ratings && t("Ratings: {n}", {n: s.ratings}), s.done && t("Finished: {n}", {n: s.done})].filter(Boolean);
+    for (const l of lines) list.appendChild(el("p", "", l));
+    list.appendChild(el("p", "", t("It's added to {name}'s play. Bringing the same list in again adds nothing.", {name: personName(PEOPLE.active)})));
+    const go = el("button", "btn primary", t("Bring it in"));
+    go.onclick = async () => {
+      const r = await api("/api/play-import", {paths, apply: true});
+      if (!r.ok) return toast(r.data.error || t("Couldn't bring that in."), true);
+      closeList(); await refresh(true);
+      toast(r.data.added ? t("Brought in play for {n}.", {n: plural(r.data.added, "game", "games")}) : t("That was brought in already."));
+    };
+    list.appendChild(go);
+  });
+}
+
 /* ---------- people ----------
    More than one person can play here, each with their own play, pins, favorites, shelves and saves; the games and
    Settings are everyone's. With more than one, the app asks who's playing when it opens */
@@ -3140,6 +3165,16 @@ function renderSettings() {
   const dups = duplicates();
   if (dups.length) { const db2 = el("button", "btn", t("Look")); db2.onclick = openDuplicates; R(t("The same game twice"), dups.length === 1 ? t("1 game is on the same console more than once, like two regions or revisions.") : t("{n} games are on the same console more than once, like two regions or revisions.", {n: dups.length}), db2); }
 
+  /* play brought in from EmulationStation or LaunchBox: what would come in first, then in */
+  const pi = el("button", "btn", t("Choose…"));
+  pi.onclick = async () => {
+    if (mouseOnly()) return;
+    const paths = await APP.pickPlayLists(); if (!paths || !paths.length) return;
+    const r = await api("/api/play-import", {paths});
+    if (!r.ok) return toast(r.data.error || t("Couldn't read that."), true);
+    openPlayImport(paths, r.data);
+  };
+  R(t("Play from another app"), t("From EmulationStation (RetroPie, Batocera, ES-DE) or LaunchBox: favorites, play counts, last played, ratings and play time, for the games that are here too."), pi);
   const xl = el("button", "btn", t("Export…"));
   xl.onclick = async () => { const quick = byPad(), r = await APP.exportList(quick); if (r && r.ok) toast(t("Saved a list of {n}.", {n: plural(r.count, "game", "games")}) + (quick ? " " + t("It's in {place}.", {place: r.path}) : "")); else if (r && r.error) toast(r.error, true); };
   R(t("A list of your games"), t("Every game with its console, year, progress, rating and time played, as a spreadsheet file (CSV) for Excel, Numbers or Google Sheets."), xl);
@@ -3199,8 +3234,9 @@ function renderSettings() {
     sm.onclick = async () => { if (mouseOnly()) return; const r = await APP.moveSaves(false); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("Saves are in {dir} now. The old copy stays where it was.", {dir: r.to})); };
     sf.appendChild(sm);
     if (PATHS.saves_dir) { const sb = el("button", "btn", t("Back to the usual place")); sb.onclick = async () => { const r = await APP.moveSaves(true); if (r && r.ok) { await refresh(true); renderSettings(); toast(t("Saves are back in Documents › The Retro Shelf.")); } else if (r && r.error) toast(r.error, true); }; sf.appendChild(sb); }
-    R(t("Saves on more than one computer"), PATHS.saves_dir ? t("Shared through {dir}. If a game is open on another computer, you're told before playing it here. In iCloud Drive, keep the folder downloaded (right-click it in Finder).", {dir: PATHS.saves_dir})
-      : t("Put the saves in a folder in iCloud Drive, Dropbox or OneDrive, and point The Retro Shelf on your other computers at the same folder: your progress follows you."), sf);
+    R(t("Saves on more than one computer"), PATHS.saves_dir ? t("Shared through {dir}. If a game is open on another computer, you're told before playing it here. In iCloud Drive, keep the folder downloaded (right-click it in Finder).", {dir: PATHS.saves_dir}) + " " + ((PATHS.others || []).length ? t("Play on {computers} counts here too.", {computers: PATHS.others.map(o => o.host || t("another computer")).join(", ")})
+        : t("Your play history, ratings, progress and notes go along too."))
+      : t("Put the saves in a folder in iCloud Drive, Dropbox or OneDrive, and point The Retro Shelf on your other computers at the same folder: your progress follows you.") + " " + t("Your play history, ratings, progress and notes go along too."), sf);
     const bb = el("div", "btns"), bk = el("button", "btn", "Back up…"), rs = el("button", "btn", "Restore…");
     bk.onclick = async () => { const quick = byPad(), r = await APP.backupSaves(quick); if (r.ok) toast(t("Backed up {n}.", {n: plural(r.count, "file", "files")}) + (quick ? " " + t("It's in {place}.", {place: r.path}) : "")); else if (r.error) toast(r.error, true); };
     rs.onclick = async () => {

@@ -814,3 +814,49 @@ test("no changing who's playing while a game is open", () => {
   be.running = null;
   assert.equal(be.usePerson(id)[0], 200);
 });
+
+test("play follows you between computers through the shared saves folder", async () => {
+  const cloud = path.join(home, "cloud");
+  // two computers, each with its own games folder and settings, the same game file, and saves in the same cloud folder
+  const computer = name => {
+    const b = new Backend({ app: APP, data: path.join(home, name, "data"), docs: path.join(home, name, "docs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+    b.init();
+    const f = path.join(b.romsRoot(), "snes", "Chrono Trigger (USA).sfc"); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, "x");
+    b.scan();
+    return b;
+  };
+  const a = computer("a"), b = computer("b");
+  assert.equal((await a.moveSaves(cloud))[0], 200);
+  assert.equal((await b.moveSaves(cloud))[0], 200);
+  const ga = [...a.games.values()][0], gb = [...b.games.values()][0];
+  assert.notEqual(ga.id, gb.id, "the same game has its own id on each computer");
+  // played on a: an hour, twice
+  a.state.plays[ga.id] = 2; a.state.time[ga.id] = 3600; a.state.last[ga.id] = 1790000000;
+  a.state.sessions.push([ga.id, 1790000000 - 7200, 1800], [ga.id, 1790000000, 1800]);
+  a.setGameInfo(ga.id, { rating: 5 });
+  a.writeJournalNow();
+  // b sees it (once it looks again: it has read the folder already): the time, the sittings, the rating
+  b.remote(true);
+  const seen = b.libraryJson().games.find(g => g.id === gb.id);
+  assert.deepEqual([seen.plays, seen.time, seen.last], [2, 3600, 1790000000]);
+  assert.equal(b.allSessions().length, 2);
+  assert.equal(b.state.rating[gb.id], 5, "a's rating, taken in");
+  // played on b too: both add up; a later rating on b wins on a
+  b.state.plays[gb.id] = 1; b.state.time[gb.id] = 600; b.state.sessions.push([gb.id, 1790100000, 600]);
+  await new Promise(r => setTimeout(r, 1100));
+  b.setGameInfo(gb.id, { rating: 3 });
+  b.writeJournalNow();
+  a.remote(true);
+  const back = a.libraryJson().games.find(g => g.id === ga.id);
+  assert.deepEqual([back.plays, back.time], [3, 4200]);
+  assert.equal(a.state.rating[ga.id], 3);
+  assert.equal(a.allSessions().length, 3, "the time card and recaps count every computer's sittings");
+  assert.deepEqual(a.settingsJson().paths.others.map(o => o.host), [os.hostname()]);
+});
+
+test("without a shared saves folder, nothing is written for other computers", () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  be.setGameInfo(byTitle("Chrono Trigger").id, { rating: 4 });
+  assert.equal(be.writeJournalNow(), false);
+  assert.ok(!fs.existsSync(path.join(home, "docs", "Saves", ".the-retro-shelf")));
+});

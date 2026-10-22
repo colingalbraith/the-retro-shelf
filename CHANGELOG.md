@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0-beta.3
+
+- **Your play follows you between computers:** with your saves in an iCloud Drive, Dropbox or OneDrive folder (Settings
+  → Saves & BIOS), play history, ratings, progress, notes and favorites go along too. Time played and sittings add up
+  across computers in Your play, recaps, the time card and pins; for a rating or progress, the latest one counts.
+  Games are matched by their file name, people by their name, and the shelves update by themselves when another
+  computer plays.
+- **Play from another app:** Settings → Library → Play from another app brings in favorites, play counts, last
+  played, ratings, play time and finished games from EmulationStation (RetroPie, Batocera, ES-DE) or LaunchBox, for the
+  games that are here too. You see what comes in first, and bringing the same list in again adds nothing.
+
 ## 0.5.0-beta.2
 
 - **Everyone gets their own play:** Settings → Your play → People. Add the people who play on this computer, and each
