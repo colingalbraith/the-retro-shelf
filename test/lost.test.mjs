@@ -77,17 +77,29 @@ function run(seed, steps) {
     async add() { addGame(be.romsRoot(), pick(KINDS), pick(NAMES)); be.scan(); },
     async play() { const g = pick(games()); if (g) play(be, g); },
     async scan() { be.scan(); },
-    async moveTo() {
-      const g = pick(games()), k = pick(KINDS); if (!g) return;
+    async moveTo(g = pick(games()), k = pick(KINDS)) {
+      if (!g) return false;
       const stem = path.parse(g.path).name, same = be.cfg.systems[g.system].core === be.cfg.systems[k[0]].core;
       // (a game of that name on that console already keeps its own saves: the moved one's don't go there)
       const taken = games().some(x => x.id !== g.id && x.system === k[0] && path.parse(x.path).name.toLowerCase() === stem.toLowerCase());
-      if (be.moveTo(g.id, k[0])[0] !== 200) return;
+      if (be.moveTo(g.id, k[0])[0] !== 200) return false;
       for (const p of be.people.list) {
         const was = keyOf(p.id, g.system, stem), v = latest.get(was), to = keyOf(p.id, k[0], stem);
         latest.delete(was);
         if (v && same && !taken) latest.set(to, v);
       }
+      return true;
+    },
+    // a game put on the wrong one of the consoles one emulator plays, maybe played there, and put back: its saves go
+    // there and back, meeting the ones it left behind
+    async moveBack() {
+      const sega = KINDS.filter(k => ["Genesis", "Master System", "Game Gear"].includes(k[0])), g = pick(games().filter(x => sega.some(k => k[0] === x.system)));
+      if (!g) return;
+      const stem = path.parse(g.path).name, from = sega.find(k => k[0] === g.system), to = pick(sega.filter(k => k !== from));
+      if (!(await actions.moveTo(g, to))) return;
+      const there = games().find(x => x.system === to[0] && path.parse(x.path).name === stem);
+      if (there && rnd() < .7) play(be, there);
+      if (there) await actions.moveTo(there, from);
     },
     async hide() { const g = pick(games()); if (g) be.hide(g.id, rnd() < .7); },
     async rename() { const g = pick(games()); if (g) be.rename(g.id, rnd() < .5 ? "" : "My " + g.title); },
@@ -147,7 +159,7 @@ function run(seed, steps) {
   // the games both computers have (so they meet in the shared folder), played often on both
   const SHARED = [[0, 0], [3, 3], [2, 1]];
   actions.playShared = async () => { const g = games().find(x => SHARED.some(([k, nm]) => x.system === KINDS[k][0] && path.parse(x.path).name === NAMES[nm])); if (g) play(be, g); };
-  const names = Object.keys(actions), weight = { play: 5, add: 2, scan: 2, otherComputer: seed % 2 ? 4 : 1, playShared: 3, share: 2, home: 2 };
+  const names = Object.keys(actions), weight = { play: 5, add: 2, moveBack: 2, scan: 2, otherComputer: seed % 2 ? 4 : 1, playShared: 3, share: 2, home: 2 };
   const bag = names.flatMap(k => Array(weight[k] || 1).fill(k));
 
   // (someone not playing now: what they'd be shown, their save where the app keeps it for them)
