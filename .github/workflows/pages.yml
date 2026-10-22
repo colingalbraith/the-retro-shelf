@@ -1,12 +1,13 @@
 name: Website
 
 # The download page on GitHub Pages (colingalbraith.github.io/the-retro-shelf): site/index.html with the README's
-# pictures and the latest release's downloads (scripts/site.mjs). Published again when the page or its pictures
-# change, and when a release comes out, so its button always offers the newest version.
+# pictures and the latest release's downloads, in English and the app's other languages (scripts/site.mjs, site/words).
+# Published again when the page, its words or its pictures change, and when a release comes out, so its button
+# always offers the newest version.
 on:
   push:
     branches: [main]
-    paths: ["site/**", "docs/images/**", "scripts/site.mjs", ".github/workflows/pages.yml"]
+    paths: ["site/**", "docs/images/**", "scripts/site.mjs", "scripts/site-words.mjs", ".github/workflows/pages.yml"]
   release:
     types: [published, edited]
   workflow_dispatch:

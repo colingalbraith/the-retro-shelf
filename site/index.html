@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Retro Shelf</title>
-<meta name="description" content="Your retro game collection as real boxes on a shelf. Emulators built in, games not included. Free for Mac, Windows and Linux, with no account and no tracking.">
+<meta name="description" data-t-content content="Your retro game collection as real boxes on a shelf. Emulators built in, games not included. Free for Mac, Windows and Linux, with no account and no tracking.">
 <meta property="og:title" content="The Retro Shelf">
-<meta property="og:description" content="Your retro game collection as real boxes on a shelf. Emulators built in. Games not included.">
+<meta property="og:description" data-t-content content="Your retro game collection as real boxes on a shelf. Emulators built in. Games not included.">
 <meta property="og:image" content="https://colingalbraith.github.io/the-retro-shelf/images/selected.jpg">
 <meta property="og:type" content="website">
 <link rel="icon" href="images/icon.png">
@@ -16,6 +16,11 @@
 @font-face{font-family:"Plex Cond";src:url(fonts/plex-cond-600.woff2) format("woff2");font-weight:600;font-display:swap}
 @font-face{font-family:"Plex Cond";src:url(fonts/plex-cond-700.woff2) format("woff2");font-weight:700;font-display:swap}
 @font-face{font-family:"Plex Mono";src:url(fonts/plex-mono-400.woff2) format("woff2");font-weight:400;font-display:swap}
+/* accented letters beyond Western Europe's (Polish), loaded only when a page has them */
+@font-face{font-family:"Plex Cond";src:url(fonts/plex-cond-400-ext.woff2) format("woff2");font-weight:400;font-display:swap;unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:"Plex Cond";src:url(fonts/plex-cond-600-ext.woff2) format("woff2");font-weight:600;font-display:swap;unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:"Plex Cond";src:url(fonts/plex-cond-700-ext.woff2) format("woff2");font-weight:700;font-display:swap;unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:"Plex Mono";src:url(fonts/plex-mono-400-ext.woff2) format("woff2");font-weight:400;font-display:swap;unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF}
 :root{
   --wall:#1e1c1a;--wall-hi:#272420;--chalk:#ddd6c8;--dust:#9a9285;
   --paper:#ece6d6;--paper-hi:#f4efe3;--ink:#1c1916;--ink2:#5f584d;
@@ -39,6 +44,11 @@ a{color:inherit}
 .top nav{display:flex;gap:6px 20px;flex-wrap:wrap;font-size:15px}
 .top nav a{text-decoration:none;color:var(--dust)}
 .top nav a:hover{color:var(--chalk)}
+#lang{font:600 14px var(--disp);background:var(--wall-hi);color:var(--chalk);border:1px solid rgba(221,214,200,.25);border-radius:2px;padding:5px 8px;margin-left:auto}
+.offer{margin:0;padding:10px max(20px,env(safe-area-inset-right,0px)) 10px max(20px,env(safe-area-inset-left,0px));background:var(--acc);color:#fff;display:flex;justify-content:center;align-items:center;gap:16px;font-weight:600}
+.offer[hidden]{display:none}
+.offer a{color:#fff}
+.offer button{background:none;border:0;color:#fff;font:700 18px/1 var(--disp);cursor:pointer}
 
 /* the label tape and the brass plate, as on the shelves */
 .tape{display:inline-block;background:var(--acc);color:#fff;font:700 14px/1 var(--disp);letter-spacing:.16em;text-transform:uppercase;padding:8px 18px 7px;
@@ -126,27 +136,29 @@ footer p{margin:6px 0;max-width:72ch}
 </style>
 </head>
 <body>
+<p class="offer" id="offer" hidden><a id="offer-a"></a><button id="offer-x" aria-label="×">×</button></p>
 <div class="wrap top">
   <a class="brand" href="#"><img src="images/icon.png" alt="">The Retro Shelf</a>
-  <nav aria-label="On this page"><a href="#download">Download</a><a href="#features">What it does</a><a href="#consoles">Consoles</a><a href="#questions">Questions</a><a href="https://github.com/colingalbraith/the-retro-shelf">GitHub</a></nav>
+  <select id="lang" aria-label="Language" data-t-aria></select>
+  <nav aria-label="On this page" data-t-aria><a href="#download" data-t>Download</a><a href="#features" data-t>What it does</a><a href="#consoles" data-t>Consoles</a><a href="#questions" data-t>Questions</a><a href="https://github.com/colingalbraith/the-retro-shelf">GitHub</a></nav>
 </div>
 
 <main>
 <div class="wrap hero" id="download">
   <div>
-    <h1>Your retro games, as real boxes on a shelf.</h1>
-    <p>Drag your games onto the window and they land on the right shelf with their box art, ready to play with a keyboard or a controller. The emulators come inside the app, so there's nothing else to set up.</p>
-    <p class="quiet">Free for Mac, Windows and Linux. No account, no ads, no tracking. Games not included.</p>
+    <h1 data-t>Your retro games, as real boxes on a shelf.</h1>
+    <p data-t>Drag your games onto the window and they land on the right shelf with their box art, ready to play with a keyboard or a controller. The emulators come inside the app, so there's nothing else to set up.</p>
+    <p class="quiet" data-t>Free for Mac, Windows and Linux. No account, no ads, no tracking. Games not included.</p>
   </div>
   <div class="slip">
-    <span class="tape">Download</span>
+    <span class="tape" data-t>Download</span>
     <a class="dl" id="dl" href="https://github.com/colingalbraith/the-retro-shelf/releases/latest">
-      <b id="dl-name">Download The Retro Shelf</b>
-      <small id="dl-info">From the releases page</small>
+      <b id="dl-name" data-t>Download The Retro Shelf</b>
+      <small id="dl-info" data-t>From the releases page</small>
     </a>
     <p class="alt" id="dl-alt"></p>
     <details>
-      <summary>Every download</summary>
+      <summary data-t>Every download</summary>
       <ul id="dl-all"></ul>
     </details>
     <p class="fine" id="dl-version"></p>
@@ -154,72 +166,72 @@ footer p{margin:6px 0;max-width:72ch}
 </div>
 
 <div class="wrap stage">
-  <img src="images/demo.gif" width="840" height="525" alt="Moving along the shelf: boxes slide out when picked, turn over to show play history, and each console's games stand spines-out on their own shelf">
+  <img src="images/demo.gif" width="840" height="525" alt="Moving along the shelf: boxes slide out when picked, turn over to show play history, and each console's games stand spines-out on their own shelf" data-t-alt>
   <div class="plank" aria-hidden="true"></div>
 </div>
 
 <section id="first">
   <div class="wrap">
-    <span class="tape">The first time</span>
-    <h2>Opening it the first time</h2>
-    <p class="lead">The app isn't signed by Apple or Microsoft, so your computer asks once whether you trust it. After that it opens normally and updates itself.</p>
-    <div class="tabs" role="tablist" aria-label="Your computer">
-      <button role="tab" id="t-mac" aria-controls="p-mac">Mac</button><button role="tab" id="t-win" aria-controls="p-win">Windows</button><button role="tab" id="t-linux" aria-controls="p-linux">Linux and Steam Deck</button>
+    <span class="tape" data-t>The first time</span>
+    <h2 data-t>Opening it the first time</h2>
+    <p class="lead" data-t>The app isn't signed by Apple or Microsoft, so your computer asks once whether you trust it. After that it opens normally and updates itself.</p>
+    <div class="tabs" role="tablist" aria-label="Your computer" data-t-aria>
+      <button role="tab" id="t-mac" aria-controls="p-mac" data-t>Mac</button><button role="tab" id="t-win" aria-controls="p-win" data-t>Windows</button><button role="tab" id="t-linux" aria-controls="p-linux" data-t>Linux and Steam Deck</button>
     </div>
     <div role="tabpanel" id="p-mac" aria-labelledby="t-mac">
       <ol class="steps">
-        <li><span>Open the <b>.dmg</b> and drag The Retro Shelf into <b>Applications</b>.</span></li>
-        <li><span>Open it from Applications. macOS says it can't check the app: click <b>Done</b>.</span></li>
-        <li><span>Open <b>System Settings → Privacy &amp; Security</b> and scroll down to Security. Next to "The Retro Shelf was blocked to protect your Mac", click <b>Open Anyway</b> and confirm with your password or Touch ID.</span></li>
-        <li><span>Click <b>Open Anyway</b> once more when asked.</span></li>
+        <li><span data-t>Open the <b>.dmg</b> and drag The Retro Shelf into <b>Applications</b>.</span></li>
+        <li><span data-t>Open it from Applications. macOS says it can't check the app: click <b>Done</b>.</span></li>
+        <li><span data-t>Open <b>System Settings → Privacy &amp; Security</b> and scroll down to Security. Next to "The Retro Shelf was blocked to protect your Mac", click <b>Open Anyway</b> and confirm with your password or Touch ID.</span></li>
+        <li><span data-t>Click <b>Open Anyway</b> once more when asked.</span></li>
       </ol>
     </div>
     <div role="tabpanel" id="p-win" aria-labelledby="t-win" hidden>
       <ol class="steps">
-        <li><span>Run the <b>Setup .exe</b> you downloaded.</span></li>
-        <li><span>If a blue "Windows protected your PC" box appears, click <b>More info</b>, then <b>Run anyway</b>.</span></li>
-        <li><span>It installs and opens by itself. For a USB stick, take the portable zip instead: unzip it anywhere and open The Retro Shelf inside. Games, saves and settings stay in its Data folder.</span></li>
+        <li><span data-t>Run the <b>Setup .exe</b> you downloaded.</span></li>
+        <li><span data-t>If a blue "Windows protected your PC" box appears, click <b>More info</b>, then <b>Run anyway</b>.</span></li>
+        <li><span data-t>It installs and opens by itself. For a USB stick, take the portable zip instead: unzip it anywhere and open The Retro Shelf inside. Games, saves and settings stay in its Data folder.</span></li>
       </ol>
     </div>
     <div role="tabpanel" id="p-linux" aria-labelledby="t-linux" hidden>
       <ol class="steps">
-        <li><span>Download the <b>.AppImage</b> and put it somewhere it can stay, like your home folder.</span></li>
-        <li><span>Right-click it, open <b>Properties</b> and allow it to run as a program (or run <code>chmod +x</code> on it).</span></li>
-        <li><span>Double-click it. On a Steam Deck, the <a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md">Steam Deck guide</a> adds it to Game Mode.</span></li>
+        <li><span data-t>Download the <b>.AppImage</b> and put it somewhere it can stay, like your home folder.</span></li>
+        <li><span data-t>Right-click it, open <b>Properties</b> and allow it to run as a program (or run <code>chmod +x</code> on it).</span></li>
+        <li><span data-t>Double-click it. On a Steam Deck, the <a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md">Steam Deck guide</a> adds it to Game Mode.</span></li>
       </ol>
     </div>
-    <p class="after">No games are included. The app's <b>Help → Where to Get Games</b> shows the legal ways to get them.</p>
+    <p class="after" data-t>No games are included. The app's <b>Help → Where to Get Games</b> shows the legal ways to get them.</p>
   </div>
 </section>
 
 <section id="features">
   <div class="wrap">
-    <span class="tape">What it does</span>
-    <h2>A game collection you'd want to look at</h2>
-    <p class="lead">Every console gets its own shelf and box style, with art, logos and details filled in for 38,000+ games.</p>
+    <span class="tape" data-t>What it does</span>
+    <h2 data-t>A game collection you'd want to look at</h2>
+    <p class="lead" data-t>Every console gets its own shelf and box style, with art, logos and details filled in for 38,000+ games.</p>
     <div class="grid">
-      <figure><img src="images/selected.jpg" alt="A game pulled out of the shelf, among other games standing spines-out" loading="lazy"><figcaption><b>Pull a box out to play</b><span>Arrows or a controller to browse; each console's games stand spines-out on their own shelf.</span></figcaption></figure>
-      <figure><img src="images/back.jpg" alt="The back of a box: last played, playtime, progress, rating and a note" loading="lazy"><figcaption><b>Turn it over</b><span>When you last played, for how long, how far you are, your stars and a note of your own.</span></figcaption></figure>
-      <figure><img src="images/your-play.jpg" alt="The trophy shelf: the five most played games with brass plates showing their hours" loading="lazy"><figcaption><b>Your play</b><span>A trophy shelf of your most played games, and a time card stamped with the days you played.</span></figcaption></figure>
-      <figure><img src="images/recap.jpg" alt="A month's recap card with hours played, the most played games and the pins earned" loading="lazy"><figcaption><b>A recap every month</b><span>Your month or year of play on one card, to save as a picture and share.</span></figcaption></figure>
-      <figure><img src="images/collections.jpg" alt="Collections: the Zelda and Mario Kart series, with games not owned standing faded" loading="lazy"><figcaption><b>Collections</b><span>Every series your games belong to, with the ones you don't have yet standing faded.</span></figcaption></figure>
-      <figure><img src="images/pins.jpg" alt="A corkboard of pins: bronze and silver ones earned, faded ones still to earn" loading="lazy"><figcaption><b>216 pins to earn</b><span>From how you play: time, habits, finishing games, every console and famous series.</span></figcaption></figure>
-      <figure><img src="images/controller-test.jpg" alt="The controller test: an Xbox controller drawing with the A button lit up" loading="lazy"><figcaption><b>Controllers just work</b><span>Xbox, PlayStation, Switch Pro and more, with a button test and your own layout for each console.</span></figcaption></figure>
-      <figure><img src="images/time-card.jpg" alt="A paper time card with twelve weeks of days stamped in ink" loading="lazy"><figcaption><b>A time card</b><span>Twelve weeks of play, a stamp for each day; darker means longer.</span></figcaption></figure>
+      <figure><img src="images/selected.jpg" alt="A game pulled out of the shelf, among other games standing spines-out" data-t-alt loading="lazy"><figcaption><b data-t>Pull a box out to play</b><span data-t>Arrows or a controller to browse; each console's games stand spines-out on their own shelf.</span></figcaption></figure>
+      <figure><img src="images/back.jpg" alt="The back of a box: last played, playtime, progress, rating and a note" data-t-alt loading="lazy"><figcaption><b data-t>Turn it over</b><span data-t>When you last played, for how long, how far you are, your stars and a note of your own.</span></figcaption></figure>
+      <figure><img src="images/your-play.jpg" alt="The trophy shelf: the five most played games with brass plates showing their hours" data-t-alt loading="lazy"><figcaption><b data-t>Your play</b><span data-t>A trophy shelf of your most played games, and a time card stamped with the days you played.</span></figcaption></figure>
+      <figure><img src="images/recap.jpg" alt="A month's recap card with hours played, the most played games and the pins earned" data-t-alt loading="lazy"><figcaption><b data-t>A recap every month</b><span data-t>Your month or year of play on one card, to save as a picture and share.</span></figcaption></figure>
+      <figure><img src="images/collections.jpg" alt="Collections: the Zelda and Mario Kart series, with games not owned standing faded" data-t-alt loading="lazy"><figcaption><b data-t>Collections</b><span data-t>Every series your games belong to, with the ones you don't have yet standing faded.</span></figcaption></figure>
+      <figure><img src="images/pins.jpg" alt="A corkboard of pins: bronze and silver ones earned, faded ones still to earn" data-t-alt loading="lazy"><figcaption><b data-t>216 pins to earn</b><span data-t>From how you play: time, habits, finishing games, every console and famous series.</span></figcaption></figure>
+      <figure><img src="images/controller-test.jpg" alt="The controller test: an Xbox controller drawing with the A button lit up" data-t-alt loading="lazy"><figcaption><b data-t>Controllers just work</b><span data-t>Xbox, PlayStation, Switch Pro and more, with a button test and your own layout for each console.</span></figcaption></figure>
+      <figure><img src="images/time-card.jpg" alt="A paper time card with twelve weeks of days stamped in ink" data-t-alt loading="lazy"><figcaption><b data-t>A time card</b><span data-t>Twelve weeks of play, a stamp for each day; darker means longer.</span></figcaption></figure>
     </div>
     <div class="also">
-      <h3>And also</h3>
+      <h3 data-t>And also</h3>
       <ul>
-        <li><b>Rewind and fast-forward</b> on the triggers</li>
-        <li><b>An old TV's look,</b> or a handheld's screen</li>
-        <li><b>TV mode</b> for the couch, and the <b>Steam Deck</b></li>
-        <li><b>Watched folders:</b> new games appear by themselves</li>
-        <li><b>Saves backed up</b> every week, and shared between computers</li>
-        <li><b>Cheats</b> and <b>RetroAchievements</b></li>
-        <li><b>Games on several discs</b> in one box</li>
-        <li><b>Menu music,</b> nine public-domain chiptunes</li>
-        <li><b>Twelve languages,</b> bigger text and screen reader labels</li>
-        <li><b>Updates itself</b> in the background</li>
+        <li data-t><b>Rewind and fast-forward</b> on the triggers</li>
+        <li data-t><b>An old TV's look,</b> or a handheld's screen</li>
+        <li data-t><b>TV mode</b> for the couch, and the <b>Steam Deck</b></li>
+        <li data-t><b>Watched folders:</b> new games appear by themselves</li>
+        <li data-t><b>Saves backed up</b> every week, and shared between computers</li>
+        <li data-t><b>Cheats</b> and <b>RetroAchievements</b></li>
+        <li data-t><b>Games on several discs</b> in one box</li>
+        <li data-t><b>Menu music,</b> nine public-domain chiptunes</li>
+        <li data-t><b>Twelve languages,</b> bigger text and screen reader labels</li>
+        <li data-t><b>Updates itself</b> in the background</li>
       </ul>
     </div>
   </div>
@@ -227,26 +239,26 @@ footer p{margin:6px 0;max-width:72ch}
 
 <section id="consoles">
   <div class="wrap">
-    <span class="tape">Consoles</span>
-    <h2>From the Atari 2600 to the GameCube</h2>
-    <p class="lead">Their emulators come with the app, inside RetroArch: nothing else to install. PlayStation 2 works too, with PCSX2 installed separately.</p>
+    <span class="tape" data-t>Consoles</span>
+    <h2 data-t>From the Atari 2600 to the GameCube</h2>
+    <p class="lead" data-t>Their emulators come with the app, inside RetroArch: nothing else to install. PlayStation 2 works too, with PCSX2 installed separately.</p>
     <div class="wood"><div class="plates" id="plates"></div></div>
   </div>
 </section>
 
 <section id="questions">
   <div class="wrap">
-    <span class="tape">Questions</span>
-    <h2>Good to know</h2>
+    <span class="tape" data-t>Questions</span>
+    <h2 data-t>Good to know</h2>
     <div class="faq">
-      <details><summary>Where do I get games?</summary><p>No games are included, and the app doesn't link to sites that hand out commercial games. You can copy the cartridges and discs you own, play free homebrew, or buy official re-releases. The app's Help → Where to Get Games walks through each of these.</p></details>
-      <details><summary>Some consoles ask for a BIOS file. What's that?</summary><p>A small file from inside the console itself, which a few emulators need (Sega CD, Saturn, 3DO, ColecoVision and Intellivision). Copy it from your own console and drop it on the window: it goes in the right place. Settings → Saves &amp; BIOS shows what each console has. Most consoles don't need one, and MSX uses a free one that comes with the app.</p></details>
-      <details><summary>Which controllers work?</summary><p>Xbox, PlayStation and Switch Pro controllers, and most others. Settings → While you play → Your controller has a test that lights up every button, and lets you choose your own buttons for each console. Two controllers are numbered player 1 and 2 on screen.</p></details>
-      <details><summary>Does it work on a Steam Deck?</summary><p>Yes. Download the Linux AppImage in desktop mode, then add it to Steam with the <a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md">Steam Deck guide</a>. In Game Mode, TV mode makes everything work with the Deck's controls.</p></details>
-      <details><summary>Is it really free?</summary><p>Yes, and open source (GPL-3.0). There's no account, no ads and no tracking, and nothing about your games leaves your computer. Some of the emulators inside are for non-commercial use only, so the app can never be sold.</p></details>
-      <details><summary>Why does my computer warn me about it?</summary><p>Apps from Apple and Microsoft's paid developer programs are signed, and this one isn't. Your computer asks once; the steps above get you past it. After that it opens normally, and updates install without asking again.</p></details>
-      <details><summary>How do updates work?</summary><p>The app checks in the background and downloads a new version by itself. It's put in place when you restart. To try new features early, turn on Settings → App → Get test versions.</p></details>
-      <details><summary>Something isn't working</summary><p>Tell us on <a href="https://github.com/colingalbraith/the-retro-shelf/issues">GitHub</a>. Settings → App → Copy info puts what helps track it down on your clipboard.</p></details>
+      <details><summary data-t>Where do I get games?</summary><p data-t>No games are included, and the app doesn't link to sites that hand out commercial games. You can copy the cartridges and discs you own, play free homebrew, or buy official re-releases. The app's Help → Where to Get Games walks through each of these.</p></details>
+      <details><summary data-t>Some consoles ask for a BIOS file. What's that?</summary><p data-t>A small file from inside the console itself, which a few emulators need (Sega CD, Saturn, 3DO, ColecoVision and Intellivision). Copy it from your own console and drop it on the window: it goes in the right place. Settings → Saves &amp; BIOS shows what each console has. Most consoles don't need one, and MSX uses a free one that comes with the app.</p></details>
+      <details><summary data-t>Which controllers work?</summary><p data-t>Xbox, PlayStation and Switch Pro controllers, and most others. Settings → While you play → Your controller has a test that lights up every button, and lets you choose your own buttons for each console. Two controllers are numbered player 1 and 2 on screen.</p></details>
+      <details><summary data-t>Does it work on a Steam Deck?</summary><p data-t>Yes. Download the Linux AppImage in desktop mode, then add it to Steam with the <a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md">Steam Deck guide</a>. In Game Mode, TV mode makes everything work with the Deck's controls.</p></details>
+      <details><summary data-t>Is it really free?</summary><p data-t>Yes, and open source (GPL-3.0). There's no account, no ads and no tracking, and nothing about your games leaves your computer. Some of the emulators inside are for non-commercial use only, so the app can never be sold.</p></details>
+      <details><summary data-t>Why does my computer warn me about it?</summary><p data-t>Apps from Apple and Microsoft's paid developer programs are signed, and this one isn't. Your computer asks once; the steps above get you past it. After that it opens normally, and updates install without asking again.</p></details>
+      <details><summary data-t>How do updates work?</summary><p data-t>The app checks in the background and downloads a new version by itself. It's put in place when you restart. To try new features early, turn on Settings → App → Get test versions.</p></details>
+      <details><summary data-t>Something isn't working</summary><p data-t>Tell us on <a href="https://github.com/colingalbraith/the-retro-shelf/issues">GitHub</a>. Settings → App → Copy info puts what helps track it down on your clipboard.</p></details>
     </div>
   </div>
 </section>
@@ -254,15 +266,25 @@ footer p{margin:6px 0;max-width:72ch}
 
 <footer>
   <div class="wrap">
-    <div class="links"><a href="https://github.com/colingalbraith/the-retro-shelf">Source on GitHub</a><a href="https://github.com/colingalbraith/the-retro-shelf/releases">All releases</a><a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a><a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/LICENSE">License (GPL-3.0)</a></div>
-    <p>The emulators keep their own licenses. Box art comes from libretro-thumbnails and belongs to its owners. The Retro Shelf isn't affiliated with any console maker.</p>
-    <p>This page uses no cookies and no analytics.</p>
+    <div class="links"><a href="https://github.com/colingalbraith/the-retro-shelf" data-t>Source on GitHub</a><a href="https://github.com/colingalbraith/the-retro-shelf/releases" data-t>All releases</a><a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/THIRD_PARTY_NOTICES.md" data-t>Third-party notices</a><a href="https://github.com/colingalbraith/the-retro-shelf/blob/main/LICENSE" data-t>License (GPL-3.0)</a></div>
+    <p data-t>The emulators keep their own licenses. Box art comes from libretro-thumbnails and belongs to its owners. The Retro Shelf isn't affiliated with any console maker.</p>
+    <p data-t>This page uses no cookies and no analytics.</p>
   </div>
 </footer>
 
 <script>
 /* the latest release's files, written in when the site is built (scripts/site.mjs); null if that couldn't be found */
 const LATEST = /*LATEST*/null;
+/* this page's language and its words for what the script writes (the page's own text is translated when the site is
+   built: scripts/site.mjs), where the other languages' pages are, and their offers to read the page in them */
+const LANG = /*LANG*/"en", WORDS = /*WORDS*/{}, UP = /*UP*/"", OFFERS = /*OFFERS*/{};
+const T = (s, v) => { let o = WORDS[s] || s; if (v) o = o.replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m); return o; };
+const LOCALE = ({ pt: "pt-BR", zh: "zh-CN", "zh-Hant": "zh-TW" })[LANG] || LANG;
+/* a sentence with a link in it ("Mac with Intel? {link}."), the link's own words given */
+function withLink(el, text, label, href) {
+  const [a, b] = text.split("{link}"), l = document.createElement("a");
+  l.href = href; l.textContent = label; el.append(a || "", l, b || "");
+}
 const CONSOLES = ["NES", "SNES", "Game Boy", "Game Boy Color", "Game Boy Advance", "Genesis / Mega Drive", "Sega CD", "32X", "Saturn", "Master System",
   "Game Gear", "SG-1000", "PC Engine", "Atari 2600", "Atari 7800", "Atari Lynx", "ColecoVision", "Intellivision", "Vectrex", "MSX", "Nintendo 64",
   "Nintendo DS", "PlayStation", "PSP", "Dreamcast", "GameCube", "Wii", "3DO", "Neo Geo CD", "Neo Geo Pocket", "WonderSwan", "Virtual Boy", "Pokémon Mini", "Arcade"];
@@ -290,11 +312,11 @@ async function macChip() {
 }
 
 const FILES = [
-  ["mac_arm64", "Mac with Apple silicon (M1 and newer)", ".dmg"],
-  ["mac_x64", "Mac with Intel", ".dmg"],
-  ["win", "Windows 10 and 11", "installer"],
-  ["portable", "Windows, portable (for a USB stick)", ".zip"],
-  ["linux", "Linux and Steam Deck (64-bit)", ".AppImage"],
+  ["mac_arm64", T("Mac with Apple silicon (M1 and newer)"), ".dmg"],
+  ["mac_x64", T("Mac with Intel"), ".dmg"],
+  ["win", T("Windows 10 and 11"), T("installer")],
+  ["portable", T("Windows, portable (for a USB stick)"), ".zip"],
+  ["linux", T("Linux and Steam Deck (64-bit)"), ".AppImage"],
 ];
 function link(key) { const f = LATEST && LATEST.files[key]; return f ? f.url : "https://github.com/colingalbraith/the-retro-shelf/releases/latest"; }
 function info(key, what) { const f = LATEST && LATEST.files[key]; return [what, LATEST ? LATEST.version : "", f ? mb(f.size) : ""].filter(Boolean).join(" · "); }
@@ -304,29 +326,26 @@ async function download() {
   const key = os === "mac" ? (chip === "x64" ? "mac_x64" : "mac_arm64") : os === "win" ? "win" : os === "linux" ? "linux" : "";
   if (key) {
     $("dl").href = link(key);
-    $("dl-name").textContent = { mac: "Download for Mac", win: "Download for Windows", linux: "Download for Linux" }[os];
-    $("dl-info").textContent = info(key, { mac_arm64: "Apple silicon", mac_x64: "Intel", win: "Windows 10 and 11", linux: "AppImage, Steam Deck too" }[key]);
+    $("dl-name").textContent = { mac: T("Download for Mac"), win: T("Download for Windows"), linux: T("Download for Linux") }[os];
+    $("dl-info").textContent = info(key, { mac_arm64: T("Apple silicon"), mac_x64: "Intel", win: T("Windows 10 and 11"), linux: T("AppImage, Steam Deck too") }[key]);
   } else {
-    $("dl-name").textContent = "For Mac, Windows and Linux";
-    $("dl-info").textContent = "Open this page on your computer to download";
+    $("dl-name").textContent = T("For Mac, Windows and Linux");
+    $("dl-info").textContent = T("Open this page on your computer to download");
   }
   const alt = $("dl-alt");
   if (os === "mac") {
     const other = key === "mac_arm64" ? "mac_x64" : "mac_arm64";
-    alt.append(key === "mac_arm64" ? "Mac with Intel? " : "Mac with Apple silicon? ");
-    const a = document.createElement("a"); a.href = link(other); a.textContent = "Get that one instead"; alt.append(a);
-    alt.append(". Not sure? Apple menu → About This Mac: “Chip” means Apple silicon, “Processor” means Intel.");
-  } else if (os === "win") {
-    alt.append("For a USB stick: "); const a = document.createElement("a"); a.href = link("portable"); a.textContent = "the portable zip"; alt.append(a, ".");
-  } else if (os === "linux") {
-    alt.append("On a Steam Deck? "); const a = document.createElement("a"); a.href = "https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md"; a.textContent = "The Steam Deck guide"; alt.append(a, " adds it to Game Mode.");
-  } else alt.hidden = true;
+    withLink(alt, key === "mac_arm64" ? T("Mac with Intel? {link}. Not sure? Apple menu → About This Mac: “Chip” means Apple silicon, “Processor” means Intel.")
+      : T("Mac with Apple silicon? {link}. Not sure? Apple menu → About This Mac: “Chip” means Apple silicon, “Processor” means Intel."), T("Get that one instead"), link(other));
+  } else if (os === "win") withLink(alt, T("For a USB stick: {link}."), T("the portable zip"), link("portable"));
+  else if (os === "linux") withLink(alt, T("On a Steam Deck? {link} adds it to Game Mode."), T("The Steam Deck guide"), "https://github.com/colingalbraith/the-retro-shelf/blob/main/docs/steam-deck.md");
+  else alt.hidden = true;
   for (const [k, label, kind] of FILES) {
     const li = document.createElement("li"), a = document.createElement("a"), s = document.createElement("span");
     a.href = link(k); a.textContent = label; s.textContent = [kind, LATEST && LATEST.files[k] ? mb(LATEST.files[k].size) : ""].filter(Boolean).join(" · ");
     li.append(a, s); $("dl-all").append(li);
   }
-  $("dl-version").textContent = LATEST ? `Version ${LATEST.version}, ${new Date(LATEST.date).toLocaleDateString(undefined, {month: "long", day: "numeric", year: "numeric"})}. Updates itself after this.` : "Updates itself after this.";
+  $("dl-version").textContent = LATEST ? T("Version {v}, {date}. Updates itself after this.", {v: LATEST.version, date: new Date(LATEST.date).toLocaleDateString(LOCALE, {month: "long", day: "numeric", year: "numeric"})}) : T("Updates itself after this.");
   showTab(os === "other" ? "mac" : os);
 }
 
@@ -342,6 +361,22 @@ TABS.forEach((t, i) => {
     if (d) { const n = TABS[(i + d + TABS.length) % TABS.length]; showTab(n); $("t-" + n).focus(); }
   });
 });
+
+/* the page in other languages: a list to choose from, and (on the English page) an offer of the visitor's own */
+const LANGS = [["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["it", "Italiano"], ["pl", "Polski"], ["pt", "Português"],
+  ["ru", "Русский"], ["ja", "日本語"], ["ko", "한국어"], ["zh", "简体中文"], ["zh-Hant", "繁體中文"]];
+const pageOf = code => UP + (code === "en" ? "" : code + "/");
+for (const [code, name] of LANGS) { const o = document.createElement("option"); o.value = code; o.textContent = name; o.selected = code === LANG; $("lang").append(o); }
+$("lang").addEventListener("change", e => { try { localStorage.setItem("lang", e.target.value); } catch (x) {} location.href = pageOf(e.target.value); });
+if (LANG === "en") {
+  // the language chosen here before, or else the browser's own
+  let chose = null; try { chose = localStorage.getItem("lang"); } catch (x) {}
+  const nav = navigator.language || "", own = chose || (/^zh-(hant|tw|hk|mo)/i.test(nav) ? "zh-Hant" : nav.slice(0, 2).toLowerCase()), o = OFFERS[own];
+  if (o) {
+    $("offer-a").textContent = o.offer; $("offer-a").href = pageOf(own); $("offer-a").lang = own; $("offer-x").setAttribute("aria-label", o.close); $("offer").hidden = false;
+    $("offer-x").addEventListener("click", () => { $("offer").hidden = true; try { localStorage.setItem("lang", "en"); } catch (x) {} });
+  }
+}
 
 for (const c of CONSOLES) { const p = document.createElement("span"); p.className = "plate"; p.textContent = c; $("plates").append(p); }
 download();

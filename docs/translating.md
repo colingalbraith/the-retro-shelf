@@ -36,6 +36,14 @@ A few things to keep:
   for 5 games (`gier`) and `"games|few"` the one for 2–4 (`gry`).
 - **Keep it short.** Buttons and labels are narrow, and the plain word is usually the best one.
 
+## The website
+
+The [download page](https://colingalbraith.github.io/the-retro-shelf/) is in the same twelve languages. Its words are
+in [`site/words`](../site/words), one file for each language, paired with the English the same way. Some entries
+have tags in them, like `<b>Open Anyway</b>` or a link: keep each tag exactly as it is, around the right words.
+Names of the app's menus and settings (Settings → App → Get test versions) should match the app's own file, so
+readers find them.
+
 ## Checking your change
 
 If you'd like to try it first: install [Node.js 22](https://nodejs.org), then in the project folder run
