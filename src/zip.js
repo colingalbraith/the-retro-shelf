@@ -6,17 +6,31 @@ const path = require("path");
 const util = require("util");
 const zlib = require("zlib");
 
-/** every file under dir (not hidden ones), as paths relative to it; a link to a file counts as that file */
+/** what's never a save: the app's own notes for other computers, and what Macs and Windows leave in folders. Other
+    names starting with a dot are saves too (".hack//Infection.srm") */
+const NOT_SAVES = name => /^(\.the-retro-shelf|\.in-play|\.DS_Store|\._.*|\.Spotlight-V100|\.Trashes|\.fseventsd|\.TemporaryItems|\.dropbox.*|desktop\.ini|Thumbs\.db)$/i.test(name);
+
+/** every file under dir (not the ones above), as paths relative to it; a link to a file counts as that file */
 function filesIn(dir, rel = "") {
   let out = [];
   for (const e of fs.readdirSync(path.join(dir, rel), { withFileTypes: true })) {
-    if (e.name.startsWith(".")) continue;
+    if (NOT_SAVES(e.name)) continue;
     const r = rel ? rel + "/" + e.name : e.name;
     if (e.isDirectory()) out = out.concat(filesIn(dir, r));
     else if (e.isFile()) out.push(r);
     else if (e.isSymbolicLink()) { try { if (fs.statSync(path.join(dir, r)).isFile()) out.push(r); } catch {} }
   }
   return out;
+}
+
+/** an entry's modification time from its "extended timestamp" extra field (0x5455), in seconds since 1970, or 0 */
+function utcTime(extra) {
+  for (let i = 0; i + 4 <= extra.length;) {
+    const id = extra.readUInt16LE(i), len = extra.readUInt16LE(i + 2);
+    if (id === 0x5455 && len >= 5 && i + 9 <= extra.length && (extra[i + 4] & 1)) return extra.readUInt32LE(i + 5);
+    i += 4 + len;
+  }
+  return 0;
 }
 
 /** a file time in the MS-DOS form zip files use */
@@ -77,18 +91,22 @@ async function zipFiles(list, out) {
       const data = await fsp.readFile(full), st = await fsp.stat(full);
       const packed = await deflate(data), stored = packed.length >= data.length;
       const body = stored ? data : packed, name = Buffer.from(entry, "utf8"), crc = zlib.crc32(data), t = dosTime(st.mtime);
-      if (offset + 30 + name.length + body.length > MAX) throw new Error(TOO_BIG);
+      // the time it was saved, exactly and the same in every time zone (the zip's own time is the clock on the wall):
+      // the "extended timestamp" extra field, 0x5455, with its modification time
+      const ext = Buffer.alloc(9); ext.writeUInt16LE(0x5455, 0); ext.writeUInt16LE(5, 2); ext.writeUInt8(1, 4);
+      ext.writeUInt32LE(Math.max(0, Math.min(0xffffffff, Math.floor(st.mtimeMs / 1000))), 5);
+      if (offset + 30 + name.length + ext.length + body.length > MAX) throw new Error(TOO_BIG);
       const head = Buffer.alloc(30);
       head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(20, 4); head.writeUInt16LE(0x0800, 6); head.writeUInt16LE(stored ? 0 : 8, 8);
       head.writeUInt16LE(t.time, 10); head.writeUInt16LE(t.date, 12); head.writeUInt32LE(crc, 14);
-      head.writeUInt32LE(body.length, 18); head.writeUInt32LE(data.length, 22); head.writeUInt16LE(name.length, 26);
+      head.writeUInt32LE(body.length, 18); head.writeUInt32LE(data.length, 22); head.writeUInt16LE(name.length, 26); head.writeUInt16LE(ext.length, 28);
       const at = offset;
-      await write(head); await write(name); await write(body);
+      await write(head); await write(name); await write(ext); await write(body);
       const c = Buffer.alloc(46);
       c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(0x0800, 8); c.writeUInt16LE(stored ? 0 : 8, 10);
       c.writeUInt16LE(t.time, 12); c.writeUInt16LE(t.date, 14); c.writeUInt32LE(crc, 16);
-      c.writeUInt32LE(body.length, 20); c.writeUInt32LE(data.length, 24); c.writeUInt16LE(name.length, 28); c.writeUInt32LE(at, 42);
-      central.push(c, name);
+      c.writeUInt32LE(body.length, 20); c.writeUInt32LE(data.length, 24); c.writeUInt16LE(name.length, 28); c.writeUInt16LE(ext.length, 30); c.writeUInt32LE(at, 42);
+      central.push(c, name, ext);
     }
     const cd = Buffer.concat(central), end = Buffer.alloc(22), start = offset;
     if (start + cd.length > MAX) throw new Error(TOO_BIG);
@@ -121,22 +139,24 @@ async function unzipInto(file, dir) {
     const { count, cd } = await index(fh, read), list = [];
     let at = 0;
     for (let k = 0; k < count && at + 46 <= cd.length && cd.readUInt32LE(at) === 0x02014b50; k++) {
-      const nlen = cd.readUInt16LE(at + 28);
+      const nlen = cd.readUInt16LE(at + 28), xlen = cd.readUInt16LE(at + 30);
       list.push({ method: cd.readUInt16LE(at + 10), time: cd.readUInt16LE(at + 12), date: cd.readUInt16LE(at + 14), crc: cd.readUInt32LE(at + 16),
-        csize: cd.readUInt32LE(at + 20), usize: cd.readUInt32LE(at + 24), local: cd.readUInt32LE(at + 42), name: entryName(cd, at, nlen).replace(/\\/g, "/") });
+        csize: cd.readUInt32LE(at + 20), usize: cd.readUInt32LE(at + 24), local: cd.readUInt32LE(at + 42), name: entryName(cd, at, nlen).replace(/\\/g, "/"),
+        utc: utcTime(cd.subarray(at + 46 + nlen, at + 46 + nlen + xlen)) });
       at += 46 + nlen + cd.readUInt16LE(at + 30) + cd.readUInt16LE(at + 32);
     }
     // the backup's one top folder (Finder's __MACOSX extras aside)
     const files = list.filter(x => !x.name.endsWith("/") && !/^__MACOSX(\/|$)/.test(x.name));
     const tops = new Set(files.map(x => x.name.includes("/") ? x.name.split("/")[0] : ""));
     if (!files.length || tops.size !== 1 || tops.has("")) throw new Error("that isn't a backup of saves from The Retro Shelf");
-    for (const { method, time, date, crc, csize, usize, local, name } of files) {
+    for (const { method, time, date, crc, csize, usize, local, name, utc } of files) {
       const parts = name.split("/").slice(1);
-      // Finder's extra files, hidden files, and anything that would end up outside the Saves folder are left out
-      if (/^__MACOSX/.test(name) || parts.some(p => !p || p === "." || p === ".." || p.startsWith(".") || /[:\\]/.test(p))) { res.skipped++; continue; }
+      // Finder's extra files, the app's own notes, and anything that would end up outside the Saves folder are left out
+      if (/^__MACOSX/.test(name) || parts.some(p => !p || p === "." || p === ".." || NOT_SAVES(p) || /[:\\]/.test(p))) { res.skipped++; continue; }
       const to = path.join(dir, ...parts);
       if (path.relative(dir, to).startsWith("..")) { res.skipped++; continue; }
-      const when = new Date(((date >> 9) & 127) + 1980, ((date >> 5) & 15) - 1, date & 31, (time >> 11) & 31, (time >> 5) & 63, (time & 31) * 2);
+      // when it was saved: exactly, from a backup that says (made by this version or later), or by the wall clock
+      const when = utc ? new Date(utc * 1000) : new Date(((date >> 9) & 127) + 1980, ((date >> 5) & 15) - 1, date & 31, (time >> 11) & 31, (time >> 5) & 63, (time & 31) * 2);
       try { if ((await fsp.stat(to)).mtimeMs > when.getTime() + 2000) { res.kept++; continue; } } catch {}
       if (csize > MAX_ENTRY || usize > MAX_ENTRY) { res.skipped++; continue; }
       let data;

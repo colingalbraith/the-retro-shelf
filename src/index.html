@@ -125,6 +125,8 @@ button{cursor:pointer}
 /* spine: each console has its own packaging look (band, body, case), the game's own colors come from its cover.
    --gm/--ga/--gt/--gd/--gl: the game's main color, accent, text on main, main as dark text, main as light text */
 .card,.lslot{--body:var(--gm);--si:var(--gt);--band:#161514;--foot:var(--ga);--bh:.8}
+/* a hidden game, shown because Settings says to: faded, as it says, until it's picked */
+.card.hid:not(.sel) .box{opacity:.45;filter:saturate(.4)}
 .sp{display:flex;flex-direction:column;align-items:center;background:var(--sa, none) var(--sx, 50%) 46% / auto 150% no-repeat,var(--body);color:var(--si)}
 /* a strip of the box art runs down the spine: zoomed to the middle of the cover, where the artwork is (covers print
    their title at the top and console branding along the edges), dimmed a touch at the edges so the logo stands out */
@@ -205,7 +207,7 @@ button{cursor:pointer}
 .card[data-lv=intv]{--band:linear-gradient(#2a2420 calc(100% - 3px),#c9a24a 0);--foot:#2a2420}
 .card[data-lv=vectrex]{--band:linear-gradient(#0f0f0f calc(100% - 3px),#e8e4da 0);--foot:#0f0f0f}
 .card[data-lv=msx]{--band:linear-gradient(#1a1a1a calc(100% - 3px),#e6c229 0);--foot:#1a1a1a}
-.card[data-lv=3do]{--body:#131313;--si:#f2efe6;--band:linear-gradient(#1e1e1e calc(100% - 2px),#e1b12c 0);--foot:var(--gm)}
+.card[data-lv="3do"]{--body:#131313;--si:#f2efe6;--band:linear-gradient(#1e1e1e calc(100% - 2px),#e1b12c 0);--foot:var(--gm)}
 .card[data-lv=neocd]{--body:#121212;--si:#f2f0ec;--band:linear-gradient(#1c1c1c calc(100% - 2px),#c8102e 0);--foot:var(--gm)}
 .card[data-lv=pmini]{--band:linear-gradient(#f1efe9 calc(100% - 3px),#d8312b 0);--foot:#1b1b1b}
 .man .sp .sys{height:max(18px,calc(var(--t) * .95));display:flex;align-items:center;justify-content:center;background:var(--bd);color:var(--bf);font:700 clamp(7px,calc(var(--t) * .3),11px)/1 var(--disp)}
@@ -321,7 +323,7 @@ kbd{font:600 11.5px/1 var(--disp);color:var(--chalk);border:1px solid #4a453e;bo
 /* ---------- loading bar + toast ---------- */
 #lbar{position:fixed;top:0;left:0;height:2px;width:100%;z-index:150;background:var(--acc);transform:scaleX(0);transform-origin:left;opacity:0;transition:opacity .3s}
 #lbar.on{opacity:1;animation:lbar 1.2s ease-in-out infinite}
-#toast{position:fixed;left:50%;bottom:52px;transform:translate(-50%,10px) rotate(-.6deg);z-index:100160;background:var(--paper-hi);color:var(--ink);padding:10px 18px;border-left:4px solid var(--acc);box-shadow:0 10px 24px rgba(0,0,0,.5);max-width:80vw;font:500 14px/1.4 var(--disp);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+#toast{position:fixed;left:50%;bottom:52px;width:max-content;transform:translate(-50%,10px) rotate(-.6deg);z-index:100160;background:var(--paper-hi);color:var(--ink);padding:10px 18px;border-left:4px solid var(--acc);box-shadow:0 10px 24px rgba(0,0,0,.5);max-width:80vw;font:500 14px/1.4 var(--disp);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
 #toast.show{opacity:1;transform:translate(-50%,0) rotate(-.6deg)}
 #toast.bad{border-left-color:#c23b22}
 
@@ -368,9 +370,10 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .phead small{display:block;font:600 12px var(--disp);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px}
 #sbody h3{counter-increment:sec;margin:30px 0 2px;padding-bottom:8px;border-bottom:1px solid var(--ink);font:700 20px/1.1 var(--disp)}
 #sbody h3::before{content:counter(sec,decimal-leading-zero);font:400 12px var(--mono);margin-right:12px;color:var(--ink2);vertical-align:2px}
-.row2{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 0;border-bottom:1px solid rgba(28,25,22,.14)}
-.rl{display:flex;flex-direction:column;min-width:0}
-.rl b{font-weight:600}
+.row2{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 18px;padding:12px 0;border-bottom:1px solid rgba(28,25,22,.14)}
+.rl{display:flex;flex-direction:column;min-width:0;flex:1 1 220px}
+.row2>:not(.rl){margin-left:auto}
+.rl b{font-weight:600;overflow-wrap:anywhere}
 .rl span{color:var(--ink2);font-size:14px;line-height:1.4}
 .row2 input[type=text]{width:320px;max-width:48vw;padding:7px 10px;border:1px solid var(--ink);border-radius:0;background:var(--paper-hi);outline:none;font:12.5px var(--mono);user-select:text}
 .row2 input[type=text]:focus{box-shadow:inset 0 0 0 1px var(--ink)}
@@ -398,7 +401,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .tro{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;transform:rotate(var(--rz, 0deg));transform-origin:50% 100%}
 .tro .art{position:relative;height:var(--th);box-shadow:0 10px 18px rgba(0,0,0,.55),0 2px 3px rgba(0,0,0,.6)}
 .tro .art img{display:block;height:100%;width:auto}
-.tro .art.gen{width:calc(var(--th) * .72);display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;background:var(--paper);color:var(--ink);font:700 15px/1.15 var(--disp);text-align:center}
+.tro .art.gen{width:calc(var(--th) * .72);display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;background:var(--paper);color:var(--ink);font:700 15px/1.15 var(--disp);font-size:clamp(9px,calc(var(--th) * .075),15px);text-align:center;overflow:hidden;overflow-wrap:anywhere}
 .tro::after{content:"";position:absolute;left:8%;right:8%;bottom:-6px;height:8px;background:radial-gradient(closest-side,rgba(0,0,0,.55),transparent)}
 .tro .star{position:absolute;top:-14px;right:-14px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#ffe9a6,#e2b33d 55%,#b8862a);color:#5a3d0c;font-size:22px;box-shadow:0 2px 5px rgba(0,0,0,.5);transform:rotate(12deg)}
 /* brass plates hang on the plank's front edge, under each box or stack */
@@ -413,7 +416,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .pk{position:absolute;z-index:3;display:grid;place-items:center;border-radius:50%;background:var(--acc);color:var(--accf);font:700 11px/1 var(--disp);box-shadow:0 1px 2px rgba(0,0,0,.5)}
 .sp .pk{width:16px;height:16px;left:50%;margin-left:-8px;top:max(6px,var(--h) * .06)}
 .cv .pk{width:15%;aspect-ratio:1;height:auto;top:4%;left:5%;font-size:calc(var(--cw) * .08)}
-#pickbar{position:fixed;left:50%;bottom:52px;z-index:120;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;transform:translate(-50%,20px);opacity:0;visibility:hidden;background:var(--paper);color:var(--ink);box-shadow:0 14px 34px rgba(0,0,0,.6);transition:transform .18s,opacity .18s,visibility .18s;font:600 14px var(--disp)}
+#pickbar{position:fixed;left:50%;bottom:52px;z-index:120;width:max-content;max-width:calc(100vw - 32px);display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;transform:translate(-50%,20px);opacity:0;visibility:hidden;background:var(--paper);color:var(--ink);box-shadow:0 14px 34px rgba(0,0,0,.6);transition:transform .18s,opacity .18s,visibility .18s;font:600 14px var(--disp)}
 #pickbar.show{transform:translate(-50%,0);opacity:1;visibility:visible}
 .playing #pickbar{visibility:hidden}
 #pickbar .btn{padding:6px 10px;font-size:13px}
@@ -454,12 +457,12 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .ci .ph{display:flex;align-items:center;justify-content:center;width:94px;height:100%;padding:8px;box-sizing:border-box;background:var(--paper);color:var(--ink);font:700 12px/1.15 var(--disp);text-align:center}
 .ci:focus-visible{outline:2px solid var(--acc);outline-offset:4px}
 /* a game you don't have: the box as a faded print, or an empty outline */
-.ci.ghost .art{box-shadow:none;outline:1.5px dashed rgba(221,214,200,.35);outline-offset:3px}
+.ci.ghost .art{box-shadow:none;outline:1.5px dashed color-mix(in srgb,var(--chalk) 40%,transparent);outline-offset:3px}
 .ci.ghost img{filter:grayscale(1) contrast(.85);opacity:.3}
 .ci.ghost .ph{background:transparent;color:var(--dust);border:0}
 .ci .x{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:0;background:var(--chalk);color:var(--wall);font:700 13px/22px var(--disp);display:none}
 .ci:hover .x,.ci:focus-within .x{display:block}
-.ci.add .art{display:flex;align-items:center;justify-content:center;width:94px;box-shadow:none;outline:1.5px dashed rgba(221,214,200,.5);outline-offset:3px;color:var(--chalk);font:600 13px/1.2 var(--disp);text-align:center}
+.ci.add .art{display:flex;align-items:center;justify-content:center;width:94px;box-shadow:none;outline:1.5px dashed color-mix(in srgb,var(--chalk) 55%,transparent);outline-offset:3px;color:var(--chalk);font:600 13px/1.2 var(--disp);text-align:center}
 .cmore{margin:40px 0 0;color:var(--dust);font-size:14px}
 .cmore button{border:0;background:none;padding:0;color:var(--chalk);font:inherit;text-decoration:underline;text-underline-offset:3px}
 .slip.wide{width:560px;max-width:86vw}
@@ -470,13 +473,13 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 .svpic{position:relative;width:70vw;height:62vh}
 .svpic img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity 2.2s;filter:drop-shadow(0 24px 40px rgba(0,0,0,.75))}
 .svpic img.on{opacity:1}
-.svcap{min-height:1.4em;margin:26px 0 0;font:700 24px var(--disp);color:#ece6d6;text-shadow:0 2px 8px rgba(0,0,0,.8);opacity:0;transition:opacity 1.2s}
+.svcap{min-height:1.4em;margin:26px 0 0;text-align:center;font:700 24px var(--disp);color:#ece6d6;text-shadow:0 2px 8px rgba(0,0,0,.8);opacity:0;transition:opacity 1.2s}
 .svcap.on{opacity:1}
 .svcap small{display:block;margin-top:4px;font:600 13px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#b5ad9f}
 /* the language list in Settings */
 .lsel{padding:6px 10px;border:1.5px solid var(--ink);border-radius:0;background:var(--paper-hi);color:var(--ink);font:600 15px var(--disp)}
 /* every key and button, in two columns */
-.kcols{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin:8px 0 14px;max-height:62vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
+.kcols{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin:8px 0 14px;max-height:calc(100vh - 210px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
 .kcols h3{margin:0 0 6px;font:700 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
 .kcols dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:13.5px;align-items:baseline}
 .kcols dt{justify-self:start;padding:1px 7px;border:1.5px solid var(--ink);border-radius:4px;font:700 12px var(--mono);white-space:nowrap}
@@ -486,9 +489,13 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 /* a month's or a year's play on one card, on its own bit of wall for saving as a picture */
 #recap .rcw{display:flex;flex-direction:column;align-items:center;gap:12px;max-height:100vh;overflow-y:auto;padding:16px}
 .rcnav{display:flex;gap:10px;align-items:center}
+#recap .rcnav,#recap .rcw>.btns{--chalk:#ddd6c8;--wall:#1e1c1a}
+#recap .rcw>.btns .btn{color:var(--chalk)}
+#recap .rcw>.btns .btn.primary{background:var(--chalk);border-color:var(--chalk);color:#1e1c1a}
 .rcnav .btn{min-width:44px;font-size:18px;padding:4px 12px}
 .rcnav .btn:disabled{opacity:.3;cursor:default}
-@media (max-height:600px){#recap .rcw{gap:8px;padding:8px 16px}.rcshot{padding:14px 20px 16px}.rcbig{font-size:32px}.rcard{padding:22px 26px 18px}.rcard .tcs{margin:8px 0 10px}}
+@media (max-height:600px){#recap .rcw{gap:8px;padding:8px 16px}.rcshot{padding:14px 20px 16px}.rcbig{font-size:32px}.rcard{padding:22px 26px 18px}.rcard .tcs{margin:8px 0 10px}
+  .rcpins .pin .badge{width:24px;height:24px;font-size:11px}.rcpins{gap:5px;margin-top:8px}.rctop .art{width:30px;height:40px}.rctop{margin-bottom:8px}.rcl{gap:8px;padding-top:6px}}
 .rcshot{padding:24px 28px 26px;background:radial-gradient(500px 220px at 50% 0,var(--wall-hi),var(--wall))}
 .rcard{margin:0;width:min(600px,calc(100vw - 96px))}
 .rcbig{margin:14px 0 0;font:700 40px/1 var(--disp)}
@@ -544,7 +551,7 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 #cheatl button.on::before{background:var(--ink);box-shadow:inset 0 0 0 2.5px var(--paper)}
 #cheatl button span{margin-left:auto;padding-left:12px;color:var(--ink2);font-size:13px;white-space:nowrap}
 #cheatl button:hover,#cheatl button:focus-visible{background:rgba(28,25,22,.06);outline:none}
-#waddr button{display:flex;width:100%;justify-content:space-between;gap:12px;padding:9px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.1);background:none;text-align:left;color:var(--ink);font:500 15px var(--disp)}
+#waddr button{display:flex;width:100%;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.1);background:none;text-align:left;color:var(--ink);font:500 15px var(--disp)}
 #waddr button span{color:var(--ink2);font-size:13px;white-space:nowrap}
 #waddr button:hover,#waddr button:focus-visible{background:rgba(28,25,22,.06);outline:none}
 /* ---------- controller: options menu, on-screen keyboard, and where the focus is ---------- */
@@ -572,7 +579,7 @@ html.tv body.kb,html.tv body.kb *{cursor:none!important}
   background:radial-gradient(circle at 20% 30%,rgba(90,55,25,.35) 0 1px,transparent 1.5px) 0 0 / 11px 13px,
     radial-gradient(circle at 70% 60%,rgba(255,230,190,.25) 0 1px,transparent 1.5px) 0 0 / 9px 7px,#b8875a;
   box-shadow:inset 0 2px 8px rgba(0,0,0,.45),0 14px 28px rgba(0,0,0,.5)}
-.corkh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px}
+.corkh{display:flex;justify-content:space-between;align-items:baseline;gap:14px;text-align:right;margin-bottom:18px}
 .corkh .tplate{position:static;transform:none;height:20px}
 .corkh span{color:#3d2814;font:600 13px var(--disp)}
 .pins{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:22px 14px}
@@ -651,12 +658,15 @@ html:not([data-fx="off"]) #pick.show .panel{animation:rise .22s ease}
 #pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:14px;margin:14px 0 4px}
 #pgrid button{display:flex;flex-direction:column;gap:6px;padding:0;border:0;background:none;text-align:left;color:var(--ink);font:500 12px/1.25 var(--disp)}
 #pgrid .im{display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:1;background:#1c1916;outline:2px solid transparent;outline-offset:2px}
+/* a preview that couldn't load: marked, not a black square that looks like a cover */
+#pgrid .im.none{background:repeating-linear-gradient(45deg,#2a2622 0 8px,#221f1b 8px 16px)}
+#pgrid .im.none img{visibility:hidden}
 #pgrid img{max-width:100%;max-height:100%;object-fit:contain}
 #pgrid button:hover .im,#pgrid button:focus-visible .im{outline-color:var(--acc)}
 #pgrid span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink2)}
 
 /* ---------- small slips: rename, welcome ---------- */
-.over{position:fixed;top:0;left:0;right:0;bottom:0;z-index:135;display:flex;align-items:center;justify-content:center;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;transition:opacity .18s,visibility .18s}
+.over{position:fixed;top:0;left:0;right:0;bottom:0;z-index:135;display:flex;align-items:safe center;justify-content:center;overflow-y:auto;background:rgba(12,11,10,.72);opacity:0;visibility:hidden;transition:opacity .18s,visibility .18s}
 .over.show{opacity:1;visibility:visible}
 .over .slip{outline:0;width:min(560px,90vw)}
 .over .slip p{margin:0 0 12px}
@@ -713,8 +723,9 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
 @media (max-width:760px){
   #shelves{--card:120px!important;padding-top:58px}
   .row{padding:0 18px}
-  .note{left:18px}
-  .note{width:calc(100% - 36px)}
+  .note{left:18px;width:calc(100% - 36px)}
+  /* below the search tape, which takes the top of a narrow window */
+  .note{top:calc(var(--A) - 150px)}
   #hintbar{display:none!important}
 }
 </style>
@@ -816,7 +827,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
 
 <div id="opts" class="over"><div class="slip"><h2 id="optst">Options</h2><div id="optl"></div></div></div>
 
-<div id="osk"><div class="oskin"><div id="oskv"></div><div id="oskk"></div><p class="oskh">A types · X deletes · Y space · B done</p></div></div>
+<div id="osk"><div class="oskin"><div id="oskv"></div><div id="oskk"></div><p class="oskh" id="oskh"></p></div></div>
 
 <div id="pick">
   <div class="panel" role="dialog" aria-label="Find a cover">
@@ -924,7 +935,7 @@ async function api(path, body) {
     const r = await fetch(path, body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
     let data = {}; try { data = await r.json(); } catch (e) {}
     return {ok: r.ok, status: r.status, data};
-  } catch (e) { return {ok: false, status: 0, data: {error: "Something went wrong. Try restarting The Retro Shelf."}}; }
+  } catch (e) { return {ok: false, status: 0, data: {error: t("Something went wrong. Try restarting The Retro Shelf.")}}; }
 }
 
 /* ---------- helpers ---------- */
@@ -978,6 +989,10 @@ function fmtSize(b) { return !b ? "" : b < 1048576 ? Math.max(1, Math.round(b / 
 function clock(s) { s = Math.floor(s); const p = n => String(n).padStart(2, "0"); return p(Math.floor(s / 3600)) + ":" + p(Math.floor(s % 3600 / 60)) + ":" + p(s % 60); }
 function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 const lum = c => (.299 * c[0] + .587 * c[1] + .114 * c[2]) / 255;
+/* how far apart two colors read, as the WCAG measures it (1 to 21) */
+const rlum = c => { const f = v => (v /= 255) <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
+const contrast = (x, y) => { const a = rlum(x), b = rlum(y); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); };
+const CREAM = [246, 241, 230], INK = [28, 25, 22];
 function setAcc(rgb) { HTML.style.setProperty("--acc", "rgb(" + rgb.join(",") + ")"); HTML.style.setProperty("--accf", lum(rgb) > .62 ? "#1c1916" : "#fff"); }
 function blurActive() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
 const isOpen = id => $("#" + id).classList.contains("show");
@@ -992,7 +1007,7 @@ const SORTS = {
 };
 /* how far you are with a game, as you set it (progress), in words, and a rating in stars */
 const PROGRESS = {backlog: "Backlog", playing: "Playing", beaten: "Beaten", complete: "100%"};
-const stars = r => "★".repeat(r) + "☆".repeat(5 - r);
+const stars = r => { r = Math.max(0, Math.min(5, Math.round(r) || 0)); return "★".repeat(r) + "☆".repeat(5 - r); };
 let SHELVES = [];
 /* Settings → Arrange shelves by: the console (as boxes come), a genre, the decade, or progress: how far you are, as
    you set it, or else what the play history says */
@@ -1033,7 +1048,10 @@ function showHintsBriefly() {
 let saveT;
 /* uiEdits counts changes not yet saved: until they are, a library refresh keeps this copy of the settings */
 let uiEdits = 0;
-function saveUI() { const n = ++uiEdits; clearTimeout(saveT); saveT = setTimeout(async () => { await api("/api/settings", {ui: UI}); if (n === uiEdits) uiEdits = 0; }, 400); }
+/* EDITS counts every change made here (a setting, a favorite): a library answer asked for before one is older than the
+   page's own copy, and doesn't replace it */
+let EDITS = 0;
+function saveUI() { EDITS++; const n = ++uiEdits; clearTimeout(saveT); saveT = setTimeout(async () => { await api("/api/settings", {ui: UI}); if (n === uiEdits) uiEdits = 0; }, 400); }
 
 /* spine colors: the cover's main color and a contrasting accent, toned so spines look printed, never neon or muddy.
    Kept between visits so spines appear in their colors right away instead of switching once covers load */
@@ -1119,9 +1137,13 @@ function setGameColors(c, m, a, q) {
   s.setProperty("--gd", css(gd)); s.setProperty("--gl", css(gl));
   const lv = c.dataset.lv || "", darkBody = DARK_BODY.test(lv) || (!LIGHT_BODY.test(lv) && !light);
   const pop = [a, gl].sort((x, y) => lum(y) - lum(x))[0];
-  s.setProperty("--wm", darkBody ? (lum(pop) > .5 ? css(pop) : "#f6f1e6") : (lum(gd) < .35 ? css(gd) : "#1c1916"));
-  s.setProperty("--wk", darkBody ? "-1px 0 0 rgba(0,0,0,.55),1px 0 0 rgba(0,0,0,.55),0 -1px 0 rgba(0,0,0,.55),0 1px 0 rgba(0,0,0,.55),0 2px 2px rgba(0,0,0,.35)"
-                                 : "-1px 0 0 rgba(255,255,255,.6),1px 0 0 rgba(255,255,255,.6),0 -1px 0 rgba(255,255,255,.6),0 1px 0 rgba(255,255,255,.6)");
+  /* the title in the game's own accent where it reads well against the spine (4.5:1, as for small text), or else in
+     cream or ink, whichever stands out more: a red label's light red, or slate's, isn't readable on it */
+  const body = DARK_BODY.test(lv) ? [20, 20, 20] : LIGHT_BODY.test(lv) ? [236, 230, 214] : m, want = darkBody ? pop : gd;
+  const wm = contrast(want, body) >= 4.5 ? want : contrast(CREAM, body) >= contrast(INK, body) ? CREAM : INK, lightText = rlum(wm) > .4;
+  s.setProperty("--wm", css(wm));
+  s.setProperty("--wk", lightText ? "-1px 0 0 rgba(0,0,0,.55),1px 0 0 rgba(0,0,0,.55),0 -1px 0 rgba(0,0,0,.55),0 1px 0 rgba(0,0,0,.55),0 2px 2px rgba(0,0,0,.35)"
+                                  : "-1px 0 0 rgba(255,255,255,.6),1px 0 0 rgba(255,255,255,.6),0 -1px 0 rgba(255,255,255,.6),0 1px 0 rgba(255,255,255,.6)");
 }
 function paintSpine(c, g, im) {
   if (spineMode() !== "cover") return;
@@ -1224,10 +1246,10 @@ function spineTitle(c, g) {
 }
 
 /* ---------- data ---------- */
-function ingest(d) {
-  G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; CONS = d.consoles || {}; GAMECHOICES = d.gameChoices || {}; SHELVES = d.shelves || [];
+function ingest(d, stale) {
+  G = d.games; byId = new Map(G.map(g => [g.id, g])); if (!stale) FAV = new Set(d.fav); SYSTEMS = d.systems; CONS = d.consoles || {}; GAMECHOICES = d.gameChoices || {}; SHELVES = d.shelves || [];
   if (d.people) PEOPLE = d.people;
-  if (!uiEdits) UI = d.settings.ui;
+  if (!uiEdits && !stale) UI = d.settings.ui;
   PATHS = d.settings.paths; APPINFO = d.settings.app || {}; CHEEVOS = d.settings.cheevos || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
   applyUI();
 }
@@ -1278,7 +1300,7 @@ function paintVars(c, g) {
   /* how far a box comes out: picked, it turns to show its cover; turned over, it comes closer still. Small boxes come further */
   /* never closer than 700px to the 1100px camera (the perspective): at the biggest box sizes a small box would
      otherwise fill the window, or pass the camera and vanish */
-  const near = 700 / (UI.card || 170);
+  const near = 700 / (CARDPX || UI.card || 170);
   s.setProperty("--zs", Math.min(k[3] * .82, near * .65).toFixed(2)); s.setProperty("--zf", Math.min(k[3] * 1.3, near).toFixed(2));
   s.setProperty("--lb", lc[0]); s.setProperty("--lf", lc[1]);
   s.setProperty("--bd", bd[0]); s.setProperty("--bf", bd[1]);
@@ -1432,18 +1454,20 @@ function fitBack(bk, inn) {
 function cardLabel(g) {
   const days = g.last ? Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(g.last * 1000).setHours(0, 0, 0, 0)) / 86400000) : null;
   const when = days === null ? t("never played") : t("last played {when}", {when: new Intl.RelativeTimeFormat(LOCALE, {numeric: "auto"}).format(-days, "day")});
-  return [g.title, g.system, g.year, FAV.has(g.id) ? t("favorite") : "", g.progress ? t(PROGRESS[g.progress]) : "", g.rating ? t("{n} stars", {n: g.rating}) : "", when].filter(Boolean).join(", ");
+  return [g.title, g.system, g.year, FAV.has(g.id) ? t("favorite") : "", g.hidden ? t("hidden") : "", g.progress ? t(PROGRESS[g.progress]) : "", g.rating ? plural(g.rating, "star", "stars") : "", when].filter(Boolean).join(", ");
 }
 function hookSlot(c) {
   c.addEventListener("focus", () => select(c));
   c.onmouseenter = () => { if (!kbMode && !scrolling && sel !== c) c.focus({preventScroll: true}); };
 }
 function slot(g, face, i) {
-  const c = el("div", "card far"); c.tabIndex = 0; c.dataset.id = g.id; paintVars(c, g);
+  const c = el("div", "card far" + (g.hidden ? " hid" : "")); c.tabIndex = 0; c.dataset.id = g.id; paintVars(c, g);
   c.setAttribute("role", "button"); c.setAttribute("aria-label", cardLabel(g));
   if (i < 80) c.style.setProperty("--i", i);
   c.appendChild(box(c, g)); stickers(c, g);
-  if (face || (g.cv && SEEN.has("/cover/" + g.id + "?v=" + g.cv))) fillCover(c, g); else if (g.cv && io) io.observe(c);
+  /* covers load as their boxes come near the view, face-out ones too (in Covers style, that's every box: thousands at
+     once froze the window); one seen already goes straight in, and a face-out box with no art gets its printed cover */
+  if (g.cv && SEEN.has("/cover/" + g.id + "?v=" + g.cv)) fillCover(c, g); else if (g.cv && io) io.observe(c); else if (face) fillCover(c, g);
   hookSlot(c);
   c.onclick = e => {
     if (e.target.closest("button")) return;
@@ -1469,7 +1493,9 @@ function manual() {
 /* ---------- shelves ---------- */
 function renderShelves(keep) {
   const root = $("#shelves"), st = root.scrollTop, wasFlip = sel && sel.classList.contains("flip");
-  const keepSec = sel ? sel.dataset.group : null, keepAt = keep ? slots().findIndex(x => x.dataset.id === keep) : -1;
+  /* where the picked box is: its shelf, and its place among all the boxes (the one picked, not the game's first copy
+     on Recently played or Favorites) */
+  const keepSec = sel ? sel.dataset.group : null, keepAt = keep ? (sel && sel.dataset.id === keep ? slots().indexOf(sel) : slots().findIndex(x => x.dataset.id === keep)) : -1;
   if (io) io.disconnect();
   POOL = new Map();
   $$("img", root).forEach(im => { const k = im.getAttribute("src"); if (k && im.complete && im.naturalWidth) (POOL.get(k) || POOL.set(k, []).get(k)).push(im); });
@@ -1525,15 +1551,25 @@ function renderShelves(keep) {
   fitPlates();
   root.scrollTop = keep ? st : 0;
   let c = null;
-  if (keep) c = (keepSec && document.querySelector('#shelves .card[data-group="' + CSS.escape(keepSec) + '"][data-id="' + keep + '"]')) || document.querySelector('#shelves .card[data-id="' + keep + '"]');
-  /* the kept game is gone (hidden, moved, trashed): its neighbor takes its place, not the first box on the wall */
+  if (keep && keepSec) c = document.querySelector('#shelves .card[data-group="' + CSS.escape(keepSec) + '"][data-id="' + keep + '"]');
+  /* the kept game has gone from its shelf (taken off Favorites, hidden, moved, trashed): its neighbor on that shelf takes
+     its place; then the game somewhere else; then whatever's in its place on the wall, not the first box */
+  if (!c && keepAt >= 0) { const n = slots()[keepAt]; if (n && n.dataset.group === keepSec) c = n; }
+  if (!c && keep) c = document.querySelector('#shelves .card[data-id="' + keep + '"]');
   if (!c && keepAt >= 0) { const all = slots(); c = all[Math.min(keepAt, all.length - 1)]; }
   c = c || document.querySelector("#shelves .card");
   if (!c) { POOL = null; return; }
   /* a redraw of the same shelf puts the picked box straight back where it was, instead of sliding it out again */
   const same = keep && c.dataset.id === keep;
   if (same) root.classList.add("noanim");
-  if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "ctest", "recap", "keys", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  /* a new shelf above it (Recently played, after a first game) can push the box out of view: it's scrolled back, and
+     the box placed where it will be then */
+  const rr = c.getBoundingClientRect(), RR = root.getBoundingClientRect();
+  const off = !LAUNCH.open && (rr.bottom < RR.top || rr.top > RR.bottom) ? Math.max(-root.scrollTop, Math.min(root.scrollHeight - root.clientHeight - root.scrollTop, Math.round(revealBy(c)))) : 0;
+  pendingScroll = off;
+  try {
+    if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "ctest", "recap", "keys", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+  } finally { pendingScroll = 0; }
   if (same) {
     if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
@@ -1541,8 +1577,7 @@ function renderShelves(keep) {
   }
   watchFar(root);
   if (same) markUnder();
-  /* a new shelf above it (Recently played, after a first game) can push the box out of view: back into it */
-  if (!LAUNCH.open) { const r = c.getBoundingClientRect(), R = root.getBoundingClientRect(); if (r.bottom < R.top || r.top > R.bottom) reveal(c); }
+  if (off) { root.scrollBy({top: off, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, 400); }
   POOL = null;
 }
 /* Only boxes within about half a screen of the view are drawn. Every box is several 3D layers, and with a big library
@@ -1644,8 +1679,11 @@ function markUnder() {
 }
 /* keep a box that's come out fully on screen: solve for the pre-perspective offset that lands its projected center in
    view. zv: which depth (--zs picked, --zf turned over); lift: how far it rises off the shelf */
+let pendingScroll = 0;
 function placeBox(c, zv, lift, vx, vy) {
-  const b = c.querySelector(".box"), r = c.getBoundingClientRect(), R = $("#shelves").getBoundingClientRect();
+  /* where the box will be once a scroll that's about to start has moved the shelves (pickAndScroll) */
+  const b = c.querySelector(".box"), r0 = c.getBoundingClientRect(), R = $("#shelves").getBoundingClientRect();
+  const r = {left: r0.left, width: r0.width, height: r0.height, top: r0.top - pendingScroll};
   const P = 1100, card = parseFloat(getComputedStyle(c).getPropertyValue("--card")) || UI.card, z = parseFloat(c.style.getPropertyValue(zv)) || 2;
   const s = P / (P - card * z), h = b.offsetHeight, w = parseFloat(getComputedStyle(b.querySelector(".bk")).width) || h;
   const ox = r.left + r.width / 2, oy = r.top + r.height * .56, yc = r.top + b.offsetTop + h / 2 - lift;
@@ -1653,7 +1691,21 @@ function placeBox(c, zv, lift, vx, vy) {
   const Y = Math.max(R.top + h * s / 2 + 12, Math.min(R.bottom - h * s / 2 - 12, oy + (yc - oy) * s));
   c.style.setProperty(vx, ((X - ox) / s).toFixed(1) + "px");
   c.style.setProperty(vy, ((Y - oy) / s + oy - yc - lift).toFixed(1) + "px");
-  return [X, Y, $("#shelves").scrollTop];
+  return [X, Y, $("#shelves").scrollTop + pendingScroll];
+}
+/* pick a box and scroll the shelves by `by`: the box comes out where it will be once they've moved (picked first, it
+   was placed against where it was, and ended up a row off, or off the screen, as they scrolled) */
+function pickAndScroll(c, by, wait) {
+  const root = $("#shelves");
+  by = Math.max(-root.scrollTop, Math.min(root.scrollHeight - root.clientHeight - root.scrollTop, Math.round(by)));
+  pendingScroll = by;
+  try { c.focus({preventScroll: true}); } finally { pendingScroll = 0; }
+  if (by) { root.scrollBy({top: by, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, wait || 450); }
+}
+/* how far to scroll for a box to be in view, just enough */
+function revealBy(c) {
+  const root = $("#shelves"), r = c.getBoundingClientRect(), R = root.getBoundingClientRect();
+  return r.top - R.top < 70 ? r.top - R.top - 70 : r.bottom > R.bottom ? r.bottom - R.bottom + 10 : 0;
 }
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
 function light() {
@@ -1671,7 +1723,7 @@ function light() {
 /* ---------- actions ---------- */
 async function toggleFav(id) {
   const r = await api("/api/fav", {id}); if (!r.ok) return;
-  FAV = new Set(r.data.fav); beep(660);
+  EDITS++; FAV = new Set(r.data.fav); beep(660);
   /* the box you're on now, which may not be the one starred if you moved meanwhile */
   renderShelves(focusId);
 }
@@ -1718,7 +1770,7 @@ async function importBatch(paths) {
   const go = fresh.map(i => ({id: i.id, system: i.system || picks[i.id]})).filter(i => i.system);
   if (!go.length) return;
   const s = await api("/api/import", {items: go});
-  if (!s.ok || !s.data.started) return toast(s.data.error || "Couldn't add those games.", true);
+  if (!s.ok || !s.data.started) return toast(s.data.error || t("Couldn't add those games."), true);
   STATUS.import = {running: true, done: 0, total: go.length}; impRun = true;
   busy(true); toast(t("Adding {n}…", {n: plural(go.length, "game", "games")})); setTimeout(poll, 400);
 }
@@ -1763,10 +1815,11 @@ function importProgress(m) {
 
 /* ---------- search: typed onto label tape ---------- */
 function paintQ() {
-  const t = $("#qtape"), active = document.activeElement === $("#q");
-  t.hidden = !q && !active; clear(t);
-  t.appendChild(document.createTextNode(q ? $("#q").value : "search"));
-  if (active) t.appendChild(el("i", "caret"));
+  const tape = $("#qtape"), active = document.activeElement === $("#q");
+  /* what's typed is a name, not a word to translate ("play" stays "play"); the empty tape's word is the app's */
+  tape.hidden = !q && !active; clear(tape); tape.translate = false;
+  tape.appendChild(document.createTextNode(q ? $("#q").value : t("search")));
+  if (active) tape.appendChild(el("i", "caret"));
 }
 /* ---------- search: every word has to fit the game. In its title, or nearly (one letter off in a short word, two in a
    long one: "zelad" finds Zelda), or its console ("snes", "psx"), year or decade ("1994", "90s"), genre ("rpg"), or
@@ -1805,7 +1858,13 @@ function wordFits(g, w) {
   if (w.length >= 4) { const max = w.length >= 7 ? 2 : 1; return titleWords(g).some(t => t.length >= 3 && near(t, w, max)); }
   return false;
 }
-function setQ(v) { $("#q").value = v; q = v.trim().toLowerCase(); renderShelves(null); paintQ(); }
+/* a search cleared goes back to the game you were on before it, or the result you moved to */
+let preSearch = null, movedInSearch = false;
+function setQ(v) {
+  const clearing = !v.trim() && q, back = clearing ? (movedInSearch ? focusId : preSearch) : null;
+  if (!q && v.trim()) { preSearch = focusId; movedInSearch = false; }
+  $("#q").value = v; q = v.trim().toLowerCase(); renderShelves(back); paintQ();
+}
 
 /* ---------- launch screen ---------- */
 function showLaunch(g) {
@@ -1832,7 +1891,7 @@ function showLaunch(g) {
   /* the controllers in the order they were connected: RetroArch numbers players the same way */
   const pads = connectedPads();
   $("#lplayers").textContent = pads.length > 1 ? pads.map((p, i) => t("Player {n}: {pad}", {n: i + 1, pad: padName(p)})).join(" · ") : "";
-  L.classList.add("show"); updatePill(); light();
+  L.classList.add("show"); updatePill(); light(); tick();
 }
 function hideLaunch() {
   if (!LAUNCH.open) return; LAUNCH.open = false;
@@ -1847,23 +1906,27 @@ function hideLaunch() {
 function showGame(id) {
   const c = document.querySelector('#shelves .card[data-id="' + id + '"]');
   if (!c) return focusById(id);
-  c.focus({preventScroll: true});
-  const root = $("#shelves"), r = c.getBoundingClientRect(), R = root.getBoundingClientRect();
-  root.scrollBy({top: r.top - R.top - (R.height - r.height) / 2, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, 450);
+  const r = c.getBoundingClientRect(), R = $("#shelves").getBoundingClientRect();
+  pickAndScroll(c, r.top - R.top - (R.height - r.height) / 2);
 }
 /* a panel opened from another one (settings → a list) gives focus back to the button that opened it */
 function opener() { const a = document.activeElement; return a && a !== document.body && !a.closest("#shelves") ? a : null; }
 function backTo(e) {
-  if (e && e.isConnected && e.getClientRects().length) return e.focus({preventScroll: true});
+  /* only a button that's really there: shown, and in a panel that's still open (one fading out takes no focus) */
+  const usable = e && e.isConnected && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden"
+    && PANELS.every(([id]) => { const p = document.getElementById(id); return !p || !p.contains(e) || isOpen(id); });
+  if (usable) { e.focus({preventScroll: true}); if (document.activeElement === e) return; }
   const p = topPanel(), f = p && focusables($("#" + p[0]))[0];
   if (f) f.focus({preventScroll: true}); else focusById(focusId);
 }
+/* a screen closed: back to whatever's still open under it, or else the box that was picked */
+function afterScreen() { if (topPanel()) backTo(null); else if (!LAUNCH.open) focusById(focusId); }
 /* back to a box after something finished, unless a panel or the playing screen has come up meanwhile */
 function focusFree(id) { if (!topPanel() && !LAUNCH.open) focusById(id); }
 function focusById(id) {
   const c = id && (sel && sel.dataset.id === id && document.getElementById("shelves").contains(sel) ? sel : document.querySelector('#shelves .card[data-id="' + id + '"]'))
     || document.querySelector("#shelves .card");
-  if (c) { c.focus({preventScroll: true}); reveal(c); }
+  if (c) pickAndScroll(c, revealBy(c), 400);
 }
 function tick() {
   if (!LAUNCH.open || !STATUS.running) return;
@@ -1884,7 +1947,7 @@ function paintUpdRow() {
   const row = $("#updrow"); if (!row) return renderSettings();
   const d = row.querySelector(".rl span"), b = row.querySelector("button");
   if (d) d.textContent = updText();
-  if (b) { b.textContent = t({ready: "Restart now", manual: "Download"}[UPD.status] || "Check now"); b.classList.toggle("primary", UPD.status === "ready"); b.disabled = UPD.status === "checking" || UPD.status === "downloading"; }
+  if (b) { b.textContent = UPD.status === "ready" ? t("Restart now") : UPD.status === "manual" ? t("Download") : t("Check now"); b.classList.toggle("primary", UPD.status === "ready"); b.disabled = UPD.status === "checking" || UPD.status === "downloading"; }
 }
 /* ---------- updates: the app checks GitHub for a new version and puts it in place when it quits ---------- */
 let UPD = {status: "idle", version: "", progress: 0, error: ""};
@@ -1905,7 +1968,7 @@ function updAction() {
   /* not while games are being added or moved: quitting would cut the copying short */
   if (UPD.status === "ready" && (STATUS.moving || (STATUS.import && STATUS.import.running))) return toast(t("The new version goes in once the games are copied."));
   if (UPD.status === "ready") APP.update("restart");
-  else if (UPD.status === "manual") APP.update("page");
+  else if (UPD.status === "manual") { if (!mouseOnly()) APP.update("page"); }
   else APP.update("check");
 }
 /* launched: the game just started, until the shelf has seen it run (or end straight away). launchingNow: a press
@@ -1982,11 +2045,11 @@ function refresh(force) {
   return refreshNext.p;
 }
 async function loadLibrary(force) {
-  const r = await api("/api/library"); if (!r.ok) return;
+  const at = EDITS, r = await api("/api/library"); if (!r.ok) return;
   /* (art isn't in it: new covers, as they download, are drawn into their own boxes below, not the whole wall again) */
   const sig = () => G.map(g => [g.id, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden + UI.sort + UI.arrange + JSON.stringify(SHELVES);
   const before = sig(), art = new Map(G.map(g => [g.id, g.cv + "/" + g.lv]));
-  ingest(r.data);
+  ingest(r.data, at !== EDITS);
   if (force || sig() !== before) renderShelves(focusId);
   else {
     let drew = false;
@@ -2165,6 +2228,9 @@ function openOsk(input) {
   sh.title = "Capital letter"; sh.onclick = () => { oskShift = !oskShift; paintOsk(); };
   sl.onclick = () => oskType("/"); sp.onclick = () => oskType(" "); bs.onclick = () => oskType(null); dn.onclick = () => closeOsk();
   [sh, sl, sp, bs, dn].forEach(b => last.appendChild(b)); k.appendChild(last); paintOsk();
+  /* the buttons by the names on the controller in hand (✕ on a PlayStation's, B on a Nintendo's) */
+  const nm = PAD_NAMES[padStyle()], nin = padStyle() === "nintendo";
+  $("#oskh").textContent = t("{a} types · {x} deletes · {y} space · {b} done", {a: nm[nin ? 1 : 0], b: nm[nin ? 0 : 1], x: nm[nin ? 3 : 2], y: nm[nin ? 2 : 3]});
   $("#oskv").textContent = oskShown(input); $("#osk").classList.add("show");
   setTimeout(() => k.querySelector("button").focus(), 30);
 }
@@ -2211,11 +2277,11 @@ async function openColls(tab) {
   COLL = r.ok ? r.data : {series: [], mine: []};
   renderColls();
 }
-function closeColls() { if (!isOpen("colls")) return; $("#colls").classList.remove("show"); if (collIO) collIO.disconnect(); focusById(focusId); light(); beep(330); }
+function closeColls() { if (!isOpen("colls")) return; $("#colls").classList.remove("show"); if (collIO) collIO.disconnect(); afterScreen(); light(); beep(330); }
 function collItem(it, list) {
   const b = el("button", "ci" + (it.id ? "" : " ghost") + (it.counts === false ? " skip" : "")), art = el("span", "art"), g = it.id && byId.get(it.id);
   if (it.counts === false) b.dataset.skip = t("Doesn't count");
-  b.title = it.title + " · " + it.system + (it.id ? "" : " · not in your library");
+  b.title = it.title + " · " + it.system + (it.id ? "" : " " + t("· not in your library"));
   if (g && g.cv) { const im = new Image(); im.alt = ""; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); }
   else if (!it.id) {
     /* a missing game's box comes from the cover site when it scrolls into view; an outline with its name until then */
@@ -2230,11 +2296,11 @@ function collItem(it, list) {
     else toast(t("{title} isn't in your library.", {title: it.title}) + (list ? "" : " " + t("Help → Where to Get Games has the legal ways to get games.")));
   };
   if (list && !it.id) {
-    const x = el("button", "x", "×"); x.title = "Take it off this collection";
+    const x = el("button", "x", "×"); x.title = t("Take it off this collection");
     x.onclick = async e => {
       e.stopPropagation();
       const r = await api("/api/shelves", {op: "unwant", name: list, system: it.system, look: it.look});
-      if (!r.ok) return toast(r.data.error || "Couldn't take it off.", true);
+      if (!r.ok) return toast(r.data.error || t("Couldn't take it off."), true);
       if (isOpen("colls")) reloadColls();
     };
     b.appendChild(x);
@@ -2253,14 +2319,14 @@ function renderColls() {
     if (opts.counts) { const cb = el("button", "lnk", t("What counts")); cb.onclick = opts.counts; h.appendChild(cb); }
     if (opts.hide) { const hb = el("button", "lnk", opts.hidden ? "Show" : "Hide"); hb.onclick = opts.hide; h.appendChild(hb); }
     const strip = el("div", "strip"); items.forEach(it => strip.appendChild(collItem(it, opts.list)));
-    if (opts.list) { const add = el("button", "ci add"), art = el("span", "art", "+ Add a game"); add.appendChild(art); add.onclick = () => openWantAdd(opts.list); strip.appendChild(add); }
+    if (opts.list) { const add = el("button", "ci add"), art = el("span", "art", t("+ Add a game")); add.appendChild(art); add.onclick = () => openWantAdd(opts.list); strip.appendChild(add); }
     sec.appendChild(h); sec.appendChild(strip); list.appendChild(sec);
   };
   if (collTab === "series") {
     const shown = COLL.series.filter(s => showHiddenSeries || !hidden.has(s.name)), done = COLL.series.filter(s => s.have === s.total).length;
     const ns = COLL.series.length === 1 ? t("1 series") : t("{n} series", {n: COLL.series.length});
     sum.textContent = COLL.series.length ? (done ? t("Your games are part of {n}, and you have all of {done}.", {n: ns, done}) : t("Your games are part of {n}.", {n: ns})) + " " + t("Faded boxes are the ones you don't have.")
-      : "None of your games belong to a series we know of yet.";
+      : t("None of your games belong to a series we know of yet.");
     shown.forEach(s => block(s.name, s.have, s.items, {total: s.total, counts: () => openCounts(s.name), hidden: hidden.has(s.name), hide: () => {
       UI.hiddenSeries = hidden.has(s.name) ? [...hidden].filter(n => n !== s.name) : [...hidden, s.name]; saveUI(); renderColls();
     }}));
@@ -2301,10 +2367,11 @@ $("#waddq").addEventListener("input", () => { clearTimeout(waddT); waddT = setTi
   clear(out);
   if (!r.data.results.length) out.appendChild(el("p", "", "No games match."));
   r.data.results.forEach(x => {
-    const b = el("button", ""); b.appendChild(document.createTextNode(x.title)); b.appendChild(el("span", "", x.system + (x.year ? " · " + x.year : "") + (x.id ? " · yours" : "")));
+    const b = el("button", ""), nm = el("span", "", x.title); nm.translate = false; b.appendChild(nm);
+    b.appendChild(el("span", "", x.system + (x.year ? " · " + x.year : "") + (x.id ? " · " + t("yours") : "")));
     b.onclick = async () => {
       const res = await api("/api/shelves", x.id ? {op: "add", name: waddList, id: x.id} : {op: "want", name: waddList, system: x.system, look: x.look});
-      if (!res.ok) return toast(res.data.error || "Couldn't add it.", true);
+      if (!res.ok) return toast(res.data.error || t("Couldn't add it."), true);
       toast(t("Added {title}.", {title: x.title})); if (x.id) refresh(true);
     };
     out.appendChild(b);
@@ -2327,9 +2394,9 @@ async function searchCovers() {
   /* a search started meanwhile (or the picker closed) has the grid now */
   if (id !== pickId || n !== pickSeq) return;
   clear(grid);
-  if (!r.ok) { msg.textContent = r.data.error || "Couldn't search for covers."; return; }
+  if (!r.ok) { msg.textContent = r.data.error || t("Couldn't search for covers."); return; }
   const res = r.data.results;
-  msg.textContent = !res.length ? "No covers match. Try fewer or different words."
+  msg.textContent = !res.length ? t("No covers match. Try fewer or different words.")
     : res.length >= 60 ? t("Click the right box to use it (showing the first 60).") : t("Click the right box to use it.");
   /* pictures load as they scroll into view: each one is a download */
   if (pickIO) pickIO.disconnect();
@@ -2343,11 +2410,17 @@ async function searchCovers() {
     grid.appendChild(b); pickIO.observe(im);
   });
 }
+/* one cover at a time: a second click while the first downloads does nothing, and a picker opened for another game
+   meanwhile stays open */
+let picking = false;
 async function pickCover(x) {
-  const id = pickId; if (!id) return;
-  busy(true); const r = await api("/api/covers/pick", {id, thumb: x.thumb, name: x.name}); busy(false);
-  if (!r.ok) return toast(r.data.error || "Couldn't use that cover.", true);
-  closePicker(); await refresh(); focusFree(id); toast(t("New cover saved."));
+  const id = pickId; if (!id || picking) return;
+  picking = true; busy(true);
+  let r;
+  try { r = await api("/api/covers/pick", {id, thumb: x.thumb, name: x.name}); } finally { picking = false; busy(false); }
+  if (!r.ok) return toast(r.data.error || t("Couldn't use that cover."), true);
+  if (pickId === id) closePicker();
+  await refresh(); focusFree(id); toast(t("New cover saved."));
 }
 $("#pclose").onclick = closePicker;
 $("#pgo").onclick = searchCovers;
@@ -2358,6 +2431,8 @@ let nsh = null;   // {id} making a shelf with this game on it, or {from} renamin
 let nshFrom = null;
 function openShelfSlip(o) {
   nsh = o; const ren = !!o.from; nshFrom = opener();
+  /* a person's name is up to 24 letters (as the app keeps it), a shelf's up to 40 */
+  $("#nshname").maxLength = o.person ? 24 : 40;
   /* a person's name, with the same slip */
   if (o.person) {
     $("#nsht").textContent = o.person.id ? t("Rename") : t("Someone new");
@@ -2378,9 +2453,11 @@ async function saveShelfSlip() {
   const o = nsh, name = $("#nshname").value.trim(); if (!o) return;
   if (o.person) {
     if (!name) return toast(t("Give them a name."), true);
+    /* unchanged: nothing to save (the first person's "Player 1" isn't saved in the language it's shown in) */
+    if (o.person.id && name === shownName(o.person)) return closeShelfSlip();
     const r = await api(o.person.id ? "/api/people/rename" : "/api/people/add", {id: o.person.id, name});
     if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't save that."), true);
-    PEOPLE = r.data; closeShelfSlip(); redrawList();
+    PEOPLE = r.data; closeShelfSlip(); redrawList(); if (isOpen("settings")) renderSettings();
     toast(o.person.id ? t("Renamed.") : t("{name} can play now: choose them in Who's playing.", {name}));
     return;
   }
@@ -2409,7 +2486,7 @@ async function saveRename() {
   const id = renId; if (!id) return;
   closeRename();
   const r = await api("/api/game/rename", {id, title: $("#rname").value});
-  if (!r.ok) return toast(r.data.error || "Couldn't rename it.", true);
+  if (!r.ok) return toast(r.data.error || t("Couldn't rename it."), true);
   await refresh(true); focusFree(id);
 }
 
@@ -2438,7 +2515,8 @@ const anyScreen = () => !!topPanel() || ["settings", "getg", "colls", "trophy"].
 function saverPics() {
   const shots = [], covers = [];
   for (const g of G) {
-    if (g.hidden) continue;
+    /* the games on the shelves: not hidden ones, nor a console's taken off them in Settings */
+    if (g.hidden || UI.hidden.indexOf(g.system) >= 0) continue;
     const sv = g.saves || {}, cap = [g.title, g.system];
     if (sv.resume && sv.rpic && !hardcore()) shots.push(["/state/" + g.id + "/auto?v=" + sv.resume, cap]);
     else if (g.shv) shots.push(["/shot/" + g.id + "/0?v=" + g.shv + "." + g.shots, cap]);
@@ -2457,12 +2535,14 @@ function startSaver() {
   $("#sva").className = $("#svb").className = ""; $("#svcap").className = "svcap"; clear($("#svcap"));
   $("#saver").classList.add("show");
   /* the shelves drift down and back up, slowly */
-  let last = performance.now();
+  /* kept as a fraction: a third of a pixel a frame, added to the scroll position itself, was rounded away every time */
+  let last = performance.now(), y = sh.scrollTop;
   const drift = now => {
     if (!SAVER) return;
     const max = sh.scrollHeight - sh.clientHeight;
-    sh.scrollTop += SAVER.dir * (now - last) * .02; last = now;
-    if (sh.scrollTop >= max - 1) SAVER.dir = -1; else if (sh.scrollTop <= 0) SAVER.dir = 1;
+    y = Math.max(0, Math.min(max, y + SAVER.dir * (now - last) * .02)); last = now;
+    sh.scrollTop = y;
+    if (y >= max - 1) SAVER.dir = -1; else if (y <= 0) SAVER.dir = 1;
     SAVER.raf = requestAnimationFrame(drift);
   };
   SAVER.raf = requestAnimationFrame(drift);
@@ -2601,6 +2681,14 @@ function openPlayImport(paths, s) {
   });
 }
 
+/* putting something in the Trash from a list takes a second press (the first says so), and afterwards the focus goes to
+   the list's first button, not the next one's Trash: a double press never takes two */
+function sure(ev) {
+  const b = ev && ev.currentTarget;
+  if (!b || b.dataset.sure) return true;
+  b.dataset.sure = "1"; b.textContent = t("Sure? Press again"); return false;
+}
+function toSafety() { const b = $("#lstl button") || $("#lstok"); if (b) b.focus({preventScroll: true}); }
 /* a game's screenshots, newest first: each to see in its folder or put in the Trash */
 async function openShots(id) {
   const g = byId.get(id); if (!g) return;
@@ -2616,12 +2704,13 @@ async function openShots(id) {
       im.src = "/shot/" + id + "/" + i + "?v=" + encodeURIComponent(s.name);
       f.appendChild(im);
       const cap = el("figcaption", "", fmtWhen(s.at));
-      if (APP && APP.revealShot) { const b = el("button", "btn", APP.platform === "darwin" ? t("Show in Finder") : t("Show in folder")); b.onclick = () => APP.revealShot(id, s.name); cap.appendChild(b); }
+      if (APP && APP.revealShot) { const b = el("button", "btn", APP.platform === "darwin" ? t("Show in Finder") : t("Show in folder")); b.onclick = () => mouseOnly() || APP.revealShot(id, s.name); cap.appendChild(b); }
       const tr = el("button", "btn", t("Move to Trash"));
-      tr.onclick = async () => {
+      tr.onclick = async ev => {
+        if (!sure(ev)) return;
         const r = await api("/api/shot/trash", {id, name: s.name});
         if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't move it to the Trash."), true);
-        await load(); await refresh(true); redrawList();
+        await load(); await refresh(true); redrawList(); toSafety();
       };
       cap.appendChild(tr); f.appendChild(cap); list.appendChild(f);
     });
@@ -2642,6 +2731,8 @@ async function usePerson(id, atStart) {
     if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't change who's playing."), true);
     PEOPLE = r.data;
     await refresh(true);
+    /* Settings under the list says who's playing, their hours and sign-in: drawn again for the new person */
+    if (isOpen("settings")) renderSettings();
     toast(t("{name} is playing.", {name: personName(id)}));
   }
   closeList();
@@ -2671,7 +2762,7 @@ function openPeople() {
         if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = t("Sure? Their play and saves go to the Trash"); return; }
         const r = await api("/api/people/remove", {id: p.id});
         if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't take them off."), true);
-        PEOPLE = r.data; await refresh(true); redrawList();
+        PEOPLE = r.data; await refresh(true); redrawList(); if (isOpen("settings")) renderSettings();
         /* saves shared with other computers stay there, for the same person playing on those */
         toast(r.data.savesKept ? t("{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.", {name: shownName(p)})
           : t("{name} is off the list. Their things are in the Trash.", {name: shownName(p)}));
@@ -2694,7 +2785,7 @@ async function openRecap(year, month, offered) {
   const r = await api("/api/recap", {year, month}); if (!r.ok || my !== recapSeq || (wasOpen && !isOpen("recap"))) return;
   if (offered) api("/api/recap/seen", {year, month});
   await renderRecap(RC = r.data);
-  if (!isOpen("recap")) { rcFrom = opener(); blurActive(); $("#recap").classList.add("show"); light(); beep(520); setTimeout(() => $("#rcdone").focus({preventScroll: true}), 40); }
+  if (!isOpen("recap")) { rcFrom = opener(); blurActive(); $("#recap").classList.add("show"); light(); beep(520); setTimeout(() => $("#rcdone").focus(), 40); }
 }
 function closeRecap() { if (!isOpen("recap")) return; $("#recap").classList.remove("show"); backTo(rcFrom); light(); beep(330); }
 const recapName = d => d.month === null ? String(d.year) : new Date(d.year, d.month, 1).toLocaleDateString(LOCALE, {month: "long", year: "numeric"});
@@ -2716,7 +2807,7 @@ async function renderRecap(d) {
       for (const x of d.top) {
         const g = byId.get(x.id); if (!g) continue;
         const row = el("div"), art = el("span", "art"), tx = el("span");
-        if (g.cv) { const im = new Image(); im.alt = ""; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); } else art.textContent = g.title;
+        if (g.cv) { const im = new Image(); im.alt = ""; im.src = "/cover/" + g.id + "?v=" + g.cv; art.appendChild(im); } else { art.textContent = g.title; art.translate = false; }
         const ti = el("b", "", g.title); ti.translate = false; tx.appendChild(ti); tx.appendChild(el("span", "", g.system + " · " + fmtDur(x.time)));
         row.appendChild(art); row.appendChild(tx); top.appendChild(row);
       }
@@ -2731,7 +2822,7 @@ async function renderRecap(d) {
     if (d.pins.length) {
       if (!PINCAT) { const r = await api("/api/pins"); if (r.ok) PINCAT = new Map(r.data.pins.map(p => [p.key, p])); }
       const row = el("div", "rcpins"), ps = d.pins.map(k => PINCAT && PINCAT.get(k)).filter(Boolean);
-      for (const p of ps.slice(0, 10)) { const e = el("div", "pin " + p.tier); e.title = p.title; e.setAttribute("role", "img"); e.setAttribute("aria-label", pinLabel(p)); e.appendChild(badge(p.icon)); row.appendChild(e); }
+      for (const p of ps.slice(0, 10)) { const e = el("div", "pin " + p.tier); e.title = pinTitle(p); e.setAttribute("role", "img"); e.setAttribute("aria-label", pinLabel(p)); e.appendChild(badge(p.icon)); row.appendChild(e); }
       if (ps.length > 10) row.appendChild(el("span", "", "+" + (ps.length - 10)));
       card.appendChild(row);
     }
@@ -2817,8 +2908,9 @@ function openCtest() {
     const pads = connectedPads(), gp = pads[0];
     $("#ctname").textContent = gp ? pads.map((p, i) => (pads.length > 1 ? t("Player {n}:", {n: i + 1}) + " " : "") + padName(p)).join(" · ") : t("No controller found. Plug one in or turn it on, then press a button.");
     const nm = PAD_NAMES[padStyle(gp)], lab = $("#ctlabels");
-    if (lab.dataset.style !== padStyle(gp)) {
-      clear(lab); lab.dataset.style = padStyle(gp);
+    /* drawn again for another kind of controller, or another language */
+    if (lab.dataset.style !== padStyle(gp) + "|" + LANG) {
+      clear(lab); lab.dataset.style = padStyle(gp) + "|" + LANG;
       $("#cthint").textContent = t("Press anything: it lights up. Hold {b} (or press Esc) to leave.", {b: nm[padStyle(gp) === "nintendo" ? 0 : 1]});
       for (const e of $$("#ctpad [data-i]")) {
         const i = +e.dataset.i; if (i >= 10 && i <= 11) continue;
@@ -2851,11 +2943,13 @@ function openButtons(system) {
   const save = async () => { const r = await api("/api/remap", {system, map}); if (!r.ok) toast(r.data.error || t("Couldn't save that."), true); await refresh(true); };
   openList(t("Buttons for {console}", {console: system}), t("Which of your controller's buttons does each of the console's. Choose one, then press the button you want for it."), list => {
     const nm = PAD_NAMES[padStyle()];
-    for (const [target, name] of names) {
+    for (let [target, name] of names) {
       const p = physFor(target);
+      /* the console's own button names stay as printed; the RetroPad's ("B (bottom)") are words to translate */
+      if (!c.buttons) name = t(name);
       listRow(list, name, t("Your controller's {b}", {b: nm[STD_TO_RP.indexOf(p)] || "?"}), [[t("Change"), () => {
         if (!connectedPads().length) return toast(t("Plug in a controller first."), true);
-        $("#lstp").textContent = t("Press the button you want for {name}… (hold B or press Esc to stop)", {name});
+        $("#lstp").textContent = t("Press the button you want for {name}… (hold {b} or press Esc to stop)", {name, b: nm[padStyle() === "nintendo" ? 0 : 1]});
         LISTEN = async i => {
           LISTEN = null; $("#lstp").textContent = t("Which of your controller's buttons does each of the console's. Choose one, then press the button you want for it.");
           if (i === null) return;
@@ -2890,7 +2984,7 @@ async function openBrowse(dir) {
       listRow(list, t("Watch this folder"), t("{n} right here, and any in the folders inside it.", {n: plural(d.games, "game", "games")}), [[t("Watch"), async () => {
         const w = await api("/api/watch/add", {dir: d.dir});
         if (!w.ok) return toast(w.data.error || t("Couldn't watch that folder."), true);
-        closeList(); await refresh(true); if (isOpen("settings")) renderSettings();
+        closeList(); await refresh(true); if (isOpen("settings")) { renderSettings(); const wf = $("#wfolder"); if (wf) wf.focus({preventScroll: true}); }
         toast(t("{n} from that folder are on the shelves.", {n: plural(w.data.games, "game", "games")}));
       }]]);
       listRow(list, t("Back"), d.parent || t("The places to start"), [[t("Open"), () => openBrowse(d.parent || "")]]);
@@ -2947,10 +3041,11 @@ async function openSaves(id) {
   const still = listTicket();
   await load();
   if (!still()) return;
-  const trash = s => async () => {
+  const trash = s => async ev => {
+    if (!sure(ev)) return;
     const r = await api("/api/saves/trash", {id, file: s.file});
     if (!r.ok) return toast(r.data.error || t("Couldn't move it to the Trash."), true);
-    toast(t("Moved to the Trash. It can come back from there.")); await load(); await refresh(true); redrawList();
+    toast(t("Moved to the Trash. It can come back from there.")); await load(); await refresh(true); redrawList(); toSafety();
   };
   openList(t("Saves for {title}", {title: g.title}), t("Everything the emulator has saved for this game. The Trash keeps what you move there, in case."), list => {
     if (!saves.length) return list.appendChild(el("p", "", t("No saves yet. They appear here once you've played.")));
@@ -2960,7 +3055,10 @@ async function openSaves(id) {
     for (const s of saves) {
       const when = fmtWhen(s.at) + " · " + fmtSize(s.size), label = s.kind === "battery" ? t("The game's own save") + " (" + s.name.split(".").pop() + ")"
         : s.kind === "resume" ? t("Where you left off") : t("Save {n}", {n: s.n});
-      const buttons = s.kind === "battery" ? [] : [[s.kind === "resume" ? t("Continue") : t("Start here"), () => { closeList(); play(g, s.kind === "resume" ? {} : {slot: s.n}); }]];
+      /* a resume point to continue from only while "pick up where you left off" is on, and no saves to start from with
+         hardcore achievements: RetroArch wouldn't load them (they can still go in the Trash) */
+      const canStart = s.kind === "resume" ? !!(g.saves && g.saves.resume) : s.kind !== "battery" && !hardcore();
+      const buttons = canStart ? [[s.kind === "resume" ? t("Continue") : t("Start here"), () => { closeList(); play(g, s.kind === "resume" ? {} : {slot: s.n}); }]] : [];
       listRow(list, label, when, [...buttons, [t("Move to the Trash"), trash(s)]], s.pic ? "/state/" + id + "/" + (s.kind === "resume" ? "auto" : s.n) + "?v=" + s.at : "");
     }
   });
@@ -3035,7 +3133,9 @@ async function saveRas() {
   toast(t("You'll be signed in when your next game starts."));
 }
 $("#rasok").onclick = saveRas; $("#rasno").onclick = closeRas;
-$("#rasnew").onclick = () => APP.openUrl("https://retroachievements.org/createaccount.php");
+/* the Getting games page's links open the browser: with only a controller there'd be no way back, so it says so */
+$("#getg").addEventListener("click", e => { const a = e.target.closest("a[target=_blank]"); if (a && byPad()) { e.preventDefault(); mouseOnly(); } });
+$("#rasnew").onclick = () => mouseOnly() || APP.openUrl("https://retroachievements.org/createaccount.php");
 
 /* ---------- cheats: libretro's cheat lists for a game, ticked on; RetroArch switches them on as the game starts ---------- */
 let CHEAT = null;
@@ -3084,7 +3184,7 @@ $("#cheatq").addEventListener("input", () => { if (CHEAT) renderCheats(); });
 
 /* ---------- getting games ---------- */
 function openGetGames() { if (LAUNCH.open) return; leaveScreens("getg"); blurActive(); $("#getg").classList.add("show"); light(); beep(520); }
-function closeGetGames() { if (!isOpen("getg")) return; $("#getg").classList.remove("show"); focusById(focusId); light(); beep(330); }
+function closeGetGames() { if (!isOpen("getg")) return; $("#getg").classList.remove("show"); afterScreen(); light(); beep(330); }
 
 /* ---------- settings ---------- */
 let RAFIND = null;
@@ -3165,13 +3265,14 @@ function renderSettings() {
     wb.appendChild(stop);
     R({own: w.dir.split(/[\\/]/).filter(Boolean).pop() || w.dir}, w.dir + " · " + plural(w.games, "game", "games") + (w.unsure ? " · " + t("{n} not sure which console", {n: w.unsure}) : ""), wb);
   }
-  const wf = el("button", "btn", t("Watch a folder…"));
+  const wf = el("button", "btn", t("Watch a folder…")); wf.id = "wfolder";
   wf.onclick = async () => {
     if (byPad()) return openBrowse();
     const r = await APP.watchFolder();
     if (!r || (!r.ok && !r.error)) return;
     if (!r.ok) return toast(r.error, true);
-    await refresh(true); renderSettings(); toast(t("{n} from that folder are on the shelves.", {n: plural(r.games, "game", "games")}));
+    /* back on this button, not on the new folder's Stop watching (one press from undoing it) */
+    await refresh(true); renderSettings(); $("#wfolder").focus({preventScroll: true}); toast(t("{n} from that folder are on the shelves.", {n: plural(r.games, "game", "games")}));
   };
   R(t("Watch a folder"), t("Games in a folder of yours show on the shelves where they are, without being copied. New ones appear by themselves."), wf);
   /* games another RetroArch on this computer already knows, from its playlists */
@@ -3198,7 +3299,7 @@ function renderSettings() {
         del.classList.add("sure", "primary"); del.textContent = "Delete it?";
         setTimeout(() => { del.classList.remove("sure", "primary"); del.textContent = "Delete"; }, 3500); return;
       }
-      const r = await api("/api/shelves", {op: "delete", name: sh.name}); if (!r.ok) return toast(r.data.error || "Couldn't delete it.", true); await refresh(true); renderSettings(); toast("Deleted the shelf. Its games are still on their console shelves.");
+      const r = await api("/api/shelves", {op: "delete", name: sh.name}); if (!r.ok) return toast(r.data.error || t("Couldn't delete it."), true); await refresh(true); renderSettings(); toast(t("Deleted the shelf. Its games are still on their console shelves."));
     };
     bs.appendChild(rn); bs.appendChild(del);
     R({own: sh.name}, t("Your shelf · {n}", {n: plural(sh.ids.length, "game", "games")}), bs);
@@ -3260,7 +3361,7 @@ function renderSettings() {
     R("Play fullscreen", "Games fill the screen. Turn off to play in a window.", sw(UI.fullscreen !== false, v => { UI.fullscreen = v; saveUI(); }));
     R(t("Picture"), t("How games look. By console: an old TV's scanlines for home consoles, a handheld's screen for Game Boy and GBA, crisp pixels for the rest."),
       seg([["auto", t("By console")], ["sharp", t("Sharp")], ["smooth", t("Smooth")], ["crt", t("Old TV")], ["lcd", t("Handheld")]], UI.picture || "auto", v => { UI.picture = v; saveUI(); }));
-    R("Pick up where you left off", "Saves your spot when you leave a game and starts there next time.", sw(UI.resume !== false, v => { UI.resume = v; saveUI(); }));
+    R("Pick up where you left off", "Saves your spot when you leave a game and starts there next time.", sw(UI.resume !== false, v => { UI.resume = v; (EDITS++, api("/api/settings", {ui: UI})).then(() => refresh(true)); }));
     R(t("Rewind"), t("Hold the left trigger, or R on a keyboard, to go back a few seconds. The right trigger, or L, fast-forwards. On 8- and 16-bit consoles and Game Boy."), sw(UI.rewind !== false, v => { UI.rewind = v; saveUI(); }));
     R(t("Fast-forward speed"), t("How fast a game goes while you hold the right trigger (on the same consoles) or L, or after pressing Space. The sound speeds up with it, and is off at Fastest."),
       seg([[2, "2×"], [3, "3×"], [4, "4×"], [0, t("Fastest")]], UI.ffSpeed ?? 3, v => { UI.ffSpeed = v; saveUI(); }));
@@ -3269,7 +3370,7 @@ function renderSettings() {
     R(t("Less lag"), t("Games answer the controller a frame sooner, on the same consoles. Turn it off if a game's sound crackles."), sw(UI.lessLag !== false, v => { UI.lessLag = v; saveUI(); }));
     /* PS2 games: the emulator that comes with the app, or PCSX2 when it's installed too */
     if (PATHS.pcsx2) R(t("PlayStation 2 games"), t("Play them with the emulator that comes with the app, or with your PCSX2, which keeps its own settings and saves."),
-      seg([["builtin", t("Built in")], ["pcsx2", "PCSX2"]], UI.pcsx2 ? "pcsx2" : "builtin", v => { UI.pcsx2 = v === "pcsx2"; saveUI(); refresh(true); }));
+      seg([["builtin", t("Built in")], ["pcsx2", "PCSX2"]], UI.pcsx2 ? "pcsx2" : "builtin", v => { UI.pcsx2 = v === "pcsx2"; (EDITS++, api("/api/settings", {ui: UI})).then(() => refresh(true)); }));
   R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); renderHints(); }));
     const cb = el("div", "btns"), ct = el("button", "btn", t("Test…")), cr = el("button", "btn", t("Change buttons…"));
     ct.onclick = openCtest; cr.onclick = openButtonConsoles; cb.appendChild(ct); cb.appendChild(cr);
@@ -3282,7 +3383,9 @@ function renderSettings() {
     R("Folders", (PATHS.saves_dir ? t("Game saves are kept in {dir}.", {dir: PATHS.saves_dir}) : t("Game saves are kept in Documents › The Retro Shelf › Saves.")) + " " + t("BIOS files are needed for some consoles; Saves & BIOS below shows which."), fb);
     /* saves shared between computers through a cloud folder */
     const sf = el("div", "btns"), sm = el("button", "btn", PATHS.saves_dir ? t("Move again…") : t("Share them…"));
-    sm.onclick = async () => { if (mouseOnly()) return; const r = await APP.moveSaves(false); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("Saves are in {dir} now. The old copy stays where it was.", {dir: r.to})); };
+    sm.onclick = async () => { if (mouseOnly()) return; const r = await APP.moveSaves(false); if (!r || (!r.ok && !r.error)) return; if (!r.ok) return toast(r.error, true); await refresh(true); renderSettings(); toast(t("Saves are in {dir} now. The old copy stays where it was.", {dir: r.to})
+      /* saves the folder had already (another computer's) stay as they were */
+      + (r.kept ? " " + t("{saves} there already stayed as they were; this computer's copies are in its old saves folder.", {saves: plural(r.kept, "save", "saves")}) : "")); };
     sf.appendChild(sm);
     if (PATHS.saves_dir) { const sb = el("button", "btn", t("Back to the usual place")); sb.onclick = async () => { const r = await APP.moveSaves(true); if (r && r.ok) { await refresh(true); renderSettings(); toast(t("Saves are back in Documents › The Retro Shelf.")); } else if (r && r.error) toast(r.error, true); }; sf.appendChild(sb); }
     R(t("Saves on more than one computer"), PATHS.saves_dir ? t("Shared through {dir}. If a game is open on another computer, you're told before playing it here. In iCloud Drive, keep the folder downloaded (right-click it in Finder).", {dir: PATHS.saves_dir}) + " " + ((PATHS.others || []).length ? t("Play on {computers} counts here too.", {computers: PATHS.others.map(o => o.host || t("another computer")).join(", ")})
@@ -3310,7 +3413,6 @@ function renderSettings() {
         const need = c.state === "missing" && /^Needed/.test(c.note) && biosGames(c) > 0;
         bl.appendChild(el("b", need ? "need" : c.state, c.label)); bl.appendChild(el("span", "", biosLine(c)));
       });
-      bl.appendChild(el("b", "", "PlayStation 2")); bl.appendChild(el("span", "", "Set up inside PCSX2, which you install yourself."));
       b.appendChild(bl);
     }
   } else {
@@ -3332,7 +3434,7 @@ function renderSettings() {
     const so = el("button", "btn", t("Sign out")); so.onclick = async () => { await api("/api/cheevos/signout", {}); await refresh(true); renderSettings(); };
     cv.appendChild(so);
     R("RetroAchievements", t("Signed in as {user}. Achievements pop up while you play; your progress is on retroachievements.org.", {user: CHEEVOS.user}), cv);
-    R(t("Hardcore"), t("Achievements count as hardcore: no rewind, no cheats, and every game starts from the beginning."), sw(!!UI.hardcore, v => { UI.hardcore = v; saveUI(); refresh(true); }));
+    R(t("Hardcore"), t("Achievements count as hardcore: no rewind, no cheats, and every game starts from the beginning."), sw(!!UI.hardcore, v => { UI.hardcore = v; (EDITS++, api("/api/settings", {ui: UI})).then(() => refresh(true)); }));
   } else if (CHEEVOS.pending) {
     const no = el("button", "btn", t("Cancel")); no.onclick = async () => { await api("/api/cheevos/signout", {}); await refresh(true); renderSettings(); };
     cv.appendChild(no);
@@ -3350,9 +3452,9 @@ function renderSettings() {
   ls.value = UI.lang || "auto";
   ls.onchange = async () => { UI.lang = ls.value; saveUI(); APP.setLang(UI.lang); await setLang(UI.lang); renderHints(); renderShelves(focusId); renderSettings(); };
   lw.appendChild(ls);
-  if (LANG !== "en") { const fx = el("button", "btn", t("Suggest better words")); fx.onclick = () => APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new?title=" + encodeURIComponent("Translation (" + LANG + "): ")); lw.appendChild(fx); }
+  if (LANG !== "en") { const fx = el("button", "btn", t("Suggest better words")); fx.onclick = () => mouseOnly() || APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new?title=" + encodeURIComponent("Translation (" + LANG + "): ")); lw.appendChild(fx); }
   R(t("Language"), t("Languages other than English are drafts. If something reads oddly, suggest better words."), lw);
-  R("TV mode", "For a computer hooked up to a TV: opens fullscreen and bigger, and everything works with a controller. Select opens a game's options.", sw(!!UI.tv, v => { UI.tv = v; saveUI(); applyUI(); APP.tvMode(v, UI.textSize); }));
+  R("TV mode", "For a computer hooked up to a TV: opens fullscreen and bigger, and everything works with a controller. Select opens a game's options.", sw(!!UI.tv, v => { UI.tv = v; saveUI(); applyUI(); APP.tvMode(v, UI.textSize); if (!v) showHintsBriefly(); }));
   /* opening when the computer starts: asked of the system, which keeps the answer */
   if (LOGIN === undefined && APP.loginItem) { LOGIN = null; APP.loginItem().then(r => { LOGIN = r; if (r && r.supported && isOpen("settings")) renderSettings(); }); }
   if (LOGIN && LOGIN.supported) R(t("Open when the computer starts"), t("Opens The Retro Shelf when you sign in, in TV mode if that's on: for a computer hooked up to a TV."), sw(!!LOGIN.on, async v => {
@@ -3376,16 +3478,16 @@ function renderSettings() {
   const fs = el("button", "btn", "Go fullscreen"); fs.onclick = () => { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else HTML.requestFullscreen && HTML.requestFullscreen(); };
   R("Fullscreen", mac ? "Or press Ctrl ⌘ F." : "Or press F11.", fs);
 
-  const ub = el("button", "btn" + (UPD.status === "ready" ? " primary" : ""), {ready: "Restart now", manual: "Download"}[UPD.status] || "Check now");
+  const ub = el("button", "btn" + (UPD.status === "ready" ? " primary" : ""), UPD.status === "ready" ? t("Restart now") : UPD.status === "manual" ? t("Download") : t("Check now"));
   ub.disabled = UPD.status === "checking" || UPD.status === "downloading"; ub.onclick = updAction;
   R("Updates", updText(), ub).id = "updrow";
   R("Check for updates by itself", "Looks for a new version on GitHub every few hours. Nothing about you or your games is sent.", sw(UI.updates !== false, v => { UI.updates = v; saveUI(); }));
-  R("Get test versions", "Try new features before they're finished, as test versions come out. They can have bugs; your games and saves stay as they are.", sw(!!UI.beta, v => { UI.beta = v; saveUI(); if (v) setTimeout(() => APP.update("check").then(s => { if (s) { UPD = s; paintUpd(); } }), 900); }));
+  R("Get test versions", "Try new features before they're finished, as test versions come out. They can have bugs; your games and saves stay as they are.", sw(!!UI.beta, v => { UI.beta = v; saveUI(); setTimeout(() => APP.update(v ? "check" : "state").then(s => { if (s) { UPD = s; paintUpd(); } }), 900); }));
   const pb = el("div", "btns"), cp = el("button", "btn", "Copy info"), is = el("button", "btn", "Report a problem");
   cp.onclick = async () => { await APP.copyReport(); toast("Copied. Paste it into your bug report."); };
-  is.onclick = () => APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new");
+  is.onclick = () => mouseOnly() || APP.openUrl("https://github.com/colingalbraith/the-retro-shelf/issues/new");
   pb.appendChild(cp); pb.appendChild(is);
-  const lb = el("button", "btn", "Licenses"); lb.onclick = () => APP.licenses();
+  const lb = el("button", "btn", "Licenses"); lb.onclick = () => mouseOnly() || APP.licenses();
   R(t("The Retro Shelf {version}", {version: APPINFO.version || ""}), "Emulation by RetroArch and the libretro cores, free software by their authors. No games are included.", lb);
   R("Something not working?", "Copy info puts your versions, setup and the last game's emulator log on the clipboard for a bug report. Nothing is sent until you paste it somewhere.", pb);
   if (PATHS.builtin) {
@@ -3570,13 +3672,18 @@ function fitTrophy() {
     const gap = parseFloat(getComputedStyle(top).columnGap) || 0, room = top.clientWidth - 40;
     const need = tros.reduce((w, t) => w + t.offsetWidth, 0) + gap * (tros.length - 1);
     if (need > room) { const k = (room - gap * (tros.length - 1)) / (need - gap * (tros.length - 1)); tros.forEach(t => t.style.setProperty("--th", Math.floor(t.dataset.h * k) + "px")); }
+    /* each as wide as its brass plate at least (the hours under it, longer in German), and the last ones go when that's
+       more than the shelf holds */
+    tros.forEach(t => { t.hidden = false; const pl = t.querySelector(".tplate"); t.style.minWidth = pl ? pl.offsetWidth + 8 + "px" : ""; });
+    const shown = [...tros];
+    while (shown.length > 1 && top.scrollWidth > top.clientWidth) shown.pop().hidden = true;
   }
   [...con.children].forEach(c => { c.hidden = false; const pl = c.querySelector(".tplate"); c.style.width = Math.max(96, pl.offsetWidth + 8) + "px"; });
   const cs = [...con.children];
   while (cs.length > 1 && con.scrollWidth > con.clientWidth) cs.pop().hidden = true;
 }
 window.addEventListener("resize", fitTrophy);
-function closeTrophy() { if (!isOpen("trophy")) return; $("#trophy").classList.remove("show"); focusById(focusId); light(); beep(330); }
+function closeTrophy() { if (!isOpen("trophy")) return; $("#trophy").classList.remove("show"); afterScreen(); light(); beep(330); }
 $("#tclose").onclick = closeTrophy;
 
 /* ---------- moving around the shelves ---------- */
@@ -3584,7 +3691,8 @@ function setKb(on) { if (kbMode !== on) { kbMode = on; document.body.classList.t
 const slots = () => $$("#shelves .card");
 function goTo(c) {
   if (!c || c === sel) return;
-  c.focus({preventScroll: true}); reveal(c);
+  if (q) movedInSearch = true;
+  pickAndScroll(c, revealBy(c), 400);
   beep(440, .035, .025);
 }
 /* scroll just enough for a box to be in view */
@@ -3615,9 +3723,8 @@ function jump(d) {
   const fs = $$("#shelves .card.first"); if (!fs.length) return;
   /* from no shelf (the Manual box, say): forward goes to the first, back to the last */
   const i = sel ? fs.findIndex(c => c.dataset.group === sel.dataset.group) : -1, c = fs[i < 0 ? (d > 0 ? 0 : fs.length - 1) : (i + d + fs.length) % fs.length];
-  c.focus({preventScroll: true});
-  const root = $("#shelves"), r = c.getBoundingClientRect(), R = root.getBoundingClientRect();
-  root.scrollBy({top: r.top - R.top - 40, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, 450); beep(520);
+  const r = c.getBoundingClientRect(), R = $("#shelves").getBoundingClientRect();
+  pickAndScroll(c, r.top - R.top - 40); beep(520);
 }
 function selGame() { return sel && !sel._manual ? byId.get(sel.dataset.id) : null; }
 function activate() {
@@ -3628,7 +3735,7 @@ function activate() {
 
 /* the shelves are rebuilt a moment after typing stops: with thousands of games, not for every letter */
 let qT = 0;
-$("#q").addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); paintQ(); clearTimeout(qT); qT = setTimeout(() => renderShelves(null), 120); });
+$("#q").addEventListener("input", e => { if (!q && e.target.value.trim()) { preSearch = focusId; movedInSearch = false; } q = e.target.value.trim().toLowerCase(); paintQ(); clearTimeout(qT); qT = setTimeout(() => renderShelves(null), 120); });
 $("#q").addEventListener("blur", paintQ);
 $("#sclose").onclick = closeSettings;
 $("#gclose").onclick = closeGetGames;
@@ -3840,6 +3947,9 @@ APP.onMenu(w => {
   if (w && w.cmd === "refresh") { refresh(true).then(() => { if (w.focus) focusById(w.focus); }); return; }
   if (w && w.cmd === "error") { toast(w.text, true); return; }
   if (LAUNCH.open) return;
+  /* a slip or list open (Rename, a note, Options…): a menu's screen doesn't open over it, leaving it underneath */
+  const top = topPanel();
+  if (top && !["settings", "getg", "colls", "trophy"].includes(top[0])) return;
   if (w === "add-games") { closeSettings(); addGames(); }
   else if (w === "get-games") openGetGames();
   else if (w === "keys") openKeys();

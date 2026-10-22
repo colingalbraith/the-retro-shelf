@@ -95,6 +95,11 @@ function csoSystemId(fd) {
   return ascii(data, within + 1, 5) === "CD001" ? ascii(data, within + 8, 32).trim() : null;
 }
 
+/** a disc's track or image, by its kind of file */
+const TRACK = /\.(bin|img|iso|raw|wav|ogg|flac|mp3|ape|wv|cue|gdi|chd|cdi|mds|mdf|ccd|sub|pbp|cso|zso|nrg|toc|ecm)$/i;
+/** whether p is in dir (or is it) */
+const within = (p, dir) => { const r = path.relative(path.resolve(dir), path.resolve(p)); return r === "" || (!path.isAbsolute(r) && r !== ".." && !r.startsWith(".." + path.sep)); };
+
 /** Parse a .cue/.gdi/.m3u and return the files it points to (absolute paths). */
 function sheetFiles(p) {
   let text;
@@ -144,7 +149,8 @@ class Importer {
       const all = zipEntries(p);
       if (!all || !all.length) return null;
       // readmes, info files and pictures that come along aren't the game
-      const es = all.filter(e => !/\.(txt|nfo|diz|url|pdf|html?|jpe?g|png|gif|bmp|ini|xml|dat|sfv|md5|sha1)$/i.test(e.name));
+      // (and patches, saves and manuals that come with a console game)
+      const es = all.filter(e => !/\.(txt|nfo|diz|url|pdf|html?|jpe?g|png|gif|bmp|ini|xml|dat|sfv|md5|sha1|ips|bps|ups|xdelta|sav|srm|rtf|doc|docx)$/i.test(e.name));
       if (!es.length) return null;
       // a BIOS in a zip isn't a game, and a disc needs its track files beside it (unzipped): asked about, not guessed
       if (es.some(e => biosDest(path.posix.basename(e.name), this.systems))) return null;
@@ -153,6 +159,9 @@ class Importer {
       // arcade romsets are zips of chip dumps: mostly not console files, or several .bin/.rom chips (a console game's zip
       // holds one ROM)
       const chips = known.length > 1 && known.every(e => [".bin", ".rom"].includes(path.extname(e.name).toLowerCase()));
+      // exactly one console's ROM (an .sfc, a .gb, not a .bin or .rom chip) is that game, whatever else came with it
+      const roms = known.filter(e => ![".bin", ".rom"].includes(path.extname(e.name).toLowerCase()));
+      if (roms.length === 1 && !chips) { const ss = this.byExt[path.extname(roms[0].name).toLowerCase()].filter(s => cands.includes(s)); if (ss.length === 1) return { system: ss[0] }; }
       if (!known.length || chips || (es.length > 2 && known.length < es.length / 2)) return { system: pick("arcade") };
       const x = path.extname(known[0].name).toLowerCase();
       if (x === ".bin") return { system: pick(known[0].size > 65536 ? "genesis" : "atari2600") };
@@ -251,12 +260,21 @@ class Importer {
 
     // files a .cue/.gdi/.m3u points at travel with it instead of showing up on their own
     // (keyed as the disk compares names: a .cue saying "TRACK 01.BIN" owns "Track 01.bin")
+    // only files that were dropped too, or a disc's tracks in its own folder: a sheet naming anything else on the
+    // computer (an absolute path, "../../.ssh/…") brings nothing along
+    const dropped = new Set(files.map(pathKey));
+    const fits = (x, sheet) => dropped.has(pathKey(x)) || (TRACK.test(x) && within(x, path.dirname(sheet)));
     const owned = new Map(), own = (x, f) => { const k = pathKey(x); if (!owned.has(k)) owned.set(k, { x, owner: f }); };
+    // an .m3u for a console whose emulator can't play one (Saturn's, made by another app) isn't a game here: its
+    // discs come in on their own
+    const m3uFor = f => { const first = sheetFiles(f)[0], x = first ? path.extname(first).toLowerCase() : ""; return (this.byExt[x] || []).filter(s => (this.byExt[".m3u"] || []).includes(s)); };
+    const skip = new Set(files.filter(f => path.extname(f).toLowerCase() === ".m3u" && !m3uFor(f).length).map(pathKey));
     for (const f of files) {
-      if (!SHEETS.includes(path.extname(f).toLowerCase())) continue;
+      if (!SHEETS.includes(path.extname(f).toLowerCase()) || skip.has(pathKey(f))) continue;
       for (const x of sheetFiles(f)) {
+        if (!fits(x, f)) continue;
         own(x, f);
-        if (path.extname(x).toLowerCase() === ".cue") for (const y of sheetFiles(x)) own(y, f);
+        if (path.extname(x).toLowerCase() === ".cue") for (const y of sheetFiles(x)) if (fits(y, x)) own(y, f);
       }
     }
     // an .m3u wins over the discs it lists
@@ -266,6 +284,7 @@ class Importer {
     for (const f of files) {
       const ext = path.extname(f).toLowerCase(), name = path.basename(f);
       if (owned.has(pathKey(f)) && owned.get(pathKey(f)).owner !== f) continue;
+      if (skip.has(pathKey(f))) continue;
       if (IMG.includes(ext)) continue;
       // a BIOS file (scph5501.bin, neogeo.zip…) goes to the BIOS folder, not onto a shelf
       const dest = biosDest(name, this.systems);
@@ -274,7 +293,8 @@ class Importer {
       { let sz = 0; try { sz = fs.statSync(f).size; } catch {}
         const by = sz > 4194303 && biosByContent(f, sz, this.systems);
         if (by) { bios.push({ src: f, name, dest: by }); continue; } }
-      const cands = this.byExt[ext];
+      // an .m3u: the consoles that take both it and its discs
+      const cands = ext === ".m3u" ? m3uFor(f) : this.byExt[ext];
       if (!cands) { if (!/^(readme|desktop\.ini|thumbs\.db)/i.test(name)) unknown.push(name); continue; }
       let size = 0;
       try { size = fs.statSync(f).size; } catch {}
@@ -316,7 +336,9 @@ class Importer {
   plan(it, root) {
     const s = this.systems[it.system], dir = path.join(root, s.folder || it.system);
     const stem = path.parse(it.name).name, nested = it.makeCue || it.extras.some(x => !IMG.includes(path.extname(x).toLowerCase()));
-    const base = nested ? path.join(dir, stem) : dir, srcDir = path.dirname(it.src);
+    // a game's discs added one by one ("… (Disc 1).cue", "… (Disc 2).cue") share one folder, named for the game, where
+    // they're made into one box with a disc list
+    const base = nested ? path.join(dir, stem.replace(/\s*\((?:Disc|Disk|CD) ?\d+(?: of \d+)?\)/i, "").trim() || stem) : dir, srcDir = path.dirname(it.src);
     // the files the game needs first, the game itself last: a copy that fails halfway leaves no game that looks whole
     const copies = [], moved = [];
     for (const x of it.extras) {
@@ -343,15 +365,27 @@ class Importer {
         let fresh = false;
         for (const [src, dest] of copies) {
           if (path.resolve(src) === path.resolve(dest)) continue;
-          try { if (fs.statSync(dest).size === fs.statSync(src).size) continue; } catch {}
+          // there already: the same file (as big) is skipped; a different one with that name is never written over
+          let there = null;
+          try { there = fs.statSync(dest); } catch {}
+          if (there) {
+            if (there.size === fs.statSync(src).size) continue;
+            // a cover picture of that name there already stays (the game still comes in); a game's own file never
+            // replaces another
+            if (IMG.includes(path.extname(dest).toLowerCase())) continue;
+            throw new Error(`a different file called "${path.basename(dest)}" is in the games folder already`);
+          }
           fs.mkdirSync(path.dirname(dest), { recursive: true });
           // clone where the disk supports it (instant on APFS), copy otherwise
-          await fs.promises.copyFile(src, dest + ".part", fs.constants.COPYFILE_FICLONE);
-          await fs.promises.rename(dest + ".part", dest);
+          // written under a short name first (a game's own can be near the longest a name can be), then put in place
+          const part = path.join(path.dirname(dest), `.retro-shelf-${crypto.randomBytes(4).toString("hex")}.part`);
+          try { await fs.promises.copyFile(src, part, fs.constants.COPYFILE_FICLONE); await fs.promises.rename(part, dest); }
+          catch (e) { try { fs.rmSync(part, { force: true }); } catch {} throw e; }
           made.push(dest);
           fresh = true;
         }
-        if (rewrite) {
+        // a disc list copied now (not one that was there already) names its tracks where they now are
+        if (rewrite && made.includes(copies[copies.length - 1][1])) {
           const dest = copies[copies.length - 1][1], text = fs.readFileSync(dest, "utf8");
           const fixed = text.split(/\r?\n/).map(line => {
             if (/^\s*FILE\s/i.test(line)) return line.replace(/^(\s*FILE\s+)(?:"([^"]+)"|(\S+))/i, (m, a, q, b) => `${a}"${leaf(q || b)}"`);
@@ -366,7 +400,8 @@ class Importer {
         }
         fresh ? added++ : already++;
       } catch (e) {
-        // what this try copied goes again (copies only: the files dropped are untouched), so adding it again works
+        // what this try copied goes again (only files it made: the files dropped, and ones already there, are untouched),
+        // so adding it again works
         for (const f of made) { try { fs.rmSync(f, { force: true }); } catch {} }
         failed++;
         errors.push(`${it.name}: ${e.code === "ENOSPC" ? "the disk is full" : e.message}`);

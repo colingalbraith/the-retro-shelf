@@ -168,6 +168,8 @@ const build = systems => [...STATIC, ...consolePins(systems), ...seriesPins()];
  * What the tests read. games: [{id, system, year, genre}]; st: the saved state (time, plays, fav, shelves, sessions,
  * events); series: [{name, have, items: [{id}]}] from collections; extra: {bios: bool, now: unix seconds}.
  */
+/** the largest of many numbers (0 for none): a loop, as spreading a very long list into Math.max overflows the stack */
+const most0 = list => { let m = 0; for (const v of list) if (v > m) m = v; return m; };
 function context(games, st, series, genreOf, extra = {}) {
   const byId = new Map(games.map(g => [g.id, g]));
   // played means for at least a few seconds: a game that closed straight away (no BIOS, a bad file) doesn't count
@@ -214,11 +216,11 @@ function context(games, st, series, genreOf, extra = {}) {
   return {
     games, played, favs: (st.fav || []).filter(id => byId.has(id)).length, shelves: st.shelves || [],
     wanted: (st.shelves || []).reduce((n, s) => n + ((s.wanted || []).length), 0),
-    total: times.reduce((a, b) => a + b, 0), most: Math.max(0, ...times),
+    total: times.reduce((a, b) => a + b, 0), most: most0(times),
     sittings: sessions.map(s => s[2]), starts: sessions.map(s => local(s[1]).getHours()),
-    bestStreak: best, maxPerDay: Math.max(0, ...perDay.values()), maxGamesPerDay: Math.max(0, ...[...gamesPerDay.values()].map(s => s.size)),
-    maxGamesPerWeek: maxWeek, mostDaysOneGame: Math.max(0, ...[...daysPerGame.values()].map(s => s.size)),
-    weekend, bestWeekend: Math.max(0, ...weekendTime.values()), comeback,
+    bestStreak: best, maxPerDay: most0(perDay.values()), maxGamesPerDay: most0([...gamesPerDay.values()].map(s => s.size)),
+    maxGamesPerWeek: maxWeek, mostDaysOneGame: most0([...daysPerGame.values()].map(s => s.size)),
+    weekend, bestWeekend: most0(weekendTime.values()), comeback,
     lunch: at(d => d.getDay() >= 1 && d.getDay() <= 5 && d.getHours() >= 12 && d.getHours() < 14),
     friday: at(d => d.getDay() === 5 && d.getHours() >= 19),
     sundayMorning: at(d => d.getDay() === 0 && d.getHours() >= 8 && d.getHours() < 12),
@@ -226,7 +228,7 @@ function context(games, st, series, genreOf, extra = {}) {
     on: (month, date) => at(d => d.getMonth() === month && d.getDate() === date),
     systems: new Set(games.map(g => g.system)), playedSystems: new Set(pg.map(g => g.system)), perSystem,
     playedYears: years, playedDecades: new Set(years.map(y => Math.floor(y / 10))), thisYear: local(extra.now || Date.now() / 1000).getFullYear(),
-    playedGenres: new Set(genreCount.keys()), mostInGenre: Math.max(0, ...genreCount.values()),
+    playedGenres: new Set(genreCount.keys()), mostInGenre: most0(genreCount.values()),
     beaten: marked(st.progress, v => v === "beaten" || v === "complete"), complete: marked(st.progress, v => v === "complete"),
     backlog: marked(st.progress, v => v === "backlog"), rated: marked(st.rating, v => v > 0), noted: marked(st.notes, v => !!String(v || "").trim()),
     // a series counts its games marked as counting (all of them, unless some were marked otherwise)

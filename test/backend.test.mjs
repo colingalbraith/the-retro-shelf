@@ -304,7 +304,11 @@ test("RetroAchievements: the password stays in memory until RetroArch has a toke
   await be.route("POST", "/api/cheevos/signout", {});
   await be.route("POST", "/api/cheevos/signin", { user: "Player_1", pass: "wrong" });
   fs.writeFileSync(be.files.raCfg, 'cheevos_password = "wrong"\ncheevos_token = ""\n');
-  be.cheevosAfter({ cheevos: be.raPending });
+  // a game that closed right away (it didn't start) never got to try: still waiting, not "wrong password"
+  be.cheevosAfter({ cheevos: be.raPending, dt: 2 });
+  assert.deepEqual(be.settingsJson().cheevos, { user: "", pending: "Player_1", failed: false });
+  fs.writeFileSync(be.files.raCfg, 'cheevos_password = "wrong"\ncheevos_token = ""\n');
+  be.cheevosAfter({ cheevos: be.raPending, dt: 60 });
   assert.deepEqual(be.settingsJson().cheevos, { user: "", pending: "", failed: true });
   assert.ok(!fs.readFileSync(be.files.raCfg, "utf8").includes("wrong"));
 });
@@ -1045,4 +1049,89 @@ test("a computer whose app data was copied to another: each gets its own name, a
   play(a, 1, t0 + 30); a.writeJournalNow(); play(b, 1, t0 + 40); b.writeJournalNow();
   assert.equal(a.machine(), id);
   assert.deepEqual([seen(a)[0], seen(b)[0]], [17, 17]);
+});
+
+test("Game Gear and Master System saves are their own, never a Genesis game's of the same name", () => {
+  put("genesis/Sonic (USA).md"); put("gg/Sonic (USA).gg"); put("gg/Columns (USA).gg"); be.scan();
+  // the built-in emulators, as far as saves go: Genesis Plus GX plays all three
+  be.ra = { info: path.join(home, "none") }; be._coreNames = { genesis_plus_gx_libretro: "Genesis Plus GX" };
+  const saves = path.join(home, "docs", "Saves"), gpgx = path.join(saves, "Genesis Plus GX"), states = path.join(saves, "States", "Genesis Plus GX");
+  fs.mkdirSync(gpgx, { recursive: true }); fs.mkdirSync(states, { recursive: true });
+  fs.writeFileSync(path.join(gpgx, "Sonic (USA).srm"), "shared"); fs.writeFileSync(path.join(gpgx, "Columns (USA).srm"), "columns");
+  fs.writeFileSync(path.join(states, "Columns (USA).state.auto"), "resume");
+  be.consoleSaves();
+  const gg = path.join(saves, "Consoles", "gg");
+  // a Game Gear game's own save moves to the Game Gear's folder; one a Genesis game of that name may be using is copied
+  assert.equal(fs.readFileSync(path.join(gg, "Genesis Plus GX", "Columns (USA).srm"), "utf8"), "columns");
+  assert.ok(!fs.existsSync(path.join(gpgx, "Columns (USA).srm")));
+  assert.ok(fs.existsSync(path.join(gg, "States", "Genesis Plus GX", "Columns (USA).state.auto")));
+  assert.ok(fs.existsSync(path.join(gg, "Genesis Plus GX", "Sonic (USA).srm")) && fs.existsSync(path.join(gpgx, "Sonic (USA).srm")));
+  const of = sys => be.gameSaves([...be.games.values()].find(g => g.system === sys && g.title.startsWith("Sonic"))).map(s => s.file);
+  assert.deepEqual(of("Genesis"), [path.join(gpgx, "Sonic (USA).srm")]);
+  assert.deepEqual(of("Game Gear"), [path.join(gg, "Genesis Plus GX", "Sonic (USA).srm")]);
+  assert.ok(be.resumeAt([...be.games.values()].find(g => g.title.startsWith("Columns"))) > 0);
+});
+
+test("joining a shared saves folder keeps the saves already there; going back home, the newer wins and the other goes to the Trash", async () => {
+  const cloud = path.join(home, "cloud"), shared = path.join(cloud, "The Retro Shelf Saves", "Snes9x");
+  fs.mkdirSync(shared, { recursive: true });
+  fs.writeFileSync(path.join(shared, "Chrono Trigger (USA).srm"), "FORTY HOURS");               // another computer's
+  const mine = path.join(home, "docs", "Saves", "Snes9x");
+  fs.mkdirSync(mine, { recursive: true });
+  fs.writeFileSync(path.join(mine, "Chrono Trigger (USA).srm"), "ONE HOUR");
+  fs.writeFileSync(path.join(mine, ".hack Infection (USA).srm"), "dot");                          // a name starting with a dot is a save too
+  const r = await be.moveSaves(cloud);
+  assert.equal(r[0], 200);
+  assert.equal(r[1].kept, 1);
+  assert.equal(fs.readFileSync(path.join(shared, "Chrono Trigger (USA).srm"), "utf8"), "FORTY HOURS");
+  assert.ok(fs.existsSync(path.join(shared, ".hack Infection (USA).srm")));
+  assert.equal(fs.readFileSync(path.join(mine, "Chrono Trigger (USA).srm"), "utf8"), "ONE HOUR", "this computer's copy stays where it was");
+  // back home: the shared folder's (newer) wins, the old home copy goes to the Trash
+  const trashed = []; be.trash = async p => { trashed.push(path.basename(p)); fs.rmSync(p); };
+  const later = new Date(Date.now() + 60000); fs.utimesSync(path.join(shared, "Chrono Trigger (USA).srm"), later, later);
+  assert.equal((await be.moveSaves(""))[0], 200);
+  assert.equal(fs.readFileSync(path.join(mine, "Chrono Trigger (USA).srm"), "utf8"), "FORTY HOURS");
+  assert.deepEqual(trashed, ["Chrono Trigger (USA).srm"]);
+  // a folder RetroArch couldn't use
+  assert.equal((await be.moveSaves(path.join(home, 'say "cheese"')))[0], 400);
+});
+
+test("no game starts while the saves or games are moving", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  let r;
+  await be.busyWith("saves", async () => { r = await be.launch(byTitle("Chrono Trigger").id); return [200, {}]; });
+  assert.equal(r[0], 409);
+  assert.equal(be.busy, null);
+});
+
+test("adding games never writes over a different file of the same name, and a sheet brings only its own tracks", async () => {
+  put("ps1/FF7/FF7 (Disc 1).bin", "THE LIBRARY'S DISC");
+  const drop = path.join(home, "drop"), secret = path.join(home, "secret.txt");
+  fs.mkdirSync(drop, { recursive: true }); fs.writeFileSync(secret, "private");
+  fs.writeFileSync(path.join(drop, "FF7 (Disc 1).bin"), "A DIFFERENT DISC, LONGER");
+  fs.writeFileSync(path.join(drop, "FF7 (Disc 1).cue"), `FILE "FF7 (Disc 1).bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\nFILE "${secret}" BINARY\n`);
+  const { items } = be.importer.inspect([drop]);
+  assert.ok(!items.some(it => it.extras.includes(secret)), "a file elsewhere on the computer isn't brought along");
+});
+
+test("a play history from another computer's journal is checked: odd values and far-future times are left out", () => {
+  const { combine } = createRequire(import.meta.url)("../src/sync.js");
+  const now = Math.floor(Date.now() / 1000);
+  const c = combine([{ j: { v: 1, machine: "x", games: { "k": { plays: -5, rating: [9, now], progress: ["constructor", now], notes: ["ok", now * 2] } }, sessions: [["k", now, 999999]] } }], new Map([["g", "k"]]), now);
+  assert.equal(c.add.get("g").plays, 0);
+  assert.ok(!c.set.has("rating:g") && !c.set.has("progress:g"));
+  assert.equal(c.set.get("notes:g")[1], now + 86400, "a time past tomorrow is tomorrow");
+  assert.equal(c.sessions[0][2], 12 * 3600);
+});
+
+test("the portable copy's games, back on another drive letter, keep their play", () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  be.followRoot();
+  const g = byTitle("Chrono Trigger"); be.state.plays[g.id] = 9; be.saveState();
+  // the games folder now somewhere else (the stick came back as F: instead of E:)
+  const moved = path.join(home, "elsewhere");
+  fs.cpSync(path.join(home, "docs"), moved, { recursive: true });
+  const b = new Backend({ app: APP, data: path.join(home, "data"), docs: moved, emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init(); b.followRoot();
+  assert.equal(b.state.plays[[...b.games.values()].find(x => x.title === "Chrono Trigger").id], 9);
 });

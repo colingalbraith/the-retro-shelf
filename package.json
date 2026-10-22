@@ -64,6 +64,12 @@
       }
     ],
     "afterPack": "scripts/after-pack.cjs",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "resetAdHocDarwinSignature": true
+    },
     "publish": [
       {
         "provider": "github",

@@ -87,6 +87,14 @@ fetch("/music/tracks.json").then(r => r.json()).then(list => {
   for (const t of list) { const li = document.createElement("li"), a = document.createElement("a"); a.href = t.url; a.textContent = t.title; li.append(a, " by " + t.by + (t.from && t.from !== t.title ? ", from " + t.from : "") + " (" + t.license + ")"); ul.append(li); }
 }).catch(() => {});
 document.addEventListener("click", e => { const a = e.target.closest("a[href^='https://']"); if (a) { e.preventDefault(); window.open(a.href); } });
+// closed with Esc, or with a controller's B (any button: the one that opened it is let go first)
+document.addEventListener("keydown", e => { if (e.key === "Escape") window.close(); });
+let held = true;
+setInterval(() => {
+  const pad = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(Boolean), down = !!pad && pad.buttons.some(b => b.pressed);
+  if (down && !held) window.close();
+  held = down;
+}, 100);
 </script>
 </body>
 </html>

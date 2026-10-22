@@ -80,6 +80,9 @@ function enforced(ra, dirs, opts) {
     // lets the app ask RetroArch to quit cleanly (saving first) from the Stop button
     stdin_cmd_enable: "true",
     savestate_auto_save: opts.resume ? "true" : "false",
+    // a game's buttons are the app's to keep (writeRemap): RetroArch writing them back as a game closes would take
+    // the app's mark off its file, and the app couldn't change them again
+    remap_save_on_exit: "false",
     // a launch from a chosen save slot, or "start fresh", skips the resume point
     savestate_auto_load: opts.resume && opts.load !== false && !hardcore ? "true" : "false",
     // the picture: sharp pixels, smoothed, or the scanlines of an old TV or a handheld's screen (a shader, passed with
@@ -282,8 +285,14 @@ function linkSystemData(ra, systemDir, core) {
       let copy = "";
       try { copy = fs.readFileSync(mark, "utf8"); } catch {}
       if (copy === from) continue;
+      // the app's copy of files that are somewhere else now (the app moved to another drive): copied over again where
+      // it is, so anything added to it stays
+      if (copy && !st.isSymbolicLink()) {
+        try { fs.cpSync(from, link, { recursive: true, force: true }); fs.writeFileSync(mark, from); } catch {}
+        continue;
+      }
       if (st.isSymbolicLink()) { try { fs.unlinkSync(link); } catch { fs.rmdirSync(link); } }
-      else if (copy || (st.isDirectory() && !fs.readdirSync(link).length)) fs.rmSync(link, { recursive: true, force: true });
+      else if (st.isDirectory() && !fs.readdirSync(link).length) fs.rmdirSync(link);
       else continue;
     }
     fs.mkdirSync(path.dirname(link), { recursive: true });

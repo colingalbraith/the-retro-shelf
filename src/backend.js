@@ -76,8 +76,11 @@ function jload(p, def) {
     moment (Windows) gets a few tries */
 function jsave(p, obj) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  const fd = fs.openSync(p + ".tmp", "w");
-  try { fs.writeSync(fd, JSON.stringify(obj, null, 2)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  const text = JSON.stringify(obj, null, 2), fd = fs.openSync(p + ".tmp", "w");
+  try { fs.writeFileSync(fd, text); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  // read back whole before it takes the old one's place: a full disk can cut a write short without saying so, and a
+  // short one must never become the file (or, the save after, its .bak)
+  if (fs.readFileSync(p + ".tmp", "utf8") !== text) { try { fs.rmSync(p + ".tmp", { force: true }); } catch {} throw new Error("Couldn't save " + path.basename(p) + ": the disk may be full."); }
   for (let i = 0; ; i++) {
     try {
       if (fs.existsSync(p)) fs.copyFileSync(p, p + ".bak");
@@ -89,6 +92,16 @@ function jsave(p, obj) {
     }
   }
 }
+/** a name for setting a file aside that no file has yet: name.old, then name.old 2, name.old 3… */
+function freeName(p) {
+  if (!fs.existsSync(p)) return p;
+  for (let i = 2; ; i++) if (!fs.existsSync(`${p} ${i}`)) return `${p} ${i}`;
+}
+/** a short name for a file being written next to dest (a game's name can be near the longest a name can be) */
+const partFor = dest => path.join(path.dirname(dest), `.retro-shelf-${crypto.randomBytes(4).toString("hex")}.part`);
+
+/** emulators whose own name (what RetroArch names their saves, states, remaps and cheats folders) isn't the .info's */
+const BUILT_IN_NAMES = { dolphin_libretro: "dolphin-emu", vecx_libretro: "VecX", freeintv_libretro: "freeintv" };
 // RetroArch's names for the RetroPad's buttons, by number (remap files say input_player1_btn_<name>)
 const RETROPAD = ["b", "y", "select", "start", "up", "down", "left", "right", "a", "x", "l", "r", "l2", "r2", "l3", "r3"];
 const CHEAT_MARK = "# Cheats chosen in The Retro Shelf (a game's options → Cheats)";
@@ -101,7 +114,7 @@ const PROGRESS = ["backlog", "playing", "beaten", "complete"];
 // settings, button layouts, watched folders, the backup clock) is the computer's. The first person's is in state.json
 // with the rest, as it always was, so one person sees no change; others' are in people/<id>.json
 const PERSONAL = ["fav", "last", "plays", "time", "sessions", "events", "pins", "pinKeys", "progress", "rating", "notes", "shelves", "cheevos", "recapSeen", "edited", "imported",
-  "journalLast", "journalBase", "former"];
+  "journalLast", "journalBase", "former", "consoleSaves"];
 const STATE_DEFAULTS = [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}], ["notCounted", {}]];
 
 // what one game can have of its own (setGameOpts): each setting's choices, with the words menus show for them
@@ -163,7 +176,7 @@ const TAG = /[([]([^)\]]*)[)\]]/g;
 /** a typed or pasted path, without the quotes Windows' "Copy as path" puts around it */
 const unquote = v => String(v).trim().replace(/^(["'])(.*)\1$/, "$2").trim();
 /** a path as the file system compares it: Windows and macOS ignore letter case */
-const pathKey = p => process.platform === "linux" ? path.resolve(p) : path.resolve(p).toLowerCase();
+const pathKey = p => process.platform === "linux" ? path.resolve(p) : path.resolve(p).normalize("NFC").toLowerCase();
 function gid(p) { return crypto.createHash("sha1").update(p).digest("hex").slice(0, 12); }
 /** what scanning skips: hidden folders, and the files macOS leaves around (._Game.iso, .DS_Store). A game whose name
     starts with a dot (.hack//Infection) still counts */
@@ -276,14 +289,19 @@ class Backend extends EventEmitter {
    */
   listCsv() {
     const st = this.state, fav = new Set(st.fav || []);
-    const cell = v => { let s = String(v ?? ""); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    const day = t => t ? new Date(t * 1000).toISOString().slice(0, 10) : "";
+    // a cell a spreadsheet won't take for a formula (one starting with =, even after spaces, isn't run)
+    const cell = v => { let s = String(v ?? ""); if (/^\s*[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    // the day where you are, not in London
+    const day = t => { if (!t) return ""; const d = new Date(t * 1000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+    // play on other computers too, as the shelves count it
+    const far = this.remote().add, plays = id => (st.plays[id] || 0) + ((far.get(id) || {}).plays || 0), time = id => (st.time[id] || 0) + ((far.get(id) || {}).time || 0);
+    const last = id => Math.max(st.last[id] || 0, (far.get(id) || {}).last || 0);
     const rows = [["Title", "Console", "Year", "Publisher", "Genre", "Progress", "Rating", "Favorite", "Times played", "Hours played", "Last played", "Hidden", "Note", "File"]];
     const games = [...this.games.values()].map(g => ({ g, title: st.names[g.id] || g.title }))
       .sort((a, b) => a.g.system.localeCompare(b.g.system) || a.title.localeCompare(b.title));
     for (const { g, title } of games) rows.push([title, g.system, g.year || "", g.pub || "", g.genre || "",
       { backlog: "Backlog", playing: "Playing", beaten: "Beaten", complete: "100%" }[st.progress[g.id]] || "", st.rating[g.id] || "",
-      fav.has(g.id) ? "Yes" : "", st.plays[g.id] || 0, ((st.time[g.id] || 0) / 3600).toFixed(1), day(st.last[g.id]),
+      fav.has(g.id) ? "Yes" : "", plays(g.id), (time(g.id) / 3600).toFixed(1), day(last(g.id)),
       st.hidden.includes(g.id) ? "Yes" : "", st.notes[g.id] || "", path.basename(g.path)]);
     return "\ufeff" + rows.map(r => r.map(cell).join(",")).join("\r\n") + "\r\n";
   }
@@ -346,6 +364,13 @@ class Backend extends EventEmitter {
   }
 
   /** the games folder moved (the app used to be called Arcade): ids come from paths, so each game's stats follow */
+  /** the games folder somewhere other than last time, by itself (a portable copy whose USB stick came back as another
+      drive letter): their play history follows the games. One chosen in Settings moves with its own steps */
+  followRoot() {
+    const root = path.resolve(this.romsRoot()), last = this._base.gamesRoot;
+    if (last && last !== root && !this.paths.roms_dir) this.remapIds(last);
+    if (last !== root) { this.state.gamesRoot = this._base.gamesRoot = root; this.saveState(true); }
+  }
   remapIds(fromRoot) {
     const toRoot = this.romsRoot();
     for (const g of this.games.values()) {
@@ -542,15 +567,63 @@ class Backend extends EventEmitter {
     const p = this.people && this.people.list.find(x => x.id === id);
     return path.join(this.savesRoot(), "People", sync.personKey(p ? p.name : id));
   }
-  /** saves kept by this computer's numbering (People/p2, before 0.5.0-beta.4) go to the name's folder */
+  /** saves kept by this computer's numbering (People/p2, before 0.5.0-beta.4, or from a backup made then) go to the
+      name's folder: moved whole, or file by file where a save is newer than the one there */
   peopleFolders() {
     for (const p of this.people.list) {
       if (p.id === "p1") continue;
       const old = path.join(this.savesRoot(), "People", p.id), to = this.personFolder(p.id);
-      try { if (old !== to && fs.existsSync(old) && !fs.existsSync(to)) fs.renameSync(old, to); } catch {}
+      if (old === to || !fs.existsSync(old)) continue;
+      try {
+        if (!fs.existsSync(to)) { fs.renameSync(old, to); continue; }
+        for (const rel of zip.filesIn(old)) {
+          const a = path.join(old, ...rel.split("/")), b = path.join(to, ...rel.split("/"));
+          let newer = true;
+          try { newer = fs.statSync(a).mtimeMs > fs.statSync(b).mtimeMs; } catch {}
+          if (!newer) continue;
+          fs.mkdirSync(path.dirname(b), { recursive: true });
+          fs.copyFileSync(a, b);
+        }
+      } catch {}
     }
   }
   applyFolders() { this.folders.saves = this.personFolder(this.people.active); this.folders.states = path.join(this.folders.saves, "States"); }
+  /**
+   * Where a console's saves and states go, in a person's saves folder (base). Consoles that share their emulator with
+   * another (Master System, Game Gear and SG-1000 use Genesis's) keep theirs in a folder of their own, Consoles/<it>:
+   * a Game Gear game and a Genesis game of the same name never share one save
+   */
+  saveDirs(system, base = this.folders.saves) {
+    const s = this.cfg.systems[system] || {}, saves = s.ownSaves ? path.join(base, "Consoles", safe(s.folder || system)) : base;
+    return { saves, states: path.join(saves, "States") };
+  }
+  /** once for each person: saves of consoles with a folder of their own (above) go there from the emulator's shared one.
+      Moved, or copied where another console's game of the same name could be using it too */
+  consoleSaves() {
+    // (with the built-in emulators, whose folder names it knows)
+    if (this.state.consoleSaves || !this.games.size || this.ownEmu() || !this.ra) return;
+    const games = [...this.games.values()], base = this.saveDirs("", this.folders.saves);
+    for (const g of games) {
+      const s = this.cfg.systems[g.system] || {};
+      if (!s.ownSaves) continue;
+      this.resumeAt(g);
+      const cn = s.core && this._coreNames && this._coreNames[s.core];
+      if (!cn) continue;
+      const stem = path.parse(g.path).name, sd = this.saveDirs(g.system);
+      const shared = games.some(x => x !== g && x.system !== g.system && (this.cfg.systems[x.system] || {}).core === s.core && path.parse(x.path).name === stem);
+      for (const [from, to] of [[path.join(base.saves, cn), path.join(sd.saves, cn)], [path.join(base.states, cn), path.join(sd.states, cn)]]) {
+        let names = [];
+        try { names = fs.readdirSync(from).filter(f => f.startsWith(stem + ".") && /^(\.[^.\s]+)+$/.test(f.slice(stem.length))); } catch {}
+        for (const f of names) {
+          const a = path.join(from, f), b = path.join(to, f);
+          if (fs.existsSync(b)) continue;
+          try { fs.mkdirSync(to, { recursive: true }); if (shared) fs.copyFileSync(a, b); else fs.renameSync(a, b); } catch {}
+        }
+      }
+    }
+    this.state.consoleSaves = 1;
+    this.saveState(true);
+  }
   /** the state as someone other than the first person has it: the computer's part and their own */
   personState(id) {
     const own = jload(this.personFile(id), {}), st = {};
@@ -584,6 +657,7 @@ class Backend extends EventEmitter {
     this.savePeople();
     this.state = id === "p1" ? this._base : this.personState(id);
     this.applyFolders();
+    try { this.consoleSaves(); } catch {}
     this._remote = null;
     this.raPending = null; this.raFailed = false;
     this.newPins = [];
@@ -785,7 +859,7 @@ class Backend extends EventEmitter {
     if (cn) {
       const a = path.parse(discs[0]).name, b = path.parse(m3u).name;
       // everyone's saves for it
-      for (const dir of this.people.list.flatMap(p => [path.join(this.personFolder(p.id), cn), path.join(this.personFolder(p.id), "States", cn)])) {
+      for (const dir of this.people.list.flatMap(p => { const sd = this.saveDirs(system, this.personFolder(p.id)); return [path.join(sd.saves, cn), path.join(sd.states, cn)]; })) {
         let files = [];
         try { files = fs.readdirSync(dir); } catch {}
         for (const f of files) if (f.startsWith(a + ".")) {
@@ -859,8 +933,11 @@ class Backend extends EventEmitter {
     let st;
     try { st = fs.statSync(dir); } catch { return [404, { error: "That folder isn't there." }]; }
     if (!st.isDirectory()) return [400, { error: "Choose a folder." }];
-    if (dir === path.resolve(os.homedir()) || path.dirname(dir) === dir) return [400, { error: "That's too big a folder to watch: choose the one your games are in." }];
-    const root = path.resolve(this.romsRoot()), inside = within;
+    // compared where they really are: a folder reached another way (Macintosh HD in /Volumes, a link) is the same folder
+    const real = p => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+    const rdir = real(dir);
+    if (rdir === real(os.homedir()) || path.dirname(rdir) === rdir) return [400, { error: "That's too big a folder to watch: choose the one your games are in." }];
+    const root = real(this.romsRoot()), inside = (a, b) => within(real(a), real(b));
     if (inside(dir, root) || inside(root, dir)) return [400, { error: "That's the games folder, or part of it: its games are on the shelves already." }];
     const list = this.paths.watch || [];
     if (list.some(d => inside(dir, d) || inside(d, dir))) return [409, { error: "That folder, or one around it, is watched already." }];
@@ -946,17 +1023,28 @@ class Backend extends EventEmitter {
    */
   async moveSaves(dir) {
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
+    if (/["\r\n]/.test(String(dir || ""))) return [400, { error: "RetroArch can't use a folder with quotation marks in its name. Choose or rename another." }];
+    return this.busyWith("saves", () => this.moveSavesNow(dir));
+  }
+  async moveSavesNow(dir) {
     const to = dir ? path.join(path.resolve(String(dir)), "The Retro Shelf Saves") : path.join(this.dirs.docs, "Saves"), from = this.savesRoot();
     if (path.resolve(to) === path.resolve(from)) { if (!dir && this.paths.saves_dir) { this.paths.saves_dir = ""; delete this.paths.oldSaves; this.applyFolders(); this.saveSettings(); } return [200, { ok: true, copied: 0 }]; }
     if (within(to, from)) return [400, { error: "That's inside the saves folder already." }];
-    let copied = 0;
+    let copied = 0, kept = 0;
     try {
       await fsp.mkdir(to, { recursive: true });
       for (const rel of fs.existsSync(from) ? zip.filesIn(from) : []) {
         const a = path.join(from, ...rel.split("/")), b = path.join(to, ...rel.split("/"));
-        let newer = true;
-        try { newer = fs.statSync(a).mtimeMs > fs.statSync(b).mtimeMs + 1000; } catch {}
-        if (!newer) continue;
+        let there = null;
+        try { there = fs.statSync(b); } catch {}
+        if (there) {
+          const sa = fs.statSync(a);
+          if (sa.size === there.size && fs.readFileSync(a).equals(fs.readFileSync(b))) continue;
+          // a different save there already. In a folder being joined it stays: another computer may be playing from it
+          // (this computer's copy stays where it was). Back home, the newer one is kept and the other goes to the Trash
+          if (dir || !(sa.mtimeMs > there.mtimeMs + 1000)) { kept++; continue; }
+          try { await this.trash(b); } catch { kept++; continue; }
+        }
         await fsp.mkdir(path.dirname(b), { recursive: true });
         await fsp.copyFile(a, b + ".part"); await fsp.rename(b + ".part", b);
         const st = fs.statSync(a); fs.utimesSync(b, st.atime, st.mtime);
@@ -969,7 +1057,7 @@ class Backend extends EventEmitter {
     this._remote = null;
     this.writeJournalNow();
     if (dir) this.event("cloud");
-    return [200, { ok: true, copied, to }];
+    return [200, { ok: true, copied, kept, to }];
   }
   /** saves shared between computers: which one has a game open. A note in the saves folder, gone when the game closes */
   inPlayDir() { return this.syncOn() ? path.join(this.savesRoot(), ".in-play") : null; }
@@ -982,10 +1070,12 @@ class Backend extends EventEmitter {
     const dir = this.inPlayDir(); if (!dir) return;
     const f = path.join(dir, this.machine() + ".json");
     try {
-      if (on) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(f, JSON.stringify({ host: os.hostname(), id: this.machine(), system: g.system, game: path.parse(g.path).name, since: Math.floor(now()) })); }
+      if (on) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(f, JSON.stringify({ host: os.hostname(), id: this.machine(), person: this.personSaves(), system: g.system, game: path.parse(g.path).name, since: Math.floor(now()) })); }
       else fs.rmSync(f, { force: true });
     } catch {}
   }
+  /** whose saves are in use, as other computers know it: the saves folder's own, or a person's folder by name */
+  personSaves() { return this.people.active === "p1" ? "" : path.basename(this.personFolder(this.people.active)); }
   inPlayElsewhere(g) {
     const dir = this.inPlayDir(); if (!dir) return null;
     let files = [];
@@ -993,7 +1083,10 @@ class Backend extends EventEmitter {
     for (const f of files) {
       let m; try { m = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); } catch { continue; }
       // a computer that went off with the game open: its note counts for half a day
-      if ((m.id ? m.id !== this.machine() : m.host !== os.hostname()) && m.system === g.system && m.game === path.parse(g.path).name && now() - m.since < 12 * 3600) return m;
+      // (and only someone playing from the same saves: each person's are their own; a note from before notes said
+      // whose is anyone's)
+      if ((m.id ? m.id !== this.machine() : m.host !== os.hostname()) && m.system === g.system && m.game === path.parse(g.path).name && now() - m.since < 12 * 3600
+        && (m.person === undefined || m.person === this.personSaves())) return m;
     }
     return null;
   }
@@ -1010,10 +1103,18 @@ class Backend extends EventEmitter {
   async moveLibrary(dest) {
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
     if (this.moving) return [409, { error: "The games are being moved already." }];
+    // games being added go where the games folder was when they started: they'd be left behind
+    if (this.imp.running) return [409, { error: "Games are being added. Move them when that's done." }];
+    if (/["\r\n]/.test(String(dest || ""))) return [400, { error: "RetroArch can't use a folder with quotation marks in its name. Choose or rename another." }];
+    return this.busyWith("library", () => this.moveLibraryNow(dest));
+  }
+  async moveLibraryNow(dest) {
     const from = path.resolve(this.romsRoot()), to = path.join(path.resolve(String(dest || "")), "Games");
     if (within(to, from)) return [400, { error: "That's inside the games folder." }];
     if (fs.existsSync(to) && fs.readdirSync(to).length) return [409, { error: "There's a Games folder there already, with things in it." }];
-    const listAll = () => { const out = []; const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.isFile()) out.push([p, fs.statSync(p).size]); } }; walk(from); return out; };
+    // every file, a link to a game included (the shelf shows those): what it links to is copied
+    const isFileLink = p => { try { return fs.statSync(p).isFile(); } catch { return false; } };
+    const listAll = () => { const out = []; const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.isFile() || (e.isSymbolicLink() && isFileLink(p))) out.push([p, fs.statSync(p).size]); } }; walk(from); return out; };
     let files;
     try { files = listAll(); } catch (e) { return [500, { error: e.message }]; }
     const total = files.reduce((t, f) => t + f[1], 0);
@@ -1131,13 +1232,15 @@ class Backend extends EventEmitter {
     this.watchDir(root);
     for (const [name, s] of Object.entries(this.cfg.systems)) {
       const exts = (s.exts || []).map(e => e.toLowerCase()), folder = s.folder || name;
-      if (s.discLists) for (const x of this.makeDiscLists(path.join(root, folder))) adopt.push([name, x]);
-      // discs listed in an .m3u show up once, as the .m3u, wherever they sit and however their names are written
-      const listed = new Set(), ids = [];
+      // disc lists made for a console whose emulator can play them (one it can't would hide its discs for nothing)
+      if (s.discLists && exts.includes(".m3u")) for (const x of this.makeDiscLists(path.join(root, folder))) adopt.push([name, x]);
+      // files a list on the shelf names show up once, as the list: discs in an .m3u, a .cue's .iso, wherever they sit
+      // and however their names are written. A list this console can't show (an .m3u for Saturn) hides nothing
+      const listed = new Set(), ids = [], sheets = [".m3u", ".cue", ".gdi"].filter(x => exts.includes(x));
       const walk = (dir, depth) => {
         let ents;
         try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-        for (const e of ents) if (e.isFile() && e.name.toLowerCase().endsWith(".m3u"))
+        for (const e of ents) if (e.isFile() && sheets.some(x => e.name.toLowerCase().endsWith(x)))
           for (const f of sheetFiles(path.join(dir, e.name))) listed.add(pathKey(f));
         for (const e of ents) {
           if (hiddenEntry(e)) continue;
@@ -1159,6 +1262,7 @@ class Backend extends EventEmitter {
     }
     this.games = found;
     if (adopt.length) { for (const [system, x] of adopt) this.adoptDiscs(system, x.m3u, x.discs); this.saveState(); }
+    try { this.consoleSaves(); } catch {}
   }
 
   // ---------------------------------------------------------------- launching
@@ -1186,7 +1290,7 @@ class Backend extends EventEmitter {
     if (!this.ownEmu()) {
       const core = ra.corePath(this.ra.cores, s.core);
       if (!fs.existsSync(core)) throw new Error(`There's no emulator for ${g.system} included yet.`);
-      const dirs = { saves: this.folders.saves, states: this.folders.states, screenshots: this.folders.screenshots, system: this.folders.bios, private: path.dirname(this.files.raCfg) };
+      const sd = this.saveDirs(g.system), dirs = { saves: sd.saves, states: sd.states, screenshots: this.folders.screenshots, system: this.folders.bios, private: path.dirname(this.files.raCfg) };
       // RetroArch ignores (and falls back from) any directory setting that doesn't exist yet
       for (const d of ra.neededDirs(dirs)) fs.mkdirSync(d, { recursive: true });
       const slot = Number.isInteger(opts.slot) && opts.slot >= 0 && opts.slot <= 9 ? opts.slot : null;
@@ -1223,11 +1327,24 @@ class Backend extends EventEmitter {
     if (!g) return [404, { error: "Unknown game. Rescan the library." }];
     // a second press while the first is still starting (cheats can take a while) doesn't start a second emulator
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "A game is already running." }];
+    // the saves or games moving, or saves coming back from a backup: a game now would save where they were, or over them
+    if (this.busy) return [409, { error: "Wait for the saves or games to finish moving, then play." }];
     // saves shared with another computer: playing a game that's open there too would overwrite its progress
     const there = this.inPlayElsewhere(g);
     if (there && !opts.force) return [409, { error: `This game is open on ${there.host} (since ${new Date(there.since * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}). Playing it here too can overwrite its progress.`, elsewhere: there.host }];
     this.launching = true;
-    try { return await this.launchNow(g, id, opts); } finally { this.launching = false; }
+    let r;
+    try { return (r = await this.launchNow(g, id, opts)); } finally {
+      this.launching = false;
+      // a launch that didn't happen leaves no RetroAchievements password in RetroArch's settings
+      if (!r || r[0] !== 200) { try { if (ra.readConfigKey(this.files.raCfg, "cheevos_password")) ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {} }
+    }
+  }
+  /** something long that no game may start during (the saves or games moving, a restore): fn's result */
+  async busyWith(kind, fn) {
+    if (this.busy) return [409, { error: "Wait for the saves or games to finish moving, then play." }];
+    this.busy = kind;
+    try { return await fn(); } finally { this.busy = null; }
   }
   async launchNow(g, id, opts) {
     // saves shared through a cloud folder that isn't there right now: playing would start from old saves, or none
@@ -1249,7 +1366,7 @@ class Backend extends EventEmitter {
     }
     proc.stdin.on("error", () => {});
     // t0: a clock that doesn't jump when the computer's time is changed, for how long it was played
-    const rec = { id, since: now(), t0: performance.now(), proc, alive: true, builtIn: built.builtIn, stopping: false,
+    const rec = { id, since: now(), t0: performance.now(), proc, alive: true, builtIn: built.builtIn, stopping: false, lastBefore: this.state.last[id] || 0,
       cheevos: built.builtIn && this.raPending ? this.raPending : null };
     // RetroArch reads the password as it starts and keeps it in memory: it isn't left in the file while the game runs
     if (rec.cheevos) setTimeout(() => { try { ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {} }, 5000).unref();
@@ -1274,6 +1391,7 @@ class Backend extends EventEmitter {
     this.markInPlay(null, false);
     // never less than nothing, and no more than half a day: a game left open overnight isn't 20 hours of play
     const dt = Math.min(12 * 3600, Math.max(0, rec.t0 != null ? (performance.now() - rec.t0) / 1000 : now() - rec.since));
+    rec.dt = dt;
     try {
       this.state.time[rec.id] = (this.state.time[rec.id] || 0) + Math.floor(dt);
       // a game that closed right away wasn't really played
@@ -1290,6 +1408,14 @@ class Backend extends EventEmitter {
     }
     let error = "";
     if (dt < 4 && !rec.stopping) error = (rec.builtIn && ra.explain(this.files.raLog, how)) || "";
+    // a game that didn't start (a missing BIOS, a broken file) wasn't played: its play and "last played" go back
+    if (error) {
+      try {
+        if (this.state.plays[rec.id] > 0) this.state.plays[rec.id]--;
+        if (rec.lastBefore) this.state.last[rec.id] = rec.lastBefore; else delete this.state.last[rec.id];
+        this.saveState();
+      } catch {}
+    }
     this.lastExit = { id: rec.id, at: now(), dt, error, code: how.code ?? null, signal: how.signal || null };
     this.emit("exit", this.lastExit);
   }
@@ -1380,12 +1506,20 @@ class Backend extends EventEmitter {
     try { if (ra.readConfigKey(this.files.raCfg, "cheevos_password")) ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {}
     // signed in already: a token RetroArch renewed in that game is theirs to keep
     const cv = this.state.cheevos;
+    // signed in from RetroArch's own menu in that game (what the app says to do for a password it can't pass on): kept
+    if (!this.raPending && !cv.user && rec && rec.builtIn) {
+      const u = ra.readConfigKey(this.files.raCfg, "cheevos_username"), t = ra.readConfigKey(this.files.raCfg, "cheevos_token");
+      if (u && t && ra.readConfigKey(this.files.raCfg, "cheevos_enable") === "true") { cv.user = u; cv.token = t; this.saveState(); }
+    }
     if (!this.raPending && cv.user && cv.token && ra.readConfigKey(this.files.raCfg, "cheevos_username") === cv.user) {
       const t = ra.readConfigKey(this.files.raCfg, "cheevos_token");
       if (t && t !== cv.token) { cv.token = t; this.saveState(); }
     }
     if (!this.raPending || !rec || rec.cheevos !== this.raPending) return;
     const user = this.raPending.user, token = ra.readConfigKey(this.files.raCfg, "cheevos_token");
+    // a game that closed before RetroArch could sign in (it didn't start) says nothing about the password: it's tried
+    // again with the next game
+    if (!token && (rec.dt || 0) < 15) return;
     this.raPending = null;
     if (token) { this.state.cheevos.user = user; this.state.cheevos.token = token; this.raFailed = false; } else this.raFailed = true;
     try { ra.writeConfig(this.files.raCfg, { cheevos_password: "" }); } catch {}
@@ -1447,12 +1581,12 @@ class Backend extends EventEmitter {
         for (const [f, nums] of byFile) { const list = cheatFiles.parse((await zip.readEntry(idx.file, idx.entries.get(f))).toString("utf8")); for (const n of nums) if (list[n]) chosen.push(list[n]); }
       } catch { chosen = []; }
     }
-    // the app's own file says so on its first line; one made in RetroArch's menu is left as it is
-    // (one from before the mark, for a game with cheats chosen here, is the app's too)
+    // the app's own file says so on its first line. One without it (made in RetroArch's menu, or from before the mark)
+    // is never deleted: it's left as it is, or set aside as .cht.before-retro-shelf when cheats chosen here take its place
     let mine = true;
-    try { mine = fs.readFileSync(target, "utf8").startsWith(CHEAT_MARK) || keys.length > 0; } catch {}
-    if (!mine) return false;
-    if (!chosen.length) { fs.rmSync(target, { force: true }); return false; }
+    try { mine = fs.readFileSync(target, "utf8").startsWith(CHEAT_MARK); } catch {}
+    if (!chosen.length) { if (mine) fs.rmSync(target, { force: true }); return false; }
+    if (!mine) { const aside = target + ".before-retro-shelf"; if (fs.existsSync(aside)) return false; fs.renameSync(target, aside); }
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, CHEAT_MARK + "\n" + cheatFiles.write(chosen));
     return true;
@@ -1548,7 +1682,7 @@ class Backend extends EventEmitter {
     const ext = path.extname(src).toLowerCase();
     if (!IMG.includes(ext)) return [400, { error: "Choose a PNG, JPEG or WebP picture." }];
     const stem = path.parse(g.path).name, dir = path.dirname(g.path), name = kind === "cover" ? stem : `${stem}.${kind}`;
-    const dest = path.join(dir, name + ext), tmp = dest + ".part";
+    const dest = path.join(dir, name + ext), tmp = partFor(dest);
     try {
       // copied first: the picture chosen may be one of the ones it replaces. The ones it replaces may be someone's own
       // (a scan of their box): they go to the Trash, or failing that are renamed aside, never deleted
@@ -1556,11 +1690,11 @@ class Backend extends EventEmitter {
       for (const e of IMG) {
         const old = path.join(dir, name + e);
         if (!fs.existsSync(old)) continue;
-        try { await this.trash(old); } catch { fs.renameSync(old, old + ".replaced"); }
+        try { await this.trash(old); } catch { fs.renameSync(old, freeName(old + ".replaced")); }
       }
       fs.renameSync(tmp, dest);
     } catch (e) {
-      fs.rmSync(tmp, { force: true });
+      try { fs.rmSync(tmp, { force: true }); } catch {}
       return [500, { error: "Couldn't save the picture: " + e.message }];
     }
     g[kind] = dest;
@@ -1672,13 +1806,16 @@ class Backend extends EventEmitter {
     try { if (now() - fs.statSync(cp).mtimeMs / 1000 < 7 * 86400) names = jload(cp, null); } catch {}
     let src = "site";
     if (names && names.src) { src = names.src; names = names.names; }
+    // a list kept from before "&amp;" was read as "&"
+    if (Array.isArray(names) && names.some(n => typeof n === "string" && n.includes("&amp;"))) names = names.map(n => n.replace(/&amp;/g, "&"));
     if (!Array.isArray(names) || (!names.length && kind === "cover")) {
       let html = "";
       try { html = (await this.fetchUrl(`${this.coverBase()}/${encodeURIComponent(thumb)}/${ART[kind].dir}/`, 60000)).toString("utf8"); }
       catch (e) { if (kind === "cover" || !/HTTP 404/.test(e.message)) throw e; }
       const set = new Set();
       for (const m of html.matchAll(/href="([^"?#]+\.png)"/gi)) {
-        try { set.add(decodeURIComponent(m[1].split("/").pop())); } catch {}
+        // the page's links are HTML: "&amp;" in one is an "&" in the file's name
+        try { set.add(decodeURIComponent(m[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').split("/").pop())); } catch {}
       }
       names = [...set].sort();
       if (!names.length && kind === "cover") throw new Error("empty index");
@@ -1851,7 +1988,7 @@ class Backend extends EventEmitter {
       top: [...perGame].filter(([id]) => this.games.has(id)).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, time]) => ({ id, time })),
       longest, busiest: busy ? { day: busy[0], time: busy[1] } : null,
       pins: Object.entries(this.state.pins || {}).filter(([, t]) => t >= from && t < to).sort((a, b) => a[1] - b[1]).map(([k]) => k),
-      first: all.length ? Math.min(...all.map(s => s[1])) : null,
+      first: all.length ? all.reduce((m, s) => Math.min(m, s[1]), Infinity) : null,
     };
   }
   /** last month's recap the first time the app opens in a new month (January: the whole last year), if there was play */
@@ -1925,8 +2062,9 @@ class Backend extends EventEmitter {
         if (!name) continue;
         const onSite = li && li.src === "site" && li.names.has(name);
         for (const where of [onSite ? "site" : null, "github"]) {
-          if (!where || tried.has(where + name)) continue;
-          tried.add(where + name);
+          // each thumbnail set is its own place to look (MAME's after FBNeo's, Game Boy Color's after Game Boy's)
+          if (!where || tried.has(where + "|" + th + "|" + name)) continue;
+          tried.add(where + "|" + th + "|" + name);
           let data;
           try {
             data = where === "site" ? await this.fetchUrl(`${this.coverBase()}/${encodeURIComponent(th)}/Named_Logos/${encodeURIComponent(name)}`, 20000)
@@ -2022,7 +2160,7 @@ class Backend extends EventEmitter {
           // aside as .old for the new one
           const good = want ? cur === want : !biosByContent(b.src, size, this.cfg.systems) || !!biosByContent(to, cur, this.cfg.systems);
           if (good) { biosKept.push(b.name); continue; }
-          fs.renameSync(to, to + ".old");
+          fs.renameSync(to, freeName(to + ".old"));
         }
         // whole or not at all: a copy cut short never sits there under the BIOS's name
         fs.copyFileSync(b.src, to + ".part"); fs.renameSync(to + ".part", to);
@@ -2033,8 +2171,9 @@ class Backend extends EventEmitter {
     const root = this.romsRoot();
     return [200, {
       items: items.map(it => {
-        let exists = false;
-        if (it.system) { try { const d = this.importer.plan(it, root).main; exists = fs.existsSync(d); } catch {} }
+        // a game dropped from the games folder itself (or a copy already there) is there already
+        let exists = within(it.src, root);
+        if (!exists && it.system) { try { const d = this.importer.plan(it, root).main; exists = fs.existsSync(d); } catch {} }
         return { id: it.id, name: it.name, size: it.size, system: it.system, choices: it.choices, exists };
       }),
       unknown: unknown.slice(0, 50), unknownCount: unknown.length, biosAdded, biosFailed, biosKept,
@@ -2047,6 +2186,7 @@ class Backend extends EventEmitter {
     const items = [];
     for (const p of Array.isArray(picks) ? picks : []) {
       const it = this.pending.get(String(p.id));
+      if (it && within(it.src, this.romsRoot())) continue;
       const sys = p.system ? String(p.system) : it && it.system;
       if (!it || !sys || !it.choices.includes(sys)) continue;
       items.push({ ...it, system: sys });
@@ -2173,13 +2313,15 @@ class Backend extends EventEmitter {
     if (!core) return 0;
     if (!this._coreNames) this._coreNames = {};
     if (!(core in this._coreNames)) {
-      let name = "";
-      try { const m = /^corename\s*=\s*"(.*)"/m.exec(fs.readFileSync(path.join(this.ra.info, core + ".info"), "utf8")); if (m) name = m[1]; } catch {}
+      // the name RetroArch gives its folders is the one built into the emulator: for a few it isn't the .info file's
+      // (checked by asking each bundled emulator, retro_get_system_info)
+      let name = BUILT_IN_NAMES[core] || "";
+      if (!name) try { const m = /^corename\s*=\s*"(.*)"/m.exec(fs.readFileSync(path.join(this.ra.info, core + ".info"), "utf8")); if (m) name = m[1]; } catch {}
       this._coreNames[core] = name;
     }
     const cn = this._coreNames[core];
     if (!cn) return 0;
-    try { return Math.floor(fs.statSync(path.join(this.folders.states, cn, path.parse(g.path).name + ".state.auto")).mtimeMs / 1000); } catch { return 0; }
+    try { return Math.floor(fs.statSync(path.join(this.saveDirs(g.system).states, cn, path.parse(g.path).name + ".state.auto")).mtimeMs / 1000); } catch { return 0; }
   }
 
   /** a game's saves: resume point and numbered slots, with when they were made and whether there's a picture */
@@ -2190,14 +2332,19 @@ class Backend extends EventEmitter {
     this.resumeAt(g);                                  // looks up the core's name, which names its save folder
     const cn = this._coreNames[core];
     if (!cn) return null;
-    if (!(cn in dirCache)) {
+    const sdir = path.join(this.saveDirs(g.system).states, cn);
+    if (!(sdir in dirCache)) {
       const files = new Map();
-      try { for (const f of fs.readdirSync(path.join(this.folders.states, cn))) files.set(f, path.join(this.folders.states, cn, f)); } catch {}
-      dirCache[cn] = files;
+      try { for (const f of fs.readdirSync(sdir)) files.set(f, path.join(sdir, f)); } catch {}
+      dirCache[sdir] = files;
     }
-    const files = dirCache[cn], stem = path.parse(g.path).name, at = f => { try { return Math.floor(fs.statSync(files.get(f)).mtimeMs / 1000); } catch { return 0; } };
+    const files = dirCache[sdir], stem = path.parse(g.path).name, at = f => { try { return Math.floor(fs.statSync(files.get(f)).mtimeMs / 1000); } catch { return 0; } };
     const out = { resume: 0, rpic: false, slots: [] };
-    if (files.has(stem + ".state.auto")) { out.resume = at(stem + ".state.auto"); out.rpic = files.has(stem + ".state.auto.png") && !this.blankPic(files.get(stem + ".state.auto.png")); }
+    // what a launch can start from: no resume point with "pick up where you left off" off, and nothing but the start
+    // with hardcore achievements (RetroArch won't load a save then)
+    const hardcore = !!(this.ui.hardcore && this.state.cheevos.user), resume = this.playOpts(g).resume !== false;
+    if (hardcore) return out;
+    if (resume && files.has(stem + ".state.auto")) { out.resume = at(stem + ".state.auto"); out.rpic = files.has(stem + ".state.auto.png") && !this.blankPic(files.get(stem + ".state.auto.png")); }
     for (let n = 0; n <= 9; n++) {
       const f = stem + ".state" + (n || "");
       if (files.has(f)) out.slots.push({ n, at: at(f), pic: files.has(f + ".png") });
@@ -2228,9 +2375,10 @@ class Backend extends EventEmitter {
     // this game's own: Name.srm, Name.state2.png — not "Name 3.srm", whose name only starts the same
     const list = dir => { try { return fs.readdirSync(dir).filter(f => f.startsWith(stem + ".") && /^(\.[^.\s]+)+$/.test(f.slice(stem.length))).map(f => path.join(dir, f)); } catch { return []; } };
     const info = f => { try { const st = fs.statSync(f); return { file: f, size: st.size, at: Math.floor(st.mtimeMs / 1000) }; } catch { return null; } };
-    for (const f of list(path.join(this.folders.saves, cn))) { const i = info(f); if (i) out.push({ kind: "battery", n: null, ...i, pic: false }); }
-    for (const f of list(path.join(this.folders.states, cn))) {
-      const rest = f.slice(path.join(this.folders.states, cn, stem).length), m = /^\.state(\d?)(\.auto)?$/.exec(rest);
+    const sd = this.saveDirs(g.system);
+    for (const f of list(path.join(sd.saves, cn))) { const i = info(f); if (i) out.push({ kind: "battery", n: null, ...i, pic: false }); }
+    for (const f of list(path.join(sd.states, cn))) {
+      const rest = f.slice(path.join(sd.states, cn, stem).length), m = /^\.state(\d?)(\.auto)?$/.exec(rest);
       if (!m) continue;
       const i = info(f); if (!i) continue;
       out.push({ kind: m[2] ? "resume" : "slot", n: m[2] ? null : +(m[1] || 0), ...i, pic: fs.existsSync(f + ".png") && !this.blankPic(f + ".png") });
@@ -2256,7 +2404,7 @@ class Backend extends EventEmitter {
     if (!cn) return null;
     const n = which === "auto" ? ".auto" : Number(which) > 0 ? String(Number(which)) : "";
     if (which !== "auto" && !/^\d$/.test(String(which))) return null;
-    return path.join(this.folders.states, cn, path.parse(g.path).name + ".state" + n + ".png");
+    return path.join(this.saveDirs(g.system).states, cn, path.parse(g.path).name + ".state" + n + ".png");
   }
 
   // ---------------------------------------------------------------- your screenshots
@@ -2346,7 +2494,8 @@ class Backend extends EventEmitter {
         plays: (st.plays[g.id] || 0) + ((far.get(g.id) || {}).plays || 0), time: (st.time[g.id] || 0) + ((far.get(g.id) || {}).time || 0), last: Math.max(st.last[g.id] || 0, (far.get(g.id) || {}).last || 0),
         added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "", gg: pins.genreGroup(g.genre),
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null, cheats: (st.cheats[g.id] || []).length,
-        progress: st.progress[g.id] || "", rating: st.rating[g.id] || 0, note: st.notes[g.id] || "",
+        progress: PROGRESS.includes(st.progress[g.id]) ? st.progress[g.id] : "", rating: Number.isInteger(st.rating[g.id]) && st.rating[g.id] >= 1 && st.rating[g.id] <= 5 ? st.rating[g.id] : 0,
+        note: typeof st.notes[g.id] === "string" ? st.notes[g.id] : "",
         ...this.shotsJson(g), ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES, people: this.peopleJson(),
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),

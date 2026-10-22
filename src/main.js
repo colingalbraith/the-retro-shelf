@@ -24,7 +24,8 @@ if (process.platform === "linux") {
 // The portable Windows copy (portable.txt beside the app) does the same with a Data folder beside it, for a USB stick.
 const PORTABLE = process.platform === "win32" && fs.existsSync(path.join(path.dirname(process.execPath), "portable.txt"));
 const HOME = process.env.ARCADE_HOME || (PORTABLE ? path.join(path.dirname(process.execPath), "Data") : "");
-if (HOME) { app.setPath("userData", path.join(HOME, "data")); app.setPath("pictures", path.join(HOME, "Pictures")); }
+// the portable copy keeps everything in its own folder: exports and pictures too, never the computer's Documents
+if (HOME) { app.setPath("userData", path.join(HOME, "data")); app.setPath("pictures", path.join(HOME, "Pictures")); app.setPath("documents", HOME); }
 const DOCS = HOME ? path.join(HOME, "The Retro Shelf") : path.join(app.getPath("documents"), "The Retro Shelf");
 // The app used to be called Arcade: the first time, move its settings and games folders to the new name
 // (before the single-instance lock below creates the new settings folder)
@@ -159,7 +160,15 @@ function createWindow() {
     win.show(); if (backend && backend.ui.tv) tvMode(true, backend.ui.textSize); else if (backend) setZoom(false, backend.ui.textSize);
   });
   for (const ev of ["resize", "move", "enter-full-screen", "leave-full-screen"]) win.on(ev, () => { clearTimeout(win._st); win._st = setTimeout(saveBounds, 500); });
-  win.on("close", saveBounds);
+  win.on("close", e => {
+    saveBounds();
+    // the games half moved to another drive: closing (and with it quitting) would leave a partial copy there
+    if (!quitting && backend && backend.moving && !win.isDestroyed()) {
+      const r = dialog.showMessageBoxSync(win, { type: "warning", buttons: [tm("Keep Moving"), tm("Quit Anyway")], defaultId: 0, cancelId: 0,
+        message: tm("The games are still being moved."), detail: tm("Quitting now leaves a partial copy in the new place. Your games stay where they were.") });
+      if (r === 0) e.preventDefault(); else win._asked = true;
+    }
+  });
   win.on("closed", () => { win = null; });
   win.loadURL("arcade://app/");
 }
@@ -433,11 +442,21 @@ function ipc() {
   });
   ipcMain.handle("restore-saves", async () => {
     // a running game would write its save over the restored one when it closes
-    if (backend.running && backend.running.alive) return { ok: false, error: "Close the game first, then restore." };
+    if ((backend.running && backend.running.alive) || backend.launching) return { ok: false, error: "Close the game first, then restore." };
     const r = await dialog.showOpenDialog(win, { title: tm("Restore saves"), buttonLabel: tm("Restore"), properties: ["openFile"], filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
-    try { fs.mkdirSync(backend.savesRoot(), { recursive: true }); return { ok: true, ...(await unzipInto(r.filePaths[0], backend.savesRoot())) }; }
-    catch (e) { return { ok: false, error: "Couldn't restore from that file: " + e.message }; }
+    // and no game starts while it's restoring
+    const [, res] = await backend.busyWith("restore", async () => {
+      try {
+        fs.mkdirSync(backend.savesRoot(), { recursive: true });
+        const res = await unzipInto(r.filePaths[0], backend.savesRoot());
+        // people's saves from a backup made when their folders were numbered go where they're read now
+        backend.peopleFolders();
+        return [200, { ok: true, ...res }];
+      }
+      catch (e) { return [500, { ok: false, error: "Couldn't restore from that file: " + e.message }]; }
+    });
+    return res;
   });
   ipcMain.handle("tv-mode", (_, on, size) => tvMode(!!on, size));
   ipcMain.handle("text-size", (_, tv, size) => setZoom(!!tv, size));
@@ -449,11 +468,13 @@ function ipc() {
     // a game still open is closed properly first (saving), not left running while the new version goes in
     if (what === "restart") return (backend.running && backend.running.alive ? backend.stop() : Promise.resolve()).finally(() => updater.restart());
     if (what === "page") return shell.openExternal(updater.page());
+    // a test version waiting, with test versions just turned off: it goes
+    updater.dropUnwanted();
     return updater.state;
   });
 }
 
-app.on("second-instance", focusApp);
+app.on("second-instance", () => { if (backend && !win) createWindow(); else focusApp(); });
 
 app.on("web-contents-created", (_, wc) => {
   // the UI only ever lives at arcade://app; anything else opens in the browser (https) or nowhere
@@ -461,7 +482,13 @@ app.on("web-contents-created", (_, wc) => {
   wc.on("will-navigate", (e, url) => { if (!url.startsWith("arcade://app/")) e.preventDefault(); });
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(start).catch(e => {
+  // something that stops the app from starting at all (its folder can't be written: a full disk, a locked USB stick)
+  // is said, and the app closes, rather than running on with no window
+  try { dialog.showErrorBox(tm("The Retro Shelf couldn't start"), String((e && e.message) || e)); } catch {}
+  app.exit(1);
+});
+function start() {
   if (!app.isPackaged && process.platform === "darwin") app.dock.setIcon(DEV_ICON);
   backend = new Backend({ app: __dirname, data: app.getPath("userData"), docs: DOCS, emu: EMU, version: app.getVersion(), watch: true, locale: app.getLocale() }, fetchUrl);
   backend.trash = p => shell.trashItem(p);
@@ -488,6 +515,7 @@ app.whenReady().then(() => {
   setInterval(autoBackup, 3600000);
   backend.init();
   if (OLD_GAMES) backend.remapIds(OLD_GAMES);
+  backend.followRoot();
   backend.on("exit", () => setTimeout(focusApp, 150));
   // games appeared or went (a watched folder, or the games folder): the shelf looks again
   backend.on("changed", () => { if (win && !win.isDestroyed()) win.webContents.send("menu", { cmd: "refresh" }); });
@@ -507,9 +535,9 @@ app.whenReady().then(() => {
   updater = new Updater();
   updater.on("change", s => { if (win && !win.isDestroyed()) win.webContents.send("menu", { cmd: "update", state: s }); });
   updater.start(() => backend.ui.updates !== false, () => !!backend.ui.beta);
-});
+}
 
-app.on("activate", () => { if (!win) createWindow(); else focusApp(); });
+app.on("activate", () => { if (!backend) return; if (!win) createWindow(); else focusApp(); });
 app.on("window-all-closed", () => app.quit());
 // a downloaded Mac update takes the old app's place once this one has quit
 app.on("will-quit", () => { if (updater) updater.applyOnQuit(); });
@@ -519,7 +547,7 @@ app.on("before-quit", e => {
   // the play on this computer, for the others (with saves in a cloud folder), as it is now
   if (backend) try { backend.writeJournalNow(); } catch {}
   // the games half moved to another drive: quitting would leave a partial copy there
-  if (!quitting && backend && backend.moving && win && !win.isDestroyed()) {
+  if (!quitting && backend && backend.moving && win && !win.isDestroyed() && !win._asked) {
     const r = dialog.showMessageBoxSync(win, { type: "warning", buttons: [tm("Keep Moving"), tm("Quit Anyway")], defaultId: 0, cancelId: 0,
       message: tm("The games are still being moved."), detail: tm("Quitting now leaves a partial copy in the new place. Your games stay where they were.") });
     if (r === 0) { e.preventDefault(); return; }

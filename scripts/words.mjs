@@ -70,7 +70,9 @@ for (const n of ["Other", "Year unknown"]) add(n);
 for (const m of page.matchAll(/const MEDIA_VERB = \{([^}]*)\}/g)) for (const x of m[1].matchAll(/"([^"]+)"/g)) add(x[1] + "…");
 add("Starting…");
 const cfg = JSON.parse(read("src/config.json"));
-for (const s of Object.values(cfg.systems)) if (s.bios) { add(s.bios.note); }
+// the BIOS notes are words whatever they look like (one can read like another sentence filled in)
+const notes = new Set();
+for (const s of Object.values(cfg.systems)) if (s.bios) { add(s.bios.note); notes.add(s.bios.note); }
 
 // not words: games, series, consoles, versions, colors, the changelog, file names, and sentences already filled in
 const franchises = JSON.parse(read("src/data/franchises.json"));
@@ -104,6 +106,7 @@ const joined = k => [...keys].some(a => a !== k && /[.!?…]$/.test(a) && k.star
 const pinsCode = read("src/pins.js");
 const inCode = k => [page, main, backend, pinsCode].some(c => c.includes(`"${k}"`) || c.includes(`>${k}<`));
 const out = [...keys].filter(k => {
+  if (notes.has(k)) return true;
   if (/\{\w+\}/.test(k) && !code.includes(k)) return false;
   if (joined(k)) return false;
   if (!/[A-Za-z]/.test(k) || fixed.has(k) || (names.has(k) && !inCode(k))) return false;
