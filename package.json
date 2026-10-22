@@ -1,7 +1,7 @@
 {
   "name": "the-retro-shelf",
   "productName": "The Retro Shelf",
-  "version": "0.5.0-beta.5",
+  "version": "0.5.0-beta.6",
   "description": "Your retro game collection as boxes on a shelf. Emulators built in, games not included.",
   "author": "Colin Galbraith",
   "license": "GPL-3.0-or-later",
