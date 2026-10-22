@@ -1051,7 +1051,7 @@ let uiEdits = 0;
 /* EDITS counts every change made here (a setting, a favorite): a library answer asked for before one is older than the
    page's own copy, and doesn't replace it */
 let EDITS = 0;
-function saveUI() { EDITS++; const n = ++uiEdits; clearTimeout(saveT); saveT = setTimeout(async () => { await api("/api/settings", {ui: UI}); if (n === uiEdits) uiEdits = 0; }, 400); }
+function saveUI() { EDITS++; const n = ++uiEdits; clearTimeout(saveT); saveT = setTimeout(async () => { await api("/api/settings", {ui: UI}); EDITS++; if (n === uiEdits) uiEdits = 0; }, 400); }
 
 /* spine colors: the cover's main color and a contrasting accent, toned so spines look printed, never neon or muddy.
    Kept between visits so spines appear in their colors right away instead of switching once covers load */
@@ -1498,7 +1498,8 @@ function renderShelves(keep) {
   const root = $("#shelves"), st = root.scrollTop, wasFlip = sel && sel.classList.contains("flip");
   /* where the picked box is: its shelf, and its place among all the boxes (the one picked, not the game's first copy
      on Recently played or Favorites) */
-  const onIt = !!(sel && keep && sel.dataset.id === keep), keepSec = onIt ? sel.dataset.group : null, keepAt = onIt ? slots().indexOf(sel) : -1;
+  const hint = keepHint && keepHint.id === keep ? keepHint : null; keepHint = null;
+  const onIt = !!(sel && keep && sel.dataset.id === keep), keepSec = onIt ? sel.dataset.group : hint ? hint.group : null, keepAt = onIt ? slots().indexOf(sel) : hint ? hint.at : -1;
   if (io) io.disconnect();
   POOL = new Map();
   $$("img", root).forEach(im => { const k = im.getAttribute("src"); if (k && im.complete && im.naturalWidth) (POOL.get(k) || POOL.set(k, []).get(k)).push(im); });
@@ -1572,9 +1573,9 @@ function renderShelves(keep) {
   pendingScroll = off;
   try {
     if (LAUNCH.open || ["settings", "ren", "nsh", "imp", "getg", "pick", "trophy", "colls", "wadd", "cheat", "ras", "notes", "lst", "ctest", "recap", "keys", "opts", "osk", "welcome", "news"].some(isOpen) || document.activeElement === $("#q")) select(c); else c.focus({preventScroll: true});
+    if (same && wasFlip && !c.classList.contains("flip")) flip(true);
   } finally { pendingScroll = 0; }
   if (same) {
-    if (wasFlip && !c.classList.contains("flip")) flip(true);
     void c.offsetWidth;
     requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("noanim")));
   }
@@ -1862,12 +1863,15 @@ function wordFits(g, w) {
   if (w.length >= 4) { const max = w.length >= 7 ? 2 : 1; return titleWords(g).some(t => t.length >= 3 && near(t, w, max)); }
   return false;
 }
-/* a search cleared goes back to the game you were on before it, or the result you moved to */
-let preSearch = null, movedInSearch = false;
+/* a search cleared goes back to the box you were on before it (that copy of the game, on its shelf), or the result you
+   moved to */
+const beforeSearch = () => ({id: focusId, group: sel && sel.dataset.id === focusId ? sel.dataset.group : null, at: sel ? slots().indexOf(sel) : -1});
+let preSearch = null, movedInSearch = false, keepHint = null;
 function setQ(v) {
   clearTimeout(qT);
-  const clearing = !v.trim() && q, back = clearing ? (movedInSearch ? focusId : preSearch) : null;
-  if (!q && v.trim()) { preSearch = focusId; movedInSearch = false; }
+  const clearing = !v.trim() && q, back = clearing ? (movedInSearch ? focusId : preSearch && preSearch.id) : null;
+  if (clearing && !movedInSearch && preSearch) keepHint = preSearch;
+  if (!q && v.trim()) { preSearch = beforeSearch(); movedInSearch = false; }
   $("#q").value = v; q = v.trim().toLowerCase(); renderShelves(back); paintQ();
 }
 
@@ -3685,12 +3689,14 @@ function fitTrophy() {
     /* each is as wide as its box or its brass plate (the hours under it, longer in German), whichever is wider: the boxes
        shrink together, the plates don't, until they all fit */
     const box = tros.map(t => t.offsetWidth), plate = tros.map(t => { const pl = t.querySelector(".tplate"); return pl ? pl.offsetWidth + 8 : 0; });
-    const need = k => tros.reduce((w, t, i) => w + Math.max(box[i] * k, plate[i]), 0) + gaps;
+    /* as many as their plates alone fit side by side (the rest go), then the boxes of those sized to fit */
+    let n = tros.length;
+    while (n > 1 && plate.slice(0, n).reduce((a, b) => a + b, 0) + gap * (n - 1) > room) n--;
+    const need = k => box.slice(0, n).reduce((w, b, i) => w + Math.max(b * k, plate[i]), 0) + gap * (n - 1);
     let k = 1;
-    if (need(1) > room) { let lo = .3, hi = 1; for (let n = 0; n < 20; n++) { const m = (lo + hi) / 2; if (need(m) > room) hi = m; else lo = m; } k = lo; }
-    tros.forEach((t, i) => { t.style.setProperty("--th", Math.floor(t.dataset.h * k) + "px"); t.style.minWidth = plate[i] ? plate[i] + "px" : ""; });
-    /* still more than the shelf holds (the plates alone): the last ones go */
-    const shown = [...tros];
+    if (need(1) > room) { let lo = 0, hi = 1; for (let m = 0; m < 20; m++) { const mid = (lo + hi) / 2; if (need(mid) > room) hi = mid; else lo = mid; } k = lo; }
+    tros.forEach((t, i) => { t.hidden = i >= n; t.style.setProperty("--th", Math.floor(t.dataset.h * k) + "px"); t.style.minWidth = plate[i] ? plate[i] + "px" : ""; });
+    const shown = tros.slice(0, n);
     while (shown.length > 1 && top.scrollWidth > top.clientWidth) shown.pop().hidden = true;
   }
   [...con.children].forEach(c => { c.hidden = false; const pl = c.querySelector(".tplate"); c.style.width = Math.max(96, pl.offsetWidth + 8) + "px"; });
@@ -3750,7 +3756,7 @@ function activate() {
 
 /* the shelves are rebuilt a moment after typing stops: with thousands of games, not for every letter */
 let qT = 0;
-$("#q").addEventListener("input", e => { if (!q && e.target.value.trim()) { preSearch = focusId; movedInSearch = false; } q = e.target.value.trim().toLowerCase(); paintQ(); clearTimeout(qT); qT = setTimeout(() => renderShelves(null), 120); });
+$("#q").addEventListener("input", e => { if (!q && e.target.value.trim()) { preSearch = beforeSearch(); movedInSearch = false; } q = e.target.value.trim().toLowerCase(); paintQ(); clearTimeout(qT); qT = setTimeout(() => renderShelves(null), 120); });
 $("#q").addEventListener("blur", paintQ);
 $("#sclose").onclick = closeSettings;
 $("#gclose").onclick = closeGetGames;

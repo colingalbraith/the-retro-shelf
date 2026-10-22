@@ -919,10 +919,10 @@ test("switching people: each one's play goes in their own journal for other comp
   assert.equal(be.addPerson("SAM!")[0], 409);
   // renamed: their saves folder and journal go by the new name
   be.state.plays[ct] = 3; be.saveState(); be.writeJournalNow();
-  fs.mkdirSync(path.join(be.folders.saves, "Snes9x"), { recursive: true });
-  assert.equal(be.renamePerson(sam, "Samantha")[0], 200);
+  fs.mkdirSync(path.join(be.folders.saves, "Snes9x"), { recursive: true }); fs.writeFileSync(path.join(be.folders.saves, "Snes9x", "CT.srm"), "sam's save");
+  assert.equal((await be.renamePerson(sam, "Samantha"))[0], 200);
   assert.equal(be.folders.saves, path.join(cloud, "The Retro Shelf Saves", "People", "samantha"));
-  assert.ok(fs.existsSync(path.join(be.folders.saves, "Snes9x")));
+  assert.equal(fs.readFileSync(path.join(be.folders.saves, "Snes9x", "CT.srm"), "utf8"), "sam's save");
   assert.ok(fs.existsSync(path.join(dir, "samantha", mine)) && !fs.existsSync(path.join(dir, "sam", mine)));
   // taken off: with saves shared between computers, their saves stay there
   be.trash = async f => fs.rmSync(f, { recursive: true, force: true });
@@ -934,11 +934,11 @@ test("switching people: each one's play goes in their own journal for other comp
 test("saves kept by this computer's numbering move to the person's name", () => {
   be.addPerson("Alex");
   const old = path.join(home, "docs", "Saves", "People", "p2");
-  fs.mkdirSync(path.join(old, "Snes9x"), { recursive: true });
+  fs.mkdirSync(path.join(old, "Snes9x"), { recursive: true }); fs.writeFileSync(path.join(old, "Snes9x", "Game.srm"), "alex's");
   const b = new Backend({ app: APP, data: path.join(home, "data"), docs: path.join(home, "docs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
   b.init();
-  assert.ok(fs.existsSync(path.join(home, "docs", "Saves", "People", "alex", "Snes9x")));
-  assert.ok(!fs.existsSync(old));
+  assert.equal(fs.readFileSync(path.join(home, "docs", "Saves", "People", "alex", "Snes9x", "Game.srm"), "utf8"), "alex's");
+  assert.ok(fs.existsSync(old), "copied, never moved: a backup or another computer may still have it");
 });
 
 test("a shared saves folder that isn't there isn't made again by the journal; a game played elsewhere still counts", async () => {
@@ -1033,7 +1033,7 @@ test("a computer whose app data was copied to another: each gets its own name, a
   // a new computer, set up from a's app data: the same name for sharing play
   fs.cpSync(path.join(home, "a", "data"), path.join(home, "b", "data"), { recursive: true });
   const b = open("b");
-  b.hostName = () => "the-new-mac";                 // a computer of its own name, as a new one is
+  // (with the same name as the old one, as two Steam Decks have: what tells them apart is what each wrote)
   assert.equal(b.machine(), a.machine());
   await new Promise(r => setTimeout(r, 1100));
   play(a, 2, t0 + 10); a.writeJournalNow();          // a plays on
@@ -1192,11 +1192,37 @@ test("the app's own cheat file is still its own after RetroArch writes it again,
   try {
     assert.equal(await be.writeCheats(g), true);
     assert.ok(fs.existsSync(target + ".before-retro-shelf"), "yours set aside");
-    fs.writeFileSync(target, "cheats = 1\ncheat0_desc = \"Infinite HP\"\n");          // RetroArch writes it again, unmarked
+    // RetroArch writes it again as the game closes, unmarked and its own way, with the cheat switched off in its menu
+    fs.writeFileSync(target, 'cheats = 1\n\ncheat0_desc = "Infinite HP"\ncheat0_code = "7E0000:FF"\ncheat0_enable = false\ncheat0_handler = "0"\n');
     assert.equal(await be.writeCheats(g), true, "still the app's");
     assert.ok(!fs.existsSync(target + ".before-retro-shelf 2"), "not set aside a second time");
+    // a cheat you added in RetroArch's menu: the file is yours now, set aside (never written over)
+    fs.writeFileSync(target, 'cheats = 2\ncheat0_desc = "Infinite HP"\ncheat0_code = "7E0000:FF"\ncheat1_desc = "My own"\ncheat1_code = "7E0001:01"\n');
+    assert.equal(await be.writeCheats(g), true);
+    assert.ok(fs.readFileSync(target + ".before-retro-shelf 2", "utf8").includes("My own"));
     be.state.cheats[g.id] = [];
     await be.writeCheats(g);
     assert.equal(fs.readFileSync(target, "utf8"), "cheats = 1\ncheat0_desc = \"mine\"\n", "yours back");
   } finally { zipMod.readEntry = read; }
+});
+
+test("going back to a cloud folder only this computer used: the newer saves win, the older go to the Trash", async () => {
+  const cloud = path.join(home, "cloud"), mine = path.join(home, "docs", "Saves", "Snes9x"), there = path.join(cloud, "The Retro Shelf Saves", "Snes9x");
+  fs.mkdirSync(mine, { recursive: true }); fs.writeFileSync(path.join(mine, "Game.srm"), "first");
+  assert.equal((await be.moveSaves(cloud))[0], 200);
+  assert.equal((await be.moveSaves(""))[0], 200);
+  // played at home since: newer
+  fs.writeFileSync(path.join(mine, "Game.srm"), "newer, at home"); const t = new Date(Date.now() + 60000); fs.utimesSync(path.join(mine, "Game.srm"), t, t);
+  const trashed = []; be.trash = async p => { trashed.push(p); fs.rmSync(p); };
+  const r = await be.moveSaves(cloud);
+  assert.equal(r[1].kept, 0);
+  assert.equal(fs.readFileSync(path.join(there, "Game.srm"), "utf8"), "newer, at home");
+  assert.equal(trashed.length, 1);
+  // with another computer's journal in it, it's a shared folder: what's there stays
+  fs.mkdirSync(path.join(cloud, "The Retro Shelf Saves", ".the-retro-shelf", "play", "player-1"), { recursive: true });
+  fs.writeFileSync(path.join(cloud, "The Retro Shelf Saves", ".the-retro-shelf", "play", "player-1", "other-computer.json"), "{}");
+  assert.equal((await be.moveSaves(""))[0], 200);
+  fs.writeFileSync(path.join(mine, "Game.srm"), "newest, at home"); const t2 = new Date(Date.now() + 120000); fs.utimesSync(path.join(mine, "Game.srm"), t2, t2);
+  assert.equal((await be.moveSaves(cloud))[1].kept, 1);
+  assert.equal(fs.readFileSync(path.join(there, "Game.srm"), "utf8"), "newer, at home");
 });

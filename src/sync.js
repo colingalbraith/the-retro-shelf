@@ -168,7 +168,9 @@ function minus(j, base) {
 /** a journal written whole or not at all (a cloud drive never sends half of one), and not when it hasn't changed */
 function writeJournal(file, j) {
   const text = JSON.stringify(j);
-  try { if (fs.readFileSync(file, "utf8").replace(/"at":\d+,/, "") === text.replace(/"at":\d+,/, "")) return false; } catch {}
+  // (when it was written, and its code, aside: the same play isn't written again)
+  const same = t => t.replace(/"at":\d+,/, "").replace(/,"nonce":"[0-9a-f]+"/, "");
+  try { if (same(fs.readFileSync(file, "utf8")) === same(text)) return false; } catch {}
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file + ".part", text);
   fs.renameSync(file + ".part", file);

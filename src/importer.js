@@ -354,7 +354,7 @@ class Importer {
     const srcDir = path.dirname(it.src);
     // …unless one of this disc's files would meet a different one of the same name there ("Track 01.bin" in each): then
     // the disc keeps a folder of its own
-    if (nested && base !== path.join(dir, stem) && it.extras.some(x => { const to = path.join(base, path.basename(x)); return fs.existsSync(to) && !sameFile(x, to); })) base = path.join(dir, stem);
+    if (nested && base !== path.join(dir, stem) && it.extras.some(x => { let rel = path.relative(srcDir, x); if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) rel = path.basename(x); const to = path.join(base, rel); return fs.existsSync(to) && !sameFile(x, to); })) base = path.join(dir, stem);
     // the files the game needs first, the game itself last: a copy that fails halfway leaves no game that looks whole
     const copies = [], moved = [];
     for (const x of it.extras) {
