@@ -745,3 +745,72 @@ test("a dropped BIOS file never replaces a good one, and one of the wrong size i
   r = be.importCheck([path.join(drop, "scph5501.bin")])[1];
   assert.deepEqual(r.biosFailed, ["scph5501.bin"]); assert.equal(fs.readFileSync(there)[0], 1);
 });
+
+test("one person: nothing changes (no people file, the usual saves folder)", () => {
+  assert.deepEqual(be.peopleJson(), { active: "p1", list: [{ id: "p1", name: "Player 1" }] });
+  assert.equal(be.folders.saves, path.join(home, "docs", "Saves"));
+  be.saveState();
+  assert.ok(!fs.existsSync(path.join(home, "data", "people.json")));
+});
+
+test("each person has their own play, pins, favorites and saves; the games' own details are everyone's", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const ct = byTitle("Chrono Trigger").id;
+  be.state.plays[ct] = 5; be.state.fav.push(ct); be.state.names[ct] = "CT"; be.saveState();
+  const added = be.addPerson("Sam");
+  assert.equal(added[0], 200);
+  assert.equal(be.addPerson("sam")[0], 409, "the same name twice");
+  assert.equal(be.usePerson(added[1].added)[0], 200);
+  assert.equal(be.people.active, "p2");
+  assert.equal(be.state.plays[ct], undefined, "Sam hasn't played it");
+  assert.deepEqual(be.state.fav, []);
+  assert.equal(be.state.names[ct], "CT", "a game's name is everyone's");
+  assert.equal(be.folders.saves, path.join(home, "docs", "Saves", "People", "p2"));
+  be.state.plays[ct] = 1; be.state.rating[ct] = 4; be.state.names[ct] = "Chrono"; be.saveState();
+  // back to the first person: theirs, and the name Sam gave the game
+  be.usePerson("p1");
+  assert.deepEqual([be.state.plays[ct], be.state.rating[ct], be.state.names[ct]], [5, undefined, "Chrono"]);
+  assert.equal(be.folders.saves, path.join(home, "docs", "Saves"));
+  // a new start remembers who played last, with their own play
+  be.usePerson("p2");
+  const b = new Backend({ app: APP, data: path.join(home, "data"), docs: path.join(home, "docs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init();
+  assert.deepEqual([b.people.active, b.state.plays[ct], b.state.rating[ct]], ["p2", 1, 4]);
+});
+
+test("a game that moves keeps everyone's play with it", () => {
+  const f = put("snes/Super Metroid (USA).sfc"); be.scan();
+  const id = byTitle("Super Metroid").id;
+  be.state.plays[id] = 2; be.saveState();
+  be.usePerson(be.addPerson("Sam")[1].added);
+  be.state.plays[id] = 7; be.state.sessions.push([id, 1000, 600]); be.saveState();
+  be.moveStats(id, "moved");
+  assert.equal(be.state.plays.moved, 7);
+  assert.equal(be.state.sessions[0][0], "moved");
+  be.usePerson("p1");
+  assert.equal(be.state.plays.moved, 2, "the first person's too");
+  assert.ok(f);
+});
+
+test("taking someone off moves their play and saves to the Trash; the first person stays", async () => {
+  const trashed = [];
+  be.trash = async f => { trashed.push(f); fs.rmSync(f, { recursive: true, force: true }); };
+  const id = be.addPerson("Sam")[1].added;
+  be.usePerson(id); be.state.plays.x = 1; be.saveState();
+  fs.mkdirSync(path.join(be.folders.saves, "Snes9x"), { recursive: true });
+  fs.writeFileSync(path.join(be.folders.saves, "Snes9x", "Game.srm"), "save");
+  assert.equal((await be.removePerson("p1"))[0], 400);
+  const r = await be.removePerson(id);
+  assert.equal(r[0], 200);
+  assert.equal(be.people.active, "p1", "back to the first person");
+  assert.deepEqual(r[1].list.map(p => p.id), ["p1"]);
+  assert.deepEqual(trashed.map(f => path.relative(home, f)).sort(), [path.join("data", "people", id + ".json"), path.join("docs", "Saves", "People", id)].sort());
+});
+
+test("no changing who's playing while a game is open", () => {
+  const id = be.addPerson("Sam")[1].added;
+  be.running = { alive: true };
+  assert.equal(be.usePerson(id)[0], 409);
+  be.running = null;
+  assert.equal(be.usePerson(id)[0], 200);
+});

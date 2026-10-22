@@ -899,7 +899,7 @@ const HTML = document.documentElement;
 /* each language's words, keyed by the English (see t() below); LOCALE formats dates and numbers to match */
 const WORDS = {};
 let LANG = "en", LOCALE = undefined;
-let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {}, GAMECHOICES = {}, LOGIN;
+let G = [], byId = new Map(), FAV = new Set(), SYSTEMS = [], CONS = {}, GAMECHOICES = {}, LOGIN, PEOPLE = {active: "p1", list: [{id: "p1", name: "Player 1"}]};
 let UI = {accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines"};
 let PATHS = {}, STATUS = {running: null, covers: {}}, APPINFO = {}, CHEEVOS = {};
 /* hardcore achievements: games start from the beginning, so there's no "continue" */
@@ -1219,6 +1219,7 @@ function spineTitle(c, g) {
 /* ---------- data ---------- */
 function ingest(d) {
   G = d.games; byId = new Map(G.map(g => [g.id, g])); FAV = new Set(d.fav); SYSTEMS = d.systems; CONS = d.consoles || {}; GAMECHOICES = d.gameChoices || {}; SHELVES = d.shelves || [];
+  if (d.people) PEOPLE = d.people;
   if (!uiEdits) UI = d.settings.ui;
   PATHS = d.settings.paths; APPINFO = d.settings.app || {}; CHEEVOS = d.settings.cheevos || {}; STATUS = d.status; offset = d.status.now * 1000 - Date.now();
   applyUI();
@@ -2123,6 +2124,7 @@ function openOpts(sub) {
       item(t("Picked ({n}): hide", {n: PICKED.size}), () => hidePicked());
       item(t("Let go of the picked games"), () => clearPicks());
     }
+    if (PEOPLE.list.length > 1) item(t("Who's playing: {name}…", {name: personName(PEOPLE.active)}), () => openWho(), "", true);
     item(t("Surprise me"), () => surprise());
     item(t("Buttons and keys"), () => openKeys());
     item("Search…", () => { $("#q").focus(); paintQ(); if (Date.now() - padAt < 2000) openOsk($("#q")); });
@@ -2339,16 +2341,32 @@ let nsh = null;   // {id} making a shelf with this game on it, or {from} renamin
 let nshFrom = null;
 function openShelfSlip(o) {
   nsh = o; const ren = !!o.from; nshFrom = opener();
+  /* a person's name, with the same slip */
+  if (o.person) {
+    $("#nsht").textContent = o.person.id ? t("Rename") : t("Someone new");
+    $("#nshp").textContent = o.person.id ? t("Their name, as the app shows it.") : t("Their name. They start with their own play, pins and saves.");
+    $("#nshok").textContent = o.person.id ? t("Save") : t("Add");
+    $("#nshname").value = o.person.id ? shownName(o.person) : "";
+  } else {
   $("#nsht").textContent = ren ? "Rename shelf" : "New shelf";
   $("#nshp").textContent = ren ? "The name on its plate." : "Name it, like Couch co-op or To finish.";
   $("#nshok").textContent = ren ? "Save" : "Make shelf";
   $("#nshname").value = ren ? o.from : "";
+  }
   $("#nsh").classList.add("show"); light();
   setTimeout(() => { $("#nshname").focus(); $("#nshname").select(); }, 50);
 }
 function closeShelfSlip() { if (!isOpen("nsh")) return; $("#nsh").classList.remove("show"); nsh = null; backTo(nshFrom); light(); }
 async function saveShelfSlip() {
   const o = nsh, name = $("#nshname").value.trim(); if (!o) return;
+  if (o.person) {
+    if (!name) return toast(t("Give them a name."), true);
+    const r = await api(o.person.id ? "/api/people/rename" : "/api/people/add", {id: o.person.id, name});
+    if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't save that."), true);
+    PEOPLE = r.data; closeShelfSlip(); redrawList();
+    toast(o.person.id ? t("Renamed.") : t("{name} can play now: choose them in Who's playing.", {name}));
+    return;
+  }
   if (!name) return toast(t("Give the shelf a name."), true);
   const r = await api("/api/shelves", o.from ? {op: "rename", name: o.from, to: name} : {op: "create", name, id: o.id || (o.ids || [])[0]});
   if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't save the shelf."), true);
@@ -2395,7 +2413,7 @@ async function showNews() {
   }
   blurActive(); $("#news").classList.add("show"); light();
 }
-function closeNews() { if (!isOpen("news")) return; $("#news").classList.remove("show"); api("/api/whatsnew/seen", {}); light(); focusById(focusId); offerRecap(); }
+function closeNews() { if (!isOpen("news")) return; $("#news").classList.remove("show"); api("/api/whatsnew/seen", {}); light(); focusById(focusId); firstThings(); }
 
 /* ---------- the screensaver: in TV mode, after some minutes with nothing pressed ---------- */
 let lastInput = Date.now(), SAVER = null, saverMouse = null;
@@ -2543,6 +2561,54 @@ $("#keysok").onclick = closeKeys;
 
 /* ---------- a month's or a year's play on one card: offered once when a month starts, and from Your play ---------- */
 let RC = null, rcFrom = null;
+/* ---------- people ----------
+   More than one person can play here, each with their own play, pins, favorites, shelves and saves; the games and
+   Settings are everyone's. With more than one, the app asks who's playing when it opens */
+/* a person's name as shown: the first person's "Player 1" is in the app's language until they're given a name */
+const shownName = p => p ? (p.id === "p1" && p.name === "Player 1" ? t("Player {n}", {n: 1}) : p.name) : "";
+const personName = id => shownName(PEOPLE.list.find(p => p.id === id));
+/* what the app does once it's open: asks who's playing (when there's a choice), then offers last month's recap */
+function firstThings() { if (PEOPLE.list.length > 1 && !STATUS.running && !LAUNCH.open) openWho(true); else offerRecap(); }
+async function usePerson(id, atStart) {
+  if (id !== PEOPLE.active) {
+    const r = await api("/api/people/use", {id});
+    if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't change who's playing."), true);
+    PEOPLE = r.data;
+    await refresh(true);
+    toast(t("{name} is playing.", {name: personName(id)}));
+  }
+  closeList();
+  if (atStart) offerRecap();
+}
+function openWho(atStart) {
+  openList(t("Who's playing?"), t("Everyone here has their own play, pins and saves."), list => {
+    for (const p of PEOPLE.list) {
+      listRow(list, shownName(p), p.id === PEOPLE.active ? t("Played last") : "", [[t("Play"), () => usePerson(p.id, atStart)]], null, true);
+      list.lastChild.dataset.person = p.id;
+    }
+  }, () => $(`#lstl .lrow[data-person="${PEOPLE.active}"] button`));
+}
+/* Settings: who plays here, to add, rename or take off (their play and saves go to the Trash) */
+function openPeople() {
+  openList(t("People"), t("Everyone here has their own play, pins, favorites, shelves and saves. The games and Settings are shared."), list => {
+    for (const p of PEOPLE.list) {
+      const buttons = [];
+      if (p.id !== PEOPLE.active) buttons.push([t("Play"), () => usePerson(p.id).then(() => openPeople())]);
+      buttons.push([t("Rename…"), () => openShelfSlip({person: p})]);
+      if (p.id !== "p1") buttons.push([t("Take off…"), async ev => {
+        const b = ev.currentTarget;
+        /* asked twice: the first press says what happens */
+        if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = t("Sure? Their play and saves go to the Trash"); return; }
+        const r = await api("/api/people/remove", {id: p.id});
+        if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't take them off."), true);
+        PEOPLE = r.data; await refresh(true); redrawList(); toast(t("{name} is off the list. Their things are in the Trash.", {name: shownName(p)}));
+      }]);
+      listRow(list, shownName(p), p.id === PEOPLE.active ? t("Playing now") : "", buttons, null, true);
+    }
+    if (PEOPLE.list.length < 8) { const add = el("button", "btn", t("Add someone…")); add.onclick = () => openShelfSlip({person: {}}); list.appendChild(add); }
+  });
+}
+
 async function offerRecap() {
   const r = await api("/api/recap/due", {});
   if (r.ok && r.data.recap && !LAUNCH.open && !topPanel()) openRecap(r.data.recap.year, r.data.recap.month, true);
@@ -3166,6 +3232,12 @@ function renderSettings() {
   }
 
   H("Your play");
+  const ppl = el("div", "btns"), pplWho = el("button", "btn", t("Who's playing…")), pplAll = el("button", "btn", t("People…"));
+  pplWho.onclick = () => openWho(); pplAll.onclick = openPeople;
+  if (PEOPLE.list.length > 1) ppl.appendChild(pplWho);
+  ppl.appendChild(pplAll);
+  R(t("People"), PEOPLE.list.length > 1 ? t("{name} is playing. {n} people play here, each with their own play, pins and saves.", {name: personName(PEOPLE.active), n: PEOPLE.list.length})
+    : t("Add someone and they get their own play, pins, favorites and saves on this computer."), ppl);
   playStats(b, R);
   /* RetroAchievements: signed in, waiting for the next game to sign in, or not */
   const cv = el("div", "btns");
@@ -3780,7 +3852,7 @@ function hideSplash() { const s = $("#splash"); s.classList.add("out"); setTimeo
   lastFound = STATUS.covers.found || 0; lastRun = !!STATUS.covers.running;
   if (STATUS.running) showLaunch(byId.get(STATUS.running.id));
   if (!UI.welcomed) setTimeout(() => { $("#welcome").classList.add("show"); light(); }, fxMode() === "off" ? 0 : 500);
-  else setTimeout(async () => { await showNews(); if (!isOpen("news")) offerRecap(); }, fxMode() === "off" ? 0 : 500);
+  else setTimeout(async () => { await showNews(); if (!isOpen("news")) firstThings(); }, fxMode() === "off" ? 0 : 500);
   setInterval(poll, 1500); setInterval(tick, 500);
   window.addEventListener("focus", poll);
 })();

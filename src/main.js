@@ -271,7 +271,7 @@ function ipc() {
     const r = await dialog.showOpenDialog(win, { title: tm("Where should backups go?"), buttonLabel: tm("Back Up Here"), properties: ["openDirectory", "createDirectory"] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
     // backups kept among the saves would each hold the ones before, growing every week
-    if (within(r.filePaths[0], backend.folders.saves)) return { ok: false, error: "That's inside the saves folder: choose a folder outside it." };
+    if (within(r.filePaths[0], backend.savesRoot())) return { ok: false, error: "That's inside the saves folder: choose a folder outside it." };
     backend.paths.backup_dir = r.filePaths[0]; backend.saveSettings();
     return { ok: true, dir: r.filePaths[0] };
   });
@@ -333,7 +333,7 @@ function ipc() {
     if (r.canceled || !r.filePath) return { ok: false };
     // laid out like a backup (Saves/<emulator>/…, Saves/States/…), so Restore can put it back
     const list = files.flatMap(s => [s.file, ...(s.pic ? [s.file + ".png"] : [])])
-      .map(f => ({ name: "Saves/" + path.relative(backend.folders.saves, f).split(path.sep).join("/"), full: f }));
+      .map(f => ({ name: "Saves/" + path.relative(backend.savesRoot(), f).split(path.sep).join("/"), full: f }));
     try { return { ok: true, count: await zipFiles(list, r.filePath), path: r.filePath }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
   });
   // the list of games as a spreadsheet; with only a controller, straight into Documents
@@ -380,7 +380,8 @@ function ipc() {
   const freeName = (dir, name, ext = ".zip") => { let f = path.join(dir, name + ext); for (let i = 2; fs.existsSync(f); i++) f = path.join(dir, `${name} ${i}${ext}`); return f; };
   // quick: from a controller, which can't work the save window: straight into the backups folder
   ipcMain.handle("backup-saves", async (_, quick) => {
-    const saves = backend.folders.saves;
+    // everyone's saves (the first person's and People/…)
+    const saves = backend.savesRoot();
     // folders RetroArch makes on the first launch don't count: only actual save files
     let any = false;
     try { any = filesIn(saves).length > 0; } catch {}
@@ -398,7 +399,7 @@ function ipc() {
     if (backend.running && backend.running.alive) return { ok: false, error: "Close the game first, then restore." };
     const r = await dialog.showOpenDialog(win, { title: tm("Restore saves"), buttonLabel: tm("Restore"), properties: ["openFile"], filters: [{ name: tm("Zip archive"), extensions: ["zip"] }] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
-    try { fs.mkdirSync(backend.folders.saves, { recursive: true }); return { ok: true, ...(await unzipInto(r.filePaths[0], backend.folders.saves)) }; }
+    try { fs.mkdirSync(backend.savesRoot(), { recursive: true }); return { ok: true, ...(await unzipInto(r.filePaths[0], backend.savesRoot())) }; }
     catch (e) { return { ok: false, error: "Couldn't restore from that file: " + e.message }; }
   });
   ipcMain.handle("tv-mode", (_, on, size) => tvMode(!!on, size));
@@ -430,7 +431,8 @@ app.whenReady().then(() => {
   // backups by themselves: weekly, when that's on, never while a game is open; the last five kept, older ones to the Trash
   const autoBackup = async () => {
     if (!backend.backupDue() || (backend.running && backend.running.alive)) return;
-    const saves = backend.folders.saves;
+    // everyone's saves (the first person's and People/…)
+    const saves = backend.savesRoot();
     let any = false;
     try { any = filesIn(saves).length > 0; } catch {}
     if (!any) return;
