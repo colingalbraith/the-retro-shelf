@@ -168,6 +168,9 @@ const SCREENS = [
       pins: ["first", "sampler", "hours10", "multi", "onemore", "streak3", "weekend", "lunch", "friday", "sunday", "quick", "sessions25"]};
     renderRecap(RC).then(() => $("#recap").classList.add("show")); })()`, "closeRecap()"],
   ["keys", "openKeys()", "closeKeys()"],
+  // more than one person: who's playing, and the list of people (a long name, the hardest to fit)
+  ["who", "(PEOPLE.list.length > 1 ? Promise.resolve() : api('/api/people/add', {name: 'Alexandria-Rosemary'}).then(r => { PEOPLE = r.data; })).then(() => openWho())", "closeList()"],
+  ["people", "openPeople()", "closeList()"],
   ["screensaver", "UI.tv = true; startSaver()", "stopSaver(); UI.tv = false"],
   ["what-counts", "openColls('series'); setTimeout(() => openCounts(COLL.series[0].name), 700)", "closeList(); closeColls()"],
 ];

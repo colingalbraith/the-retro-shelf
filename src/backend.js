@@ -95,6 +95,12 @@ const REMAP_MARK = "# Buttons changed in The Retro Shelf (Settings â†’ Playing â
 // how far you are with a game (setGameInfo): not started yet, playing it, beaten, or done everything there is (100%)
 const PROGRESS = ["backlog", "playing", "beaten", "complete"];
 
+// What each person who plays on this computer has of their own; everything else in the state (games' names and
+// settings, button layouts, watched folders, the backup clock) is the computer's. The first person's is in state.json
+// with the rest, as it always was, so one person sees no change; others' are in people/<id>.json
+const PERSONAL = ["fav", "last", "plays", "time", "sessions", "events", "pins", "progress", "rating", "notes", "shelves", "cheevos", "recapSeen"];
+const STATE_DEFAULTS = [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}], ["notCounted", {}]];
+
 // what one game can have of its own (setGameOpts): each setting's choices, with the words menus show for them
 const GAME_CHOICES = {
   picture: [["sharp", "Sharp"], ["smooth", "Smooth"], ["crt", "Old TV"], ["lcd", "Handheld"]],
@@ -227,17 +233,19 @@ class Backend extends EventEmitter {
     const base = jload(path.join(this.dirs.app, "config.json"), {});
     const user = jload(this.files.cfg, {});
     this.cfg = { ...base, ...user, systems: { ...base.systems, ...(user.systems || {}) }, retroarch: { ...(user.retroarch || {}) } };
-    this.state = jload(this.files.state, {});
+    this.state = this._base = jload(this.files.state, {});
     // names: titles people gave games; hidden: games taken off the shelves; shelves: ones people made ({name, ids})
     // sessions: each time a game was played, as [id, started (unix seconds), seconds played], oldest first
-    for (const [k, v] of [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}], ["notCounted", {}]]) if (!this.state[k]) this.state[k] = v;
+    for (const [k, v] of STATE_DEFAULTS) if (!this.state[k]) this.state[k] = structuredClone(v);
     const st = jload(this.files.settings, {});
     this.ui = cleanUi(st.ui);
     this.paths = { roms_dir: "", ...(st.paths || {}) };
     // saves somewhere of your own (a cloud folder, to share them between computers)
     // kept even while it isn't there (a cloud drive not started yet): games wait for it, rather than playing on with old
-    // saves from before it was shared
-    if (this.paths.saves_dir) { this.folders.saves = this.paths.saves_dir; this.folders.states = path.join(this.paths.saves_dir, "States"); }
+    // saves from before it was shared. Whoever's playing has theirs in it (savesRoot, personFolder)
+    this.loadPeople();
+    if (this.people.active !== "p1") this.state = this.personState(this.people.active);
+    this.applyFolders();
     this.ra = ra.bundled(this.dirs.emu);
     this.names = { arcade: jload(path.join(this.dirs.app, "data", "arcade-names.json"), {}) };
     this.importer = new Importer(this.cfg.systems);
@@ -384,7 +392,102 @@ class Backend extends EventEmitter {
     for (const s of Object.values(this.cfg.systems)) fs.mkdirSync(path.join(root, s.folder), { recursive: true });
   }
 
-  saveState() { jsave(this.files.state, this.state); }
+  saveState() {
+    if (this.state === this._base) return jsave(this.files.state, this._base);
+    // someone other than the first person: the computer's part goes to state.json, theirs to their own file
+    for (const [k, v] of Object.entries(this.state)) if (!PERSONAL.includes(k)) this._base[k] = v;
+    jsave(this.files.state, this._base);
+    jsave(this.personFile(this.people.active), Object.fromEntries(PERSONAL.filter(k => this.state[k] !== undefined).map(k => [k, this.state[k]])));
+  }
+
+  // ---------------------------------------------------------------- people
+  /** who plays on this computer ({active, list: [{id, name}]}): just the first person until someone's added */
+  loadPeople() {
+    const p = jload(path.join(this.dirs.data, "people.json"), null) || {};
+    const list = (Array.isArray(p.list) ? p.list : []).filter(x => x && /^p\d+$/.test(x.id) && typeof x.name === "string" && x.name.trim());
+    if (!list.some(x => x.id === "p1")) list.unshift({ id: "p1", name: "Player 1" });
+    this.people = { active: list.some(x => x.id === p.active) ? p.active : "p1", list };
+  }
+  savePeople() { jsave(path.join(this.dirs.data, "people.json"), this.people); }
+  personFile(id) { return path.join(this.dirs.data, "people", id + ".json"); }
+  /** the saves folder (the usual one, or one of your own), with everyone's saves: the first person's in it, others' in
+      People/<id> */
+  savesRoot() { return this.paths.saves_dir || path.join(this.dirs.docs, "Saves"); }
+  personFolder(id) { return id === "p1" ? this.savesRoot() : path.join(this.savesRoot(), "People", id); }
+  applyFolders() { this.folders.saves = this.personFolder(this.people.active); this.folders.states = path.join(this.folders.saves, "States"); }
+  /** the state as someone other than the first person has it: the computer's part and their own */
+  personState(id) {
+    const own = jload(this.personFile(id), {}), st = {};
+    for (const [k, v] of Object.entries(this._base)) if (!PERSONAL.includes(k)) st[k] = v;
+    for (const [k, v] of STATE_DEFAULTS) if (PERSONAL.includes(k)) st[k] = own[k] !== undefined ? own[k] : structuredClone(v);
+    for (const k of PERSONAL) if (st[k] === undefined && own[k] !== undefined) st[k] = own[k];
+    return st;
+  }
+  /** what changes for a game (its id moves, discs join a list) changes for everyone: fn gets each other person's own
+      part, and it's saved */
+  otherPeople(fn) {
+    for (const p of this.people ? this.people.list : []) {
+      if (p.id === this.people.active) continue;
+      if (p.id === "p1") { fn(this._base); jsave(this.files.state, this._base); continue; }
+      if (!fs.existsSync(this.personFile(p.id))) continue;
+      const own = jload(this.personFile(p.id), {});
+      fn(own);
+      jsave(this.personFile(p.id), own);
+    }
+  }
+  peopleJson() { return { active: this.people.active, list: this.people.list.map(p => ({ id: p.id, name: p.name })) }; }
+  /** someone else plays now: their play, pins and saves */
+  usePerson(id) {
+    if (!this.people.list.some(p => p.id === id)) return [404, { error: "There's no one by that name here." }];
+    if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
+    if (id === this.people.active) return [200, this.peopleJson()];
+    this.saveState();
+    this.people.active = id;
+    this.savePeople();
+    this.state = id === "p1" ? this._base : this.personState(id);
+    this.applyFolders();
+    this.raPending = null;
+    this.newPins = [];
+    try { this.checkPins(); } catch {}
+    return [200, this.peopleJson()];
+  }
+  addPerson(name) {
+    name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 24);
+    if (!name) return [400, { error: "Give them a name." }];
+    if (this.people.list.length >= 8) return [400, { error: "That's as many people as one computer keeps (8)." }];
+    if (this.people.list.some(p => p.name.toLowerCase() === name.toLowerCase())) return [409, { error: "There's someone with that name already." }];
+    let n = 2;
+    while (this.people.list.some(p => p.id === "p" + n) || fs.existsSync(this.personFile("p" + n))) n++;
+    this.people.list.push({ id: "p" + n, name });
+    this.savePeople();
+    return [200, { ...this.peopleJson(), added: "p" + n }];
+  }
+  renamePerson(id, name) {
+    const p = this.people.list.find(x => x.id === id);
+    if (!p) return [404, { error: "There's no one by that name here." }];
+    name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 24);
+    if (!name) return [400, { error: "Give them a name." }];
+    if (this.people.list.some(x => x !== p && x.name.toLowerCase() === name.toLowerCase())) return [409, { error: "There's someone with that name already." }];
+    p.name = name;
+    this.savePeople();
+    return [200, this.peopleJson()];
+  }
+  /** someone who doesn't play here anymore: their play and saves go to the Trash (never deleted for good). The first
+      person stays */
+  async removePerson(id) {
+    if (id === "p1") return [400, { error: "The first person stays: rename them instead." }];
+    const i = this.people.list.findIndex(x => x.id === id);
+    if (i < 0) return [404, { error: "There's no one by that name here." }];
+    if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
+    if (this.people.active === id) this.usePerson("p1");
+    for (const f of [this.personFile(id), this.personFolder(id)]) {
+      if (!fs.existsSync(f)) continue;
+      try { await this.trash(f); } catch (e) { return [500, { error: "Couldn't move their things to the Trash: " + e.message }]; }
+    }
+    this.people.list.splice(i, 1);
+    this.savePeople();
+    return [200, this.peopleJson()];
+  }
 
   /** details for a bug report: versions, setup, BIOS, the last game's exit and RetroArch's log. Paths say ~ for home */
   report(version) {
@@ -503,25 +606,33 @@ class Backend extends EventEmitter {
    * first disc's saves are copied to the list's name, which the emulator saves under from now on.
    */
   adoptDiscs(system, m3u, discs) {
-    const st = this.state, to = gid(m3u), from = discs.map(gid);
-    for (const id of from) {
-      if (id === from[0]) { this.moveStats(id, to); continue; }
-      st.time[to] = (st.time[to] || 0) + (st.time[id] || 0); st.plays[to] = (st.plays[to] || 0) + (st.plays[id] || 0);
-      if ((st.last[id] || 0) > (st.last[to] || 0)) st.last[to] = st.last[id];
-      for (const k of ["progress", "rating", "notes"]) if (st[k][id] && !st[k][to]) st[k][to] = st[k][id];
-      for (const k of ["time", "plays", "last", "names", "gameOpts", "cheats", "progress", "rating", "notes"]) delete st[k][id];
-      for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(id); if (i >= 0) { st[k].splice(i, 1); if (!st[k].includes(to)) st[k].push(to); } }
-      for (const sh of st.shelves) { const i = sh.ids.indexOf(id); if (i >= 0) { sh.ids.splice(i, 1); if (!sh.ids.includes(to)) sh.ids.push(to); } }
-      for (const ses of st.sessions) if (ses[0] === id) ses[0] = to;
-    }
-    for (const sh of st.shelves) sh.ids = [...new Set(sh.ids)];
-    for (const k of ["fav", "hidden"]) st[k] = [...new Set(st[k])];
+    const to = gid(m3u), from = discs.map(gid);
+    // everyone's play (st: whoever's playing now, or another person's own part, which has only theirs)
+    const adopt = st => {
+      for (const id of from) {
+        if (id === from[0]) { this.moveStats(id, to, st); continue; }
+        if (st.time) st.time[to] = (st.time[to] || 0) + (st.time[id] || 0);
+        if (st.plays) st.plays[to] = (st.plays[to] || 0) + (st.plays[id] || 0);
+        if (st.last && (st.last[id] || 0) > (st.last[to] || 0)) st.last[to] = st.last[id];
+        for (const k of ["progress", "rating", "notes"]) if (st[k] && st[k][id] && !st[k][to]) st[k][to] = st[k][id];
+        for (const k of ["time", "plays", "last", "names", "gameOpts", "cheats", "progress", "rating", "notes"]) if (st[k]) delete st[k][id];
+        for (const k of ["fav", "hidden"]) { if (!st[k]) continue; const i = st[k].indexOf(id); if (i >= 0) { st[k].splice(i, 1); if (!st[k].includes(to)) st[k].push(to); } }
+        for (const sh of st.shelves || []) { const i = sh.ids.indexOf(id); if (i >= 0) { sh.ids.splice(i, 1); if (!sh.ids.includes(to)) sh.ids.push(to); } }
+        for (const ses of st.sessions || []) if (ses[0] === id) ses[0] = to;
+      }
+      for (const sh of st.shelves || []) sh.ids = [...new Set(sh.ids)];
+      for (const k of ["fav", "hidden"]) if (st[k]) st[k] = [...new Set(st[k])];
+    };
+    adopt(this.state);
+    this.otherPeople(adopt);
+    const st = this.state;
     const core = this.cfg.systems[system].core;
     this.resumeAt({ system, path: discs[0] });          // looks up the emulator's name, which names its save folders
     const cn = core && this._coreNames && this._coreNames[core];
     if (cn) {
       const a = path.parse(discs[0]).name, b = path.parse(m3u).name;
-      for (const dir of [path.join(this.folders.saves, cn), path.join(this.folders.states, cn)]) {
+      // everyone's saves for it
+      for (const dir of this.people.list.flatMap(p => [path.join(this.personFolder(p.id), cn), path.join(this.personFolder(p.id), "States", cn)])) {
         let files = [];
         try { files = fs.readdirSync(dir); } catch {}
         for (const f of files) if (f.startsWith(a + ".")) {
@@ -682,8 +793,8 @@ class Backend extends EventEmitter {
    */
   async moveSaves(dir) {
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
-    const to = dir ? path.join(path.resolve(String(dir)), "The Retro Shelf Saves") : path.join(this.dirs.docs, "Saves"), from = this.folders.saves;
-    if (path.resolve(to) === path.resolve(from)) { if (!dir && this.paths.saves_dir) { this.paths.saves_dir = ""; this.saveSettings(); } return [200, { ok: true, copied: 0 }]; }
+    const to = dir ? path.join(path.resolve(String(dir)), "The Retro Shelf Saves") : path.join(this.dirs.docs, "Saves"), from = this.savesRoot();
+    if (path.resolve(to) === path.resolve(from)) { if (!dir && this.paths.saves_dir) { this.paths.saves_dir = ""; this.applyFolders(); this.saveSettings(); } return [200, { ok: true, copied: 0 }]; }
     if (within(to, from)) return [400, { error: "That's inside the saves folder already." }];
     let copied = 0;
     try {
@@ -700,13 +811,13 @@ class Backend extends EventEmitter {
       }
     } catch (e) { return [500, { error: "Couldn't copy the saves there: " + e.message }]; }
     this.paths.saves_dir = dir ? to : "";
-    this.folders.saves = to; this.folders.states = path.join(to, "States");
+    this.applyFolders();
     this.saveSettings();
     if (dir) this.event("cloud");
     return [200, { ok: true, copied, to }];
   }
   /** saves shared between computers: which one has a game open. A note in the saves folder, gone when the game closes */
-  inPlayDir() { return this.paths.saves_dir ? path.join(this.folders.saves, ".in-play") : null; }
+  inPlayDir() { return this.paths.saves_dir ? path.join(this.savesRoot(), ".in-play") : null; }
   /** this computer, for in-play notes: an id kept in its state (a Mac's network name can change from place to place) */
   machine() {
     if (!this.state.machine) { this.state.machine = crypto.randomBytes(8).toString("hex"); try { this.saveState(); } catch {} }
@@ -1038,21 +1149,22 @@ class Backend extends EventEmitter {
 
   // ---------------------------------------------------------------- per-game changes
   /** stats belong to a game's id (its path); when the file moves they move with it */
-  moveStats(from, to) {
+  moveStats(from, to, st) {
     if (from === to) return;
-    const st = this.state;
+    // everyone's: whoever's playing now, then the others' own parts
+    if (!st) { this.moveStats(from, to, this.state); this.otherPeople(o => this.moveStats(from, to, o)); return; }
     // added to what the game already has there, never over it: plays and time add up, the latest play counts, and
     // its own name, settings and notes stay
     for (const k of ["last", "plays", "time", "names", "gameOpts", "cheats", "progress", "rating", "notes"]) {
-      if (!(from in st[k])) continue;
+      if (!st[k] || !(from in st[k])) continue;
       if (!(to in st[k])) st[k][to] = st[k][from];
       else if (k === "plays" || k === "time") st[k][to] += st[k][from];
       else if (k === "last") st[k][to] = Math.max(st[k][to], st[k][from]);
       delete st[k][from];
     }
-    for (const k of ["fav", "hidden"]) { const i = st[k].indexOf(from); if (i >= 0) { if (st[k].includes(to)) st[k].splice(i, 1); else st[k][i] = to; } }
-    for (const sh of st.shelves) { const i = sh.ids.indexOf(from); if (i >= 0) { if (sh.ids.includes(to)) sh.ids.splice(i, 1); else sh.ids[i] = to; } }
-    for (const ses of st.sessions) if (ses[0] === from) ses[0] = to;
+    for (const k of ["fav", "hidden"]) { if (!st[k]) continue; const i = st[k].indexOf(from); if (i >= 0) { if (st[k].includes(to)) st[k].splice(i, 1); else st[k][i] = to; } }
+    for (const sh of st.shelves || []) { const i = sh.ids.indexOf(from); if (i >= 0) { if (sh.ids.includes(to)) sh.ids.splice(i, 1); else sh.ids[i] = to; } }
+    for (const ses of st.sessions || []) if (ses[0] === from) ses[0] = to;
   }
 
   /**
@@ -1824,7 +1936,7 @@ class Backend extends EventEmitter {
       roms_ok: fs.existsSync(root), exe_ok: this.exeOk(), cores_ok: this.coresOk(),
       pcsx2: !!(this.cfg.systems.PS2 && this.cfg.systems.PS2.emulator && this.resolveApp(this.cfg.systems.PS2.emulator[0])),
       builtin: this.ra ? { version: this.ra.version, systems } : null, own: this.ownEmu(),
-      folders: { games: root, saves: this.folders.saves, bios: this.folders.bios },
+      folders: { games: root, saves: this.savesRoot(), bios: this.folders.bios },
       saves_dir: this.paths.saves_dir || "", backup_dir: this.backupDir(), last_backup: this.state.lastAutoBackup || 0,
       watch: this.watchedDirs().map(dir => { const c = this.watchedItems(dir); return { dir, games: c.items.length, unsure: c.unsure.length }; }),
     }, app: { version: this.dirs.version || "" },
@@ -1974,7 +2086,7 @@ class Backend extends EventEmitter {
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null, cheats: (st.cheats[g.id] || []).length,
         progress: st.progress[g.id] || "", rating: st.rating[g.id] || 0, note: st.notes[g.id] || "",
         ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
-      fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES,
+      fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES, people: this.peopleJson(),
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
       // how each console's games look on the shelf: the kind of box, its short name, packaging and the color of its pile
       consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null, light: !!v.light, freeTriggers: !!v.freeTriggers, builtin: !this.standalone(k), buttons: v.buttons || null, remap: st.remaps[k] || null }])),
@@ -2015,6 +2127,7 @@ class Backend extends EventEmitter {
       if (words) return this.file(path.join(this.dirs.app, "words", words[1] + ".json"), "application/json; charset=utf-8");
       if (pathname === "/api/library") return { code: 200, body: this.libraryJson() };
       if (pathname === "/api/status") return { code: 200, body: this.statusJson() };
+      if (pathname === "/api/people") return { code: 200, body: this.peopleJson() };
       if (pathname === "/api/sessions") return { code: 200, body: { sessions: this.state.sessions, now: now() } };
       if (pathname === "/api/collections") return { code: 200, body: this.collections()[1] };
       if (pathname === "/api/whatsnew") return { code: 200, body: { version: this.dirs.version, changes: this.whatsNew() } };
@@ -2092,6 +2205,10 @@ class Backend extends EventEmitter {
         return j([200, r]);
       }
       case "/api/recap/due": return j([200, { recap: this.recapDue() }]);
+      case "/api/people/use": return j(this.usePerson(String(d.id || "")));
+      case "/api/people/add": return j(this.addPerson(d.name));
+      case "/api/people/rename": return j(this.renamePerson(String(d.id || ""), d.name));
+      case "/api/people/remove": return j(await this.removePerson(String(d.id || "")));
       case "/api/recap/seen": { const y = parseInt(d.year, 10), m = d.month === null || d.month === undefined ? null : parseInt(d.month, 10); this.state.recapSeen = recapKey(y, m); this.saveState(); return j([200, { ok: true }]); }
       case "/api/collections/count": return j(this.setCounts(String(d.series || ""), String(d.system || ""), String(d.look || ""), d.counts !== false));
       case "/api/whatsnew/seen": this.state.seenVersion = this.dirs.version; this.saveState(); return j([200, { ok: true }]);
