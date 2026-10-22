@@ -1351,7 +1351,7 @@ function fillBack(c, g) {
   inn.appendChild(el("div", "sub", [g.system, g.tag, g.year].filter(Boolean).join(" · ")));
   const who = [g.pub, g.dev && g.dev !== g.pub ? t("by {dev}", {dev: g.dev}) : "", g.genre].filter(Boolean).join(" · ");
   if (who) inn.appendChild(el("div", "sub2", who));
-  const left = resume && sv.rpic, src = left ? "/state/" + g.id + "/auto?v=" + resume : g.shv ? "/shot/" + g.id + "/0?v=" + g.shv : g.sv ? "/snap/" + g.id + "?v=" + g.sv : "";
+  const left = resume && sv.rpic, src = left ? "/state/" + g.id + "/auto?v=" + resume : g.shv ? "/shot/" + g.id + "/0?v=" + g.shv + "." + g.shots : g.sv ? "/snap/" + g.id + "?v=" + g.sv : "";
   if (src) {
     const pic = el("div", "pic"), im = new Image(); im.alt = ""; im.decoding = "async"; im.src = src;
     im.onerror = () => pic.remove();
@@ -2441,7 +2441,7 @@ function saverPics() {
     if (g.hidden) continue;
     const sv = g.saves || {}, cap = [g.title, g.system];
     if (sv.resume && sv.rpic && !hardcore()) shots.push(["/state/" + g.id + "/auto?v=" + sv.resume, cap]);
-    else if (g.shv) shots.push(["/shot/" + g.id + "/0?v=" + g.shv, cap]);
+    else if (g.shv) shots.push(["/shot/" + g.id + "/0?v=" + g.shv + "." + g.shots, cap]);
     else if (g.sv) shots.push(["/snap/" + g.id + "?v=" + g.sv, cap]);
     if (g.cv) covers.push(["/cover/" + g.id + "?v=" + g.cv, cap]);
   }
@@ -2613,7 +2613,7 @@ async function openShots(id) {
     if (!shots.length) list.appendChild(el("p", "", t("No screenshots yet.")));
     shots.forEach((s, i) => {
       const f = el("figure", "shot"), im = new Image(); im.alt = t("Screenshot · {when}", {when: fmtWhen(s.at)}); im.loading = "lazy"; im.decoding = "async";
-      im.src = "/shot/" + id + "/" + i + "?v=" + s.at;
+      im.src = "/shot/" + id + "/" + i + "?v=" + encodeURIComponent(s.name);
       f.appendChild(im);
       const cap = el("figcaption", "", fmtWhen(s.at));
       if (APP && APP.revealShot) { const b = el("button", "btn", APP.platform === "darwin" ? t("Show in Finder") : t("Show in folder")); b.onclick = () => APP.revealShot(id, s.name); cap.appendChild(b); }
@@ -2668,7 +2668,10 @@ function openPeople() {
         if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = t("Sure? Their play and saves go to the Trash"); return; }
         const r = await api("/api/people/remove", {id: p.id});
         if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't take them off."), true);
-        PEOPLE = r.data; await refresh(true); redrawList(); toast(t("{name} is off the list. Their things are in the Trash.", {name: shownName(p)}));
+        PEOPLE = r.data; await refresh(true); redrawList();
+        /* saves shared with other computers stay there, for the same person playing on those */
+        toast(r.data.savesKept ? t("{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.", {name: shownName(p)})
+          : t("{name} is off the list. Their things are in the Trash.", {name: shownName(p)}));
       }]);
       listRow(list, shownName(p), p.id === PEOPLE.active ? t("Playing now") : "", buttons, null, true);
     }

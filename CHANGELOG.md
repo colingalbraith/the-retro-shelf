@@ -6,6 +6,15 @@
   goes on the back of the game's box instead of the stock picture. Screenshots… in a game's options shows them all,
   each to find in its folder or put in the Trash. They're kept in a folder for each console, in Screenshots next to
   your games. A picture you chose for the box yourself (right-click → Change Screenshot) still comes first.
+- **People and computers, fixed:** switching who's playing no longer puts one person's play in another's for other
+  computers. Names in any alphabet (Саша, ゆき, 小明) each keep their own play. Each person's saves folder in a shared
+  folder goes by their name, so two computers' people never share one. RetroAchievements signs in as whoever's
+  playing. Copies a cloud drive makes of a computer's play count once, and play on another computer shows up even
+  when its file arrives late. Games on a drive that isn't plugged in still count on your other computers.
+- **PlayStation 2, fixed:** with your own RetroArch, or once PCSX2 is uninstalled, PS2 games play with the right
+  emulator. A PS2 BIOS cut short (a pulled USB stick) makes way for a good one.
+- **Play from another app, fixed:** a list for one console no longer matches another console's game of the same
+  name (SNES and NES), and bringing a list in again after moving your games adds nothing.
 - **Fixes:** "Playing" on the playing screen is in your language. Switches, sliders and name fields in Settings and
   the Rename and New shelf windows now tell screen readers what they're for. Moving over from the app's old name
   (Arcade) no longer shows an empty shelf when the games folder can't be moved: the app uses it where it is.

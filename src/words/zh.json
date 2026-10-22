@@ -29,6 +29,7 @@
  "{n} stars": "{n} 星",
  "{n} were already here": "{n} 款已经在这里了",
  "{name} can play now: choose them in Who's playing.": "{name} 现在可以玩了：在“谁来玩”里选这个名字就行。",
+ "{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.": "{name} 已经不在名单上了。游玩记录在回收站里；存档留在共享文件夹中，供其他电脑使用。",
  "{name} is off the list. Their things are in the Trash.": "{name} 已经不在名单上了。相关的游玩记录和存档都在回收站里。",
  "{name} is playing.": "现在轮到 {name} 玩了。",
  "{name} is playing. {n} people play here, each with their own play, pins and saves.": "现在轮到 {name} 玩了。这里有 {n} 个人在玩，每人都有自己的游玩记录、徽章和存档。",

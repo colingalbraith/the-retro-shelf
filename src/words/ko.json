@@ -29,6 +29,7 @@
  "{n} stars": "별 {n}개",
  "{n} were already here": "{n}개는 이미 있었어요",
  "{name} can play now: choose them in Who's playing.": "새로 추가했어요: {name}. '플레이할 사람 고르기'에서 고르면 바로 플레이할 수 있어요.",
+ "{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.": "목록에서 뺐어요: {name}. 그 사람의 플레이 기록은 휴지통으로 옮겼고, 세이브는 다른 컴퓨터를 위해 공유 폴더에 남겨 뒀어요.",
  "{name} is off the list. Their things are in the Trash.": "목록에서 뺐어요: {name}. 그 사람의 기록과 세이브는 휴지통으로 옮겼어요.",
  "{name} is playing.": "이제 {name} 차례예요.",
  "{name} is playing. {n} people play here, each with their own play, pins and saves.": "지금은 {name} 차례예요. 여기서는 {n}명이 플레이하고, 저마다 플레이 기록, 배지, 세이브가 따로 있어요.",

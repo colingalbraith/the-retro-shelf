@@ -29,6 +29,7 @@
  "{n} stars": "{n} estrellas",
  "{n} were already here": "{n} ya estaban aquí",
  "{name} can play now: choose them in Who's playing.": "{name} ya puede jugar: elige su nombre en Quién juega.",
+ "{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.": "{name} ya no está en la lista. Su actividad está en la Papelera; sus partidas se quedan en la carpeta compartida para los otros equipos.",
  "{name} is off the list. Their things are in the Trash.": "{name} ya no está en la lista. Sus cosas están en la Papelera.",
  "{name} is playing.": "Ahora juega {name}.",
  "{name} is playing. {n} people play here, each with their own play, pins and saves.": "Ahora juega {name}. Aquí juegan {n} personas, cada una con su propia actividad, pines y partidas.",

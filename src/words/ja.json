@@ -29,6 +29,7 @@
  "{n} stars": "星 {n} つ",
  "{n} were already here": "{n} 本はすでにありました",
  "{name} can play now: choose them in Who's playing.": "{name} も遊べるようになりました。「遊ぶ人を選ぶ」から選んでください。",
+ "{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.": "{name} をリストから外しました。プレイ記録はゴミ箱にあります。セーブはほかのパソコンのために共有フォルダに残っています。",
  "{name} is off the list. Their things are in the Trash.": "{name} をリストから外しました。プレイ記録などはゴミ箱にあります。",
  "{name} is playing.": "{name} に交代しました。",
  "{name} is playing. {n} people play here, each with their own play, pins and saves.": "いまは {name} が遊んでいます。ここでは {n} 人が遊んでいて、それぞれにプレイ記録、バッジ、セーブがあります。",

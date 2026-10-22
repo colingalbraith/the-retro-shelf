@@ -29,6 +29,7 @@
  "{n} stars": "оценка {n} из 5",
  "{n} were already here": "Уже были здесь: {n}",
  "{name} can play now: choose them in Who's playing.": "{name} теперь может играть: выберите это имя в «Кто играет».",
+ "{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.": "Больше не в списке: {name}. Дневник и значки — в Корзине; сохранения остаются в общей папке для других компьютеров.",
  "{name} is off the list. Their things are in the Trash.": "Больше не в списке: {name}. Дневник, значки и сохранения — в Корзине.",
  "{name} is playing.": "Теперь играет {name}.",
  "{name} is playing. {n} people play here, each with their own play, pins and saves.": "Теперь играет {name}. Игроков здесь: {n}, у каждого свой игровой дневник, значки и сохранения.",

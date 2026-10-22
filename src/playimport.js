@@ -12,6 +12,21 @@ const unxml = s => String(s).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
 const tag = (block, name) => { const m = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i").exec(block); return m ? unxml(m[1]) : ""; };
 const blocks = (text, name) => [...text.matchAll(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "gi"))].map(m => m[1]);
 const yes = v => /^(true|1|yes)$/i.test(v);
+/** each console here by the names the other apps give it: EmulationStation's folders and LaunchBox's platforms */
+const ALIASES = {
+  "NES": ["nes", "famicom", "nintendo entertainment system"], "SNES": ["snes", "sfc", "superfamicom", "super nintendo entertainment system", "super famicom"],
+  "Game Boy": ["gb", "gbc", "nintendo game boy", "nintendo game boy color"], "GBA": ["gba", "nintendo game boy advance"],
+  "Genesis": ["genesis", "megadrive", "sega genesis", "sega mega drive"], "Sega CD": ["segacd", "megacd", "sega cd", "sega mega-cd"], "32X": ["sega32x", "32x", "sega 32x"],
+  "Master System": ["mastersystem", "sms", "sega master system"], "Game Gear": ["gamegear", "gg", "sega game gear"], "SG-1000": ["sg-1000", "sg1000", "sega sg-1000"],
+  "PC Engine": ["pcengine", "tg16", "turbografx16", "pce", "nec turbografx-16", "nec pc engine"], "Atari 2600": ["atari2600", "atari 2600"], "Atari 7800": ["atari7800", "atari 7800"],
+  "Lynx": ["atarilynx", "lynx", "atari lynx"], "ColecoVision": ["colecovision", "coleco"], "Intellivision": ["intellivision", "mattel intellivision"], "Vectrex": ["vectrex", "gce vectrex"],
+  "MSX": ["msx", "msx2", "microsoft msx", "microsoft msx2"], "N64": ["n64", "nintendo 64"], "PS1": ["psx", "ps1", "sony playstation"], "Saturn": ["saturn", "sega saturn"],
+  "3DO": ["3do", "3do interactive multiplayer"], "Neo Geo CD": ["neogeocd", "snk neo geo cd"], "Dreamcast": ["dreamcast", "sega dreamcast"], "DS": ["nds", "nintendo ds"],
+  "PSP": ["psp", "sony psp"], "Neo Geo Pocket": ["ngp", "ngpc", "snk neo geo pocket", "snk neo geo pocket color"], "WonderSwan": ["wonderswan", "wonderswancolor", "bandai wonderswan", "bandai wonderswan color"],
+  "Virtual Boy": ["virtualboy", "nintendo virtual boy"], "Pokémon Mini": ["pokemini", "nintendo pokemon mini"], "Arcade": ["arcade", "mame", "fbneo", "neogeo"],
+  "GameCube/Wii": ["gc", "gamecube", "wii", "nintendo gamecube", "nintendo wii"], "PS2": ["ps2", "sony playstation 2"],
+};
+const KNOWN = new Set(Object.values(ALIASES).flat());
 /** a file name the way games are matched: no folders, no letter case, accents written one way */
 const fileKey = p => path.basename(String(p).replace(/\\/g, "/")).normalize("NFC").toLowerCase();
 
@@ -83,10 +98,11 @@ function plan(lists, games) {
       if (!(it.fav || it.plays || it.last || it.rating || it.time || it.done)) continue;
       listed++;
       let cands = byFile.get(fileKey(it.file)) || [];
-      if (cands.length > 1) {
-        const hint = (it.platform || folder || "").toLowerCase();
-        cands = cands.filter(g => hint && (hint.includes(g.system.toLowerCase()) || g.path.toLowerCase().includes("/" + folder + "/")));
-      }
+      // the list's console (LaunchBox's platform, or EmulationStation's folder for it) by its whole name, or the game
+      // here in a folder of that name. When the list says which console and it's another one, it's another game
+      const names = [(it.platform || "").toLowerCase(), folder].filter(Boolean);
+      const fits = g => names.some(n => n === g.system.toLowerCase() || (ALIASES[g.system] || []).includes(n) || g.path.toLowerCase().split(/[\\/]/).slice(0, -1).includes(n));
+      if (cands.length > 1 || names.some(n => KNOWN.has(n))) cands = cands.filter(fits);
       if (cands.length !== 1 || seen.has(cands[0].id)) continue;
       seen.add(cands[0].id);
       found.push({ id: cands[0].id, source: file, ...it });
@@ -110,8 +126,10 @@ function apply(st, p) {
   st.imported = st.imported || {};
   let n = 0;
   for (const f of p.found) {
-    const mark = f.source + "|" + f.id;
-    if (st.imported[mark]) continue;
+    // marked by the list and the game's line in it, not the game's id here, which changes when its file moves (marks
+    // from before were by id: they still count)
+    const mark = f.source + "|" + fileKey(f.file);
+    if (st.imported[mark] || st.imported[f.source + "|" + f.id]) continue;
     st.imported[mark] = 1; n++;
     if (f.fav && !st.fav.includes(f.id)) st.fav.push(f.id);
     if (f.plays) st.plays[f.id] = (st.plays[f.id] || 0) + f.plays;

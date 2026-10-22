@@ -122,6 +122,8 @@ function enforced(ra, dirs, opts) {
     cheevos_enable: opts.cheevos ? "true" : "false",
     cheevos_hardcore_mode_enable: hardcore ? "true" : "false",
     ...(opts.cheevos && opts.cheevos.pass ? { cheevos_username: opts.cheevos.user, cheevos_password: opts.cheevos.pass, cheevos_token: "" } : {}),
+    // signed in already: whoever's playing, with their own token
+    ...(opts.cheevos && !opts.cheevos.pass && opts.cheevos.token ? { cheevos_username: opts.cheevos.user, cheevos_password: "", cheevos_token: opts.cheevos.token } : {}),
     ...(!opts.cheevos ? { cheevos_username: "", cheevos_password: "", cheevos_token: "" } : {}),
     // a picture with every save, shown on the back of the box
     savestate_thumbnail_enable: "true",

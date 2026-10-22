@@ -29,6 +29,7 @@
  "{n} stars": "ocena {n} z 5",
  "{n} were already here": "Już tu były: {n}",
  "{name} can play now: choose them in Who's playing.": "{name} może już grać. Wybierz to imię w „Kto gra”.",
+ "{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.": "Usunięto z listy: {name}. Dziennik gracza tej osoby jest w Koszu; jej zapisy zostają we wspólnym folderze dla innych komputerów.",
  "{name} is off the list. Their things are in the Trash.": "Usunięto z listy: {name}. Rzeczy tej osoby są w Koszu.",
  "{name} is playing.": "Teraz gra: {name}.",
  "{name} is playing. {n} people play here, each with their own play, pins and saves.": "Teraz gra: {name}. Osób grających tutaj: {n}. Każda ma własny dziennik gracza, odznaki i zapisy.",

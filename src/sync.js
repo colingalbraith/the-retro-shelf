@@ -6,21 +6,43 @@
 // file name (a game's id comes from where it is on each computer), people by name.
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const FIELDS = ["progress", "rating", "notes", "fav"];
 /** a game across computers: its console and file name */
 const gameKey = g => g.system + "/" + path.basename(g.path).toLowerCase();
-/** a person across computers: their name, as a folder name */
-const personKey = name => String(name || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "player";
+/** every game's key, by id. Two games here with the same console and file name (Disc 1.chd in two games' folders)
+    have their folder's name in it too, so neither takes the other's play */
+function keysFor(games) {
+  const all = [...games], n = new Map();
+  for (const g of all) n.set(gameKey(g), (n.get(gameKey(g)) || 0) + 1);
+  return new Map(all.map(g => [g.id, n.get(gameKey(g)) > 1 ? g.system + "/" + path.basename(path.dirname(g.path)).toLowerCase() + "/" + path.basename(g.path).toLowerCase() : gameKey(g)]));
+}
+/** a person across computers: their name as a folder name. A name in letters beyond English's (Саша, ゆき, Zoë) gets
+    a short fingerprint of itself, so two such names never share one */
+function personKey(name) {
+  const n = String(name || "").normalize("NFC").trim().toLowerCase();
+  const slug = n.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!/[^\x00-\x7f]/.test(n)) return slug || "player";
+  return (slug ? slug + "-" : "") + crypto.createHash("sha1").update(n).digest("hex").slice(0, 10);
+}
 const journalDir = (root, person) => path.join(root, ".the-retro-shelf", "play", personKey(person));
 
 /**
  * This computer's journal for one person: its own sittings, and for each game the totals played here and what was set
- * (with when), by game key. st: the person's state (plays, time, last, sessions, progress, rating, notes, fav, edited)
+ * (with when), by game key. st: the person's state (plays, time, last, sessions, progress, rating, notes, fav, edited);
+ * keyOf: each game's key by id, games not here right now (a drive unplugged, a game deleted) included
  */
-function journal(st, games, machine, host, at) {
-  const keyOf = new Map([...games].map(g => [g.id, gameKey(g)])), out = { v: 1, machine, host, at, games: {}, sessions: [] };
-  const entry = id => { const k = keyOf.get(id); return k ? (out.games[k] = out.games[k] || {}) : null; };
+function journal(st, keyOf, machine, host, at) {
+  const out = { v: 1, machine, host, at, games: {}, sessions: [] };
+  // two ids with one key (a game that was somewhere else before) add up: plays and time, the latest play, the newest edit
+  const put = (k, e) => {
+    const o = out.games[k];
+    if (!o) { out.games[k] = e; return; }
+    for (const f of ["plays", "time"]) if (e[f]) o[f] = (o[f] || 0) + e[f];
+    if (e.last) o.last = Math.max(o.last || 0, e.last);
+    for (const f of FIELDS) if (e[f] && (!o[f] || e[f][1] > o[f][1])) o[f] = e[f];
+  };
   for (const id of keyOf.keys()) {
     const e = {};
     if (st.plays[id]) e.plays = st.plays[id];
@@ -32,45 +54,51 @@ function journal(st, games, machine, host, at) {
       // what was set, or taken off, here: only once it's been touched (a value from before journals counts too)
       if (when || (f === "fav" ? value : value !== undefined)) e[f] = [f === "fav" ? value : value ?? null, when];
     }
-    if (Object.keys(e).length) Object.assign(entry(id), e);
+    if (Object.keys(e).length) put(keyOf.get(id), e);
   }
   for (const [id, start, secs] of st.sessions) { const k = keyOf.get(id); if (k) out.sessions.push([k, start, secs]); }
   return out;
 }
 
 /** the other computers' journals for a person: [{file, j}], this computer's left out, unreadable ones skipped (a
-    cloud drive part-way through bringing one in) */
+    cloud drive part-way through bringing one in). A copy a cloud drive made of one ("… 2.json", a conflicted copy)
+    counts once: the newest for each computer */
 function readJournals(dir, machine) {
   let names = [];
   try { names = fs.readdirSync(dir).filter(n => n.endsWith(".json") && n !== machine + ".json"); } catch { return []; }
-  const out = [];
+  const by = new Map();
   for (const n of names) {
-    try { const j = JSON.parse(fs.readFileSync(path.join(dir, n), "utf8")); if (j && j.v === 1 && j.games) out.push({ file: n, j }); } catch {}
+    let j;
+    try { j = JSON.parse(fs.readFileSync(path.join(dir, n), "utf8")); } catch { continue; }
+    if (!j || j.v !== 1 || !j.games || typeof j.games !== "object" || typeof j.machine !== "string" || j.machine === machine) continue;
+    const had = by.get(j.machine);
+    if (!had || (j.at || 0) > (had.j.at || 0)) by.set(j.machine, { file: n, j });
   }
-  return out;
+  return [...by.values()];
 }
 
 /**
  * What the other computers add, in this computer's ids: play totals by game, their sittings (a game this computer
  * doesn't have keeps its key, so time still counts), and what they set for games, newest per field
  */
-function combine(journals, games) {
-  const idOf = new Map([...games].map(g => [gameKey(g), g.id])), add = new Map(), sessions = [], set = new Map(), hosts = [];
+function combine(journals, keyOf) {
+  const idOf = new Map([...keyOf].map(([id, k]) => [k, id])), add = new Map(), sessions = [], set = new Map(), hosts = [];
+  const num = v => Number.isFinite(v) && v > 0 ? v : 0;
   for (const { j } of journals) {
-    hosts.push({ host: j.host || "", at: j.at || 0 });
+    hosts.push({ host: String(j.host || ""), at: num(j.at) });
     for (const [k, e] of Object.entries(j.games || {})) {
       const id = idOf.get(k);
-      if (!id) continue;
+      if (!id || !e || typeof e !== "object") continue;
       const a = add.get(id) || { plays: 0, time: 0, last: 0 };
-      a.plays += e.plays || 0; a.time += e.time || 0; a.last = Math.max(a.last, e.last || 0);
+      a.plays += num(e.plays); a.time += num(e.time); a.last = Math.max(a.last, num(e.last));
       add.set(id, a);
       for (const f of FIELDS) {
-        if (!Array.isArray(e[f])) continue;
+        if (!Array.isArray(e[f]) || e[f].length !== 2) continue;
         const cur = set.get(f + ":" + id);
         if (!cur || e[f][1] > cur[1]) set.set(f + ":" + id, e[f]);
       }
     }
-    for (const s of j.sessions || []) if (Array.isArray(s) && s.length === 3) sessions.push([idOf.get(s[0]) || "~" + s[0], s[1], s[2]]);
+    for (const s of Array.isArray(j.sessions) ? j.sessions : []) if (Array.isArray(s) && s.length === 3 && typeof s[0] === "string" && num(s[1]) && num(s[2])) sessions.push([idOf.get(s[0]) || "~" + s[0], s[1], s[2]]);
   }
   sessions.sort((a, b) => a[1] - b[1]);
   return { add, sessions, set, hosts };
@@ -108,4 +136,4 @@ function writeJournal(file, j) {
   return true;
 }
 
-module.exports = { gameKey, personKey, journalDir, journal, readJournals, combine, adopt, writeJournal, FIELDS };
+module.exports = { gameKey, keysFor, personKey, journalDir, journal, readJournals, combine, adopt, writeJournal, FIELDS };
