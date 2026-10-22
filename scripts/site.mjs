@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 // The website (GitHub Pages): site/index.html with the README's pictures (docs/images), the app's fonts, and the
-// latest release's downloads written in, put together in dist/site. CI publishes it (.github/workflows/pages.yml)
-// when the page changes and when a release comes out; run it to look first.
+// latest release's downloads written in, put together in dist/site, in English and (dist/site/<lang>/) the app's other
+// languages (scripts/site-words.mjs, site/words). CI publishes it (.github/workflows/pages.yml) when the page changes
+// and when a release comes out; run it to look first.
 //   node scripts/site.mjs      then open dist/site/index.html
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { LANGS, OFFER, translate } from "./site-words.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(ROOT, "dist", "site"), REPO = "colingalbraith/the-retro-shelf";
-const FONTS = ["plex-cond-400.woff2", "plex-cond-600.woff2", "plex-cond-700.woff2", "plex-mono-400.woff2"];
+const FONTS = ["plex-cond-400", "plex-cond-600", "plex-cond-700", "plex-mono-400"].flatMap(f => [f + ".woff2", f + "-ext.woff2"]);
+const SITE = "https://colingalbraith.github.io/the-retro-shelf/";
 // which file is which, by name
 const KINDS = { mac_arm64: /-mac-arm64\.dmg$/, mac_x64: /-mac-x64\.dmg$/, win: /Setup-.*\.exe$/, portable: /portable-win\.zip$/, linux: /\.AppImage$/ };
 
@@ -41,6 +44,17 @@ const rel = await latest();
 const page = fs.readFileSync(path.join(ROOT, "site", "index.html"), "utf8");
 if (!page.includes("/*LATEST*/null")) throw new Error("site/index.html has no /*LATEST*/null to fill in");
 // as JSON inside a script: nothing in it can close the script early
-fs.writeFileSync(path.join(OUT, "index.html"), page.replace("/*LATEST*/null", JSON.stringify(rel).replace(/</g, "\\u003c")));
+const json = v => JSON.stringify(v).replace(/</g, "\\u003c");
+const words = Object.fromEntries(LANGS.map(l => [l, JSON.parse(fs.readFileSync(path.join(ROOT, "site", "words", l + ".json"), "utf8"))]));
+// each language's page, and where the others are (for search engines)
+const alternates = [`<link rel="alternate" hreflang="en" href="${SITE}">`, `<link rel="alternate" hreflang="x-default" href="${SITE}">`,
+  ...LANGS.map(l => `<link rel="alternate" hreflang="${l === "zh" ? "zh-Hans" : l}" href="${SITE}${l}/">`)].join("\n");
+const base = page.replace("/*LATEST*/null", json(rel)).replace('<link rel="icon"', alternates + '\n<link rel="icon"');
+const offers = Object.fromEntries(LANGS.map(l => [l, { offer: words[l][OFFER[0]], close: words[l][OFFER[1]] }]).filter(([, o]) => o.offer && o.close));
+fs.writeFileSync(path.join(OUT, "index.html"), base.replace("/*OFFERS*/{}", json(offers)));
+for (const l of LANGS) {
+  fs.mkdirSync(path.join(OUT, l));
+  fs.writeFileSync(path.join(OUT, l, "index.html"), translate(base, l, words[l]));
+}
 fs.writeFileSync(path.join(OUT, ".nojekyll"), "");
-console.log(`dist/site: ${rel ? `downloads for ${rel.version} (${Object.keys(rel.files).join(", ")})` : "no release found"}`);
+console.log(`dist/site, in English and ${LANGS.length} more languages: ${rel ? `downloads for ${rel.version} (${Object.keys(rel.files).join(", ")})` : "no release found"}`);
