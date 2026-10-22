@@ -52,7 +52,7 @@ function run(seed, steps) {
     return b;
   };
   const be = computer("a", path.join(home, "docs"));
-  let other = null, backup = null;
+  let other = null, backup = null, shared = false;
   const games = () => [...be.games.values()];
   const addGame = (root, kind, name) => write(path.join(root, kind[1], name + kind[2]), "game " + name + kind[2]);
 
@@ -92,12 +92,21 @@ function run(seed, steps) {
     async rename() { const g = pick(games()); if (g) be.rename(g.id, rnd() < .5 ? "" : "My " + g.title); },
     async addPerson() { be.addPerson(pick(["Sam", "Alex", "Ann Marie", "Саша", "Zoë", "Kim"])); },
     async usePerson() { be.usePerson(pick(be.people.list).id); },
-    async renamePerson() { const p = pick(be.people.list); await be.renamePerson(p.id, pick(["Samantha", "Lex", "Ann-Marie", "Маша", "Zoe", "Kimberly"])); },
+    // a folder of the new name already there (one left in a shared folder by someone taken off): the newer saves win
+    async renamePerson() {
+      const p = pick(be.people.list), was = new Map(), walk = d => { let es = []; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch {} for (const e of es) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else was.set(f, fs.readFileSync(f, "utf8")); } };
+      walk(path.join(be.savesRoot(), "People"));
+      if ((await be.renamePerson(p.id, pick(["Samantha", "Lex", "Ann-Marie", "Маша", "Zoe", "Kimberly"])))[0] !== 200) return;
+      for (const [k, v] of [...latest]) { const [id, sys, stem] = k.split("|"), there = id === p.id && was.get(theirFile(id, sys, stem)); if (there && num(there) > num(v)) latest.set(k, there); }
+    },
     async removePerson() { const p = pick(be.people.list); if (p.id !== "p1" && (await be.removePerson(p.id))[0] === 200) for (const k of [...latest.keys()]) if (k.startsWith(p.id + "|")) latest.delete(k); },
     async share() {
-      const r = await be.moveSaves(cloud);
-      // the other computer's saves kept there (the folder is theirs too): what's shown now is theirs, as meant
-      if (r[0] === 200 && r[1].kept) accept(); else newerWins();
+      if ((await be.moveSaves(cloud))[0] !== 200) return;
+      // a folder another computer may use keeps the saves in it: all of them the first time this one shares it; after
+      // that, the part of whoever another computer plays as (the first person's: the other computer's only one), and
+      // for the rest the newer wins
+      if (!shared) accept(); else { newerWins(); if (other) accept(k => k.startsWith("p1|")); }
+      shared = true;
     },
     // coming home, the newer of each save wins: one played on the other computer since can be the one shown
     async home() { if ((await be.moveSaves(""))[0] === 200) newerWins(); },
@@ -140,22 +149,23 @@ function run(seed, steps) {
   const names = Object.keys(actions), weight = { play: 5, add: 2, scan: 2, otherComputer: seed % 2 ? 4 : 1, playShared: 3, share: 2, home: 2 };
   const bag = names.flatMap(k => Array(weight[k] || 1).fill(k));
 
+  // (someone not playing now: what they'd be shown, their save where the app keeps it for them)
   const shownSave = (person, system, stem) => {
-    if (person !== be.people.active) return undefined;
     const g = games().find(x => x.system === system && path.parse(x.path).name === stem);
     if (!g) return undefined;
+    if (person !== be.people.active) return theirSave(person, system, stem);
     const f = be.gameSaves(g).find(x => x.kind === "battery");
     try { return f ? fs.readFileSync(f.file, "utf8") : null; } catch { return null; }
   };
   const num = v => +((/#(\d+)$/.exec(v || "") || [])[1] || 0);
   // what a person would be shown (playing or not): their save of that game, where the app keeps it for them
+  const theirFile = (person, system, stem) => path.join(be.saveDirs(system, be.personFolder(person)).saves, CORES[be.cfg.systems[system].core], stem + ".srm");
   const theirSave = (person, system, stem) => {
     if (!be.people.list.some(p => p.id === person)) return undefined;
-    const cn = CORES[be.cfg.systems[system].core];
-    try { return fs.readFileSync(path.join(be.saveDirs(system, be.personFolder(person)).saves, cn, stem + ".srm"), "utf8"); } catch { return null; }
+    try { return fs.readFileSync(theirFile(person, system, stem), "utf8"); } catch { return null; }
   };
   const newerWins = () => { for (const [k, v] of [...latest]) { const there = theirSave(...k.split("|")); if (there && num(there) > num(v)) latest.set(k, there); } };
-  const accept = () => { for (const k of [...latest.keys()]) { const v = theirSave(...k.split("|")); if (v !== undefined) { if (v) latest.set(k, v); else latest.delete(k); } } };
+  const accept = (only = () => true) => { for (const k of [...latest.keys()].filter(only)) { const v = theirSave(...k.split("|")); if (v !== undefined) { if (v) latest.set(k, v); else latest.delete(k); } } };
   // everything that's yours, wherever it is: contents of every file under the home folder and in the Trash
   const everywhere = () => {
     const seen = new Set(), walk = d => { let es = []; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of es) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.isFile()) { try { const st = fs.statSync(p); if (st.size < 512) seen.add(fs.readFileSync(p, "utf8")); } catch {} } } };

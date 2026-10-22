@@ -194,8 +194,17 @@ try {
     if (!system) throw new Error(`${title} isn't on the shelf`);
     const started = await page.evaluate(`api("/api/launch", {id: G.find(g => g.title === ${JSON.stringify(title)}).id}).then(r => r.ok ? "" : r.data.error || "error")`);
     if (started) throw new Error(`${system}: the game didn't start: ${started}`);
+    const look = PICTURE[system] === "lcd" ? "handheld" : PICTURE[system] === "crt" ? "old-TV" : "sharp", shader = { handheld: "zfast_lcd", "old-TV": "zfast_crt" }[look];
+    const pictured = ra => !shader || new RegExp(`\\[Slang\\] Compiling shader: "[^"]*${shader}`).test(ra);
+    // a slow machine (GitHub's Intel Macs) can still be opening the window after 7 s: up to 25 s, until the picture's
+    // set up or RetroArch has stopped
     await sleep(7000);
-    const st = await page.evaluate(`api("/api/status").then(r => r.data)`), ra = fs.readFileSync(log, "utf8");
+    let st, ra;
+    for (let waited = 7000; ; waited += 1000) {
+      st = await page.evaluate(`api("/api/status").then(r => r.data)`); ra = fs.readFileSync(log, "utf8");
+      if (!st.running || pictured(ra) || waited >= 25000) break;
+      await sleep(1000);
+    }
     fs.writeFileSync(path.join(OUT, `retroarch-${system.replace(/\W+/g, "-").toLowerCase()}.log`), ra);
     if (!st.running && process.platform === "darwin" && /Apple Paravirtual device/.test(ra) && /\[Core\] Geometry/.test(ra)) {
       step(`${system}: loaded (its window can't open on this machine's virtual graphics chip)`);
@@ -203,8 +212,7 @@ try {
       continue;
     }
     if (!st.running) throw new Error(`${system}: the game closed by itself` + (st.exit && st.exit.error ? ": " + st.exit.error : "") + (st.exit ? ` (exit code ${st.exit.code}${st.exit.signal ? ", " + st.exit.signal : ""})` : ""));
-    const look = PICTURE[system] === "lcd" ? "handheld" : PICTURE[system] === "crt" ? "old-TV" : "sharp", shader = { handheld: "zfast_lcd", "old-TV": "zfast_crt" }[look];
-    if (shader && !new RegExp(`\\[Slang\\] Compiling shader: "[^"]*${shader}`).test(ra)) throw new Error(`${system}: the game runs, but without the ${look} picture (see its retroarch log)`);
+    if (!pictured(ra)) throw new Error(`${system}: the game runs, but without the ${look} picture (see its retroarch log)`);
     const asked = Date.now();
     await page.evaluate(`api("/api/stop", {})`);
     const ex = await until(`${system}: the game didn't close when asked`, () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
