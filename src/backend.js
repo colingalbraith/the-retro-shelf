@@ -100,7 +100,8 @@ const PROGRESS = ["backlog", "playing", "beaten", "complete"];
 // What each person who plays on this computer has of their own; everything else in the state (games' names and
 // settings, button layouts, watched folders, the backup clock) is the computer's. The first person's is in state.json
 // with the rest, as it always was, so one person sees no change; others' are in people/<id>.json
-const PERSONAL = ["fav", "last", "plays", "time", "sessions", "events", "pins", "pinKeys", "progress", "rating", "notes", "shelves", "cheevos", "recapSeen", "edited", "imported"];
+const PERSONAL = ["fav", "last", "plays", "time", "sessions", "events", "pins", "pinKeys", "progress", "rating", "notes", "shelves", "cheevos", "recapSeen", "edited", "imported",
+  "journalLast", "journalBase", "former"];
 const STATE_DEFAULTS = [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}], ["notCounted", {}]];
 
 // what one game can have of its own (setGameOpts): each setting's choices, with the words menus show for them
@@ -397,8 +398,9 @@ class Backend extends EventEmitter {
     for (const s of Object.values(this.cfg.systems)) fs.mkdirSync(path.join(root, s.folder), { recursive: true });
   }
 
-  saveState() {
-    this.journalSoon();
+  /** quiet: not a change of play (the journal's own bookkeeping), so no journal is written for it */
+  saveState(quiet) {
+    if (!quiet) this.journalSoon();
     if (this.state === this._base) return jsave(this.files.state, this._base);
     // someone other than the first person: the computer's part goes to state.json, theirs to their own file
     for (const [k, v] of Object.entries(this.state)) if (!PERSONAL.includes(k)) this._base[k] = v;
@@ -425,7 +427,40 @@ class Backend extends EventEmitter {
     // a cloud folder that isn't there right now isn't made again here: games wait for it (launch) rather than starting
     // with no saves
     if (!this.syncOn() || !this.people || !fs.existsSync(this.savesRoot())) return false;
-    try { return sync.writeJournal(this.journalFile(), sync.journal(this.state, this.keysKnown(), this.machine(), os.hostname(), Math.floor(now()))); } catch { return false; }
+    try {
+      const file = this.journalFile(), st = this.state;
+      // another computer writing as this one: its app data was copied from here (a new computer, with the old one
+      // still in use). This one takes a new name (splitMachine)
+      if (st.journalLast) {
+        let cur = null;
+        try { cur = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
+        if (cur && cur.machine === this.machine() && cur.at > st.journalLast.at) return this.splitMachine();
+      }
+      const at = Math.floor(now()), j = sync.minus(sync.journal(st, this.keysKnown(), this.machine(), os.hostname(), at), st.journalBase);
+      if (!sync.writeJournal(file, j)) return false;
+      st.journalLast = { at, games: sync.totals(j) };
+      this.saveState(true);
+      return true;
+    } catch { return false; }
+  }
+  /**
+   * Two computers with one name (one's app data copied from the other): this one takes a new name. The journal they
+   * shared is the other's from now on; what this one last wrote there (the play they have in common, from before the
+   * copy) is taken off what it writes under its new name, and off what it reads in the other's, so it counts once
+   */
+  splitMachine() {
+    const old = this.machine();
+    const mark = st => {
+      if (!st.journalLast) return;
+      st.former = { ...(st.former || {}), [old]: st.journalLast };
+      st.journalBase = { at: st.journalLast.at, games: sync.addTotals(st.journalBase && st.journalBase.games, st.journalLast.games) };
+      delete st.journalLast;
+    };
+    mark(this.state); this.otherPeople(mark);
+    this._base.machine = this.state.machine = crypto.randomBytes(8).toString("hex");
+    this.saveState(true);
+    this._remote = null;
+    return this.writeJournalNow();
   }
   /** every game's key for other computers, by id: the games here now, and ones that were (on a drive that isn't plugged
       in, or deleted), so their play still counts there */
@@ -444,7 +479,10 @@ class Backend extends EventEmitter {
     if (!this.syncOn() || !this.people) return { add: new Map(), sessions: [], hosts: [] };
     const dir = path.dirname(this.journalFile());
     if (!fresh && this._remote && this._remote.dir === dir && Date.now() - this._remote.t < 20000) return this._remote.v;
-    const sig = this.journalSig(dir), v = sync.combine(sync.readJournals(dir, this.machine()), sync.keysFor(this.games.values()));
+    // a journal this computer used to share (see splitMachine): less what it had put there itself
+    const former = this.state.former || {};
+    const js = sync.readJournals(dir, this.machine()).map(x => former[x.j.machine] ? { ...x, j: sync.minus(structuredClone(x.j), former[x.j.machine]) } : x);
+    const sig = this.journalSig(dir), v = sync.combine(js, sync.keysFor(this.games.values()));
     this._remote = { dir, t: Date.now(), v, sig: sig.sig };
     if (sync.adopt(this.state, v.set)) { this.saveState(); try { this.checkPins(); } catch {} }
     return v;
@@ -2227,11 +2265,13 @@ class Backend extends EventEmitter {
   shotDir(system) { return path.join(this.folders.screenshots, safe(system)); }
   /** the screenshots in a folder, by game (its file name without the extension, in lowercase), newest first. Read
       again only when the folder changes */
-  shotsIn(dir) {
+  shotsIn(dir, fresh) {
     this._shots = this._shots || new Map();
+    if (fresh) this._shots.delete(dir);
     let mt = 0;
     try { mt = fs.statSync(dir).mtimeMs; } catch { this._shots.delete(dir); return new Map(); }
-    // read again when the folder changes, and every half minute anyway (a USB stick's folder times can stay put)
+    // read again when the folder changes, and every half minute anyway (a USB stick's folder times can stay put, and
+    // Windows' move in steps of about 15 ms)
     const c = this._shots.get(dir);
     if (c && c.mt === mt && Date.now() - c.t < 30000) return c.by;
     const by = new Map();
@@ -2267,11 +2307,12 @@ class Backend extends EventEmitter {
     if (!g) return 0;
     const k = path.parse(g.path).name.toLowerCase(), dir = this.shotDir(g.system);
     let n = 0;
-    for (const s of this.shotsIn(this.folders.screenshots).get(k) || []) {
+    for (const s of this.shotsIn(this.folders.screenshots, true).get(k) || []) {
       if (s.at < Math.floor(rec.since) - 5) continue;
       const to = path.join(dir, path.basename(s.file));
       try { if (fs.existsSync(to)) continue; fs.mkdirSync(dir, { recursive: true }); fs.renameSync(s.file, to); n++; } catch {}
     }
+    if (n) { this._shots.delete(dir); this._shots.delete(this.folders.screenshots); }
     return n;
   }
   /** how many screenshots a game has, and when the newest was taken: it goes on the back of the box, unless a picture
@@ -2293,6 +2334,7 @@ class Backend extends EventEmitter {
     const g = this.games.get(id), s = g && this.shotsOf(g).find(x => path.basename(x.file) === name);
     if (!s) return [404, { error: "That isn't one of this game's screenshots." }];
     try { await this.trash(s.file); } catch (e) { return [500, { error: "Couldn't move it to the Trash: " + e.message }]; }
+    this._shots.delete(path.dirname(s.file));
     return [200, { ok: true }];
   }
 
@@ -2436,9 +2478,15 @@ class Backend extends EventEmitter {
       case "/api/people/use": return j(this.usePerson(String(d.id || "")));
       // play from EmulationStation or LaunchBox (playimport.js): what would come in, then bringing it in
       case "/api/play-import": {
-        const lists = playImport.findLists((Array.isArray(d.paths) ? d.paths : []).map(String));
-        const p = playImport.plan(lists, [...this.games.values()]), s = playImport.summary(p);
+        const lists = await playImport.findLists((Array.isArray(d.paths) ? d.paths : []).map(String));
+        // the lists as they are now (each one's size and time): what was read for the summary is used to bring it in,
+        // unless something changed in between
+        const key = JSON.stringify(lists.map(f => { try { const st = fs.statSync(f); return [f, st.size, st.mtimeMs]; } catch { return [f]; } })) + "|" + this.games.size + "|" + this.people.active;
+        const c = this._importPlan, p = c && c.key === key && c.games === this.games && Date.now() - c.at < 600000 ? c.p : await playImport.plan(lists, [...this.games.values()]);
+        this._importPlan = { key, games: this.games, at: Date.now(), p };
+        const s = playImport.summary(p);
         if (!d.apply) return j([200, s]);
+        this._importPlan = null;
         const n = playImport.apply(this.state, p);
         this.saveState();
         try { this.checkPins(); } catch {}

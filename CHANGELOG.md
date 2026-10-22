@@ -15,7 +15,13 @@
   emulator. A PS2 BIOS cut short (a pulled USB stick) makes way for a good one.
 - **Play from another app, fixed:** a list for one console no longer matches another console's game of the same
   name (SNES and NES), and bringing a list in again after moving your games adds nothing.
-- **Fixes:** "Playing" on the playing screen is in your language. Switches, sliders and name fields in Settings and
+- **Moving to a new computer and keeping the old one:** when one computer's app data was copied to another (Migration
+  Assistant, say) and both share play through a cloud folder, they now tell themselves apart, and play from before the
+  move counts once.
+- **Play from another app is quicker:** a big LaunchBox folder no longer holds up the app while it's looked through,
+  and what was read for the summary is used to bring it in.
+- **Fixes:** People now says when saves are everyone's: with your own RetroArch, or PS2 games in PCSX2.
+  "Playing" on the playing screen is in your language. Switches, sliders and name fields in Settings and
   the Rename and New shelf windows now tell screen readers what they're for. Moving over from the app's old name
   (Arcade) no longer shows an empty shelf when the games folder can't be moved: the app uses it where it is.
 
