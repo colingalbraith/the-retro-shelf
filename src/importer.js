@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const zlib = require("zlib");
-const { biosDest } = require("./bios");
+const { biosDest, biosByContent } = require("./bios");
 
 const IMG = [".png", ".jpg", ".jpeg", ".webp"];
 const SHEETS = [".cue", ".gdi", ".m3u"];
@@ -270,6 +270,10 @@ class Importer {
       // a BIOS file (scph5501.bin, neogeo.zip…) goes to the BIOS folder, not onto a shelf
       const dest = biosDest(name, this.systems);
       if (dest) { bios.push({ src: f, name, dest }); continue; }
+      // a BIOS known by what's in it, whatever its name (a PS2's)
+      { let sz = 0; try { sz = fs.statSync(f).size; } catch {}
+        const by = sz > 4194303 && biosByContent(f, sz, this.systems);
+        if (by) { bios.push({ src: f, name, dest: by }); continue; } }
       const cands = this.byExt[ext];
       if (!cands) { if (!/^(readme|desktop\.ini|thumbs\.db)/i.test(name)) unknown.push(name); continue; }
       let size = 0;

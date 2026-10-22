@@ -54,6 +54,7 @@ Settings → About → Licenses.
 | Pokémon Mini | PokeMini | GPLv3 | https://github.com/libretro/PokeMini |
 | Arcade | FinalBurn Neo | **Non-commercial** | https://github.com/libretro/FBNeo |
 | GameCube / Wii | Dolphin | GPLv2+ | https://github.com/libretro/dolphin |
+| PlayStation 2 | LRPS2 (PCSX2) | GPLv3 | https://github.com/libretro/ps2 |
 
 **Non-commercial** cores may be redistributed freely but not sold. The Retro Shelf must therefore be given away
 for free. To sell it, replace them with GPL alternatives (bsnes for SNES, BlastEm for Genesis, MAME for

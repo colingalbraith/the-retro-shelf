@@ -2962,6 +2962,7 @@ function biosLine(c) {
   if (c.state === "ok") return has.length > 1 ? t("Found {file} and {n} more.", {file: has[0], n: has.length - 1}) : t("Found {file}.", {file: has[0]});
   if (c.state === "bad") return t("{files} is the wrong size, so it's probably not a real BIOS. Copy it again from your console.", {files: wrong.join(", ")});
   if (c.state === "partial") return t("Has {has}. Missing {missing}.", {has: has.join(", "), missing: c.files.filter(f => !f.found).map(f => f.name).join(", ")}) + " " + note;
+  if (!c.files.length) return note + games;
   return (c.files.length > 3 ? t("Missing: {file} (or another one of its BIOS files).", {file: c.files[0].name}) : t("Missing: {files}.", {files: c.files.map(f => f.name).join(", ")})) + " " + note + games;
 }
 function closeSettings() { if (!isOpen("settings")) return; $("#settings").classList.remove("show"); focusById(focusId); light(); beep(330); }
@@ -3114,6 +3115,9 @@ function renderSettings() {
     R(t("Fast-forward on the trigger"), t("Hold the right trigger to speed up, or press it once to switch fast-forward on and again to switch it off."),
       seg([["hold", t("Hold")], ["toggle", t("Press to switch")]], UI.ffTrigger || "hold", v => { UI.ffTrigger = v; saveUI(); }));
     R(t("Less lag"), t("Games answer the controller a frame sooner, on the same consoles. Turn it off if a game's sound crackles."), sw(UI.lessLag !== false, v => { UI.lessLag = v; saveUI(); }));
+    /* PS2 games: the emulator that comes with the app, or PCSX2 when it's installed too */
+    if (PATHS.pcsx2) R(t("PlayStation 2 games"), t("Play them with the emulator that comes with the app, or with your PCSX2, which keeps its own settings and saves."),
+      seg([["builtin", t("Built in")], ["pcsx2", "PCSX2"]], UI.pcsx2 ? "pcsx2" : "builtin", v => { UI.pcsx2 = v === "pcsx2"; saveUI(); refresh(true); }));
   R("Controller buttons", "Which button is A. Automatic uses Nintendo style for Switch controllers and Xbox style for the rest.", seg([["auto", "Automatic"], ["xbox", "Xbox"], ["nintendo", "Nintendo"]], UI.buttons || "auto", v => { UI.buttons = v; saveUI(); renderHints(); }));
     const cb = el("div", "btns"), ct = el("button", "btn", t("Test…")), cr = el("button", "btn", t("Change buttons…"));
     ct.onclick = openCtest; cr.onclick = openButtonConsoles; cb.appendChild(ct); cb.appendChild(cr);

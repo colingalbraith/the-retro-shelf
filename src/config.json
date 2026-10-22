@@ -1345,6 +1345,7 @@
         ".chd",
         ".cso"
       ],
+      "core": "pcsx2_libretro",
       "emulator": [
         "pcsx2-qt",
         "-batch",
@@ -1363,7 +1364,19 @@
       "pile": [
         "#16294d",
         "#e9e1cf"
-      ]
+      ],
+      "bios": {
+        "label": "PlayStation 2",
+        "note": "Needed for PS2 games: a BIOS file copied from your own PS2, under any name.",
+        "dir": "pcsx2/bios",
+        "min": 4194304,
+        "max": 8388608,
+        "sig": [
+          "RESET",
+          "ROMDIR",
+          "ROMVER"
+        ]
+      }
     }
   }
 }

@@ -106,6 +106,20 @@ test("each controller's own triggers rewind and fast-forward, whatever they are 
   assert.equal(ra.withTriggers(own), own);
 });
 
+test("a core's own options: some kept as the app needs, others only set the first time", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-opts-"));
+  try {
+    const file = path.join(dir, "config", "LRPS2", "LRPS2.opt");
+    ra.coreOptions(dir, "LRPS2", { pcsx2_shared_memory_cards: "disabled" }, { pcsx2_renderer: "paraLLEl-GS" });
+    assert.equal(ra.readConfigKey(file, "pcsx2_renderer"), "paraLLEl-GS");
+    // changed in RetroArch's menu: the renderer stays as chosen, the memory cards go back to one per game
+    fs.writeFileSync(file, 'pcsx2_renderer = "OpenGL"\npcsx2_shared_memory_cards = "enabled"\n');
+    ra.coreOptions(dir, "LRPS2", { pcsx2_shared_memory_cards: "disabled" }, { pcsx2_renderer: "paraLLEl-GS" });
+    assert.equal(ra.readConfigKey(file, "pcsx2_renderer"), "OpenGL");
+    assert.equal(ra.readConfigKey(file, "pcsx2_shared_memory_cards"), "disabled");
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("RetroArch's menu and messages are in the app's language", () => {
   const lang = l => ra.enforced({ autoconfig: "j" }, { saves: "s", states: "t", screenshots: "p", system: "b", private: "x" }, { lang: l }).user_language;
   assert.deepEqual([lang("en"), lang("ja"), lang("de"), lang("pt"), lang("ru"), lang("ko"), lang("zh"), lang("zh-Hant"), lang("pl")], ["0", "1", "4", "7", "9", "10", "12", "11", "14"]);

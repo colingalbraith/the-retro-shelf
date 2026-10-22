@@ -28,7 +28,35 @@ test("the checker tells found, partly there, missing and wrong-size apart", () =
     const st = Object.fromEntries(biosStatus(dir, null).map(c => [c.system, c.state]));
     assert.deepEqual(st, { PS1: "ok", "PC Engine": "missing", Dreamcast: "bad", DS: "partial", GBA: "missing", Arcade: "missing",
       "Sega CD": "ok", Saturn: "missing", Lynx: "missing", "Atari 7800": "missing", ColecoVision: "missing", Intellivision: "missing",
-      "3DO": "missing", "Neo Geo CD": "missing", "Pokémon Mini": "missing" });
+      "3DO": "missing", "Neo Geo CD": "missing", "Pokémon Mini": "missing", PS2: "missing" });
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+// a PS2 BIOS's start: its table of contents names RESET, ROMDIR and ROMVER
+const ps2Bios = (size = 4194304) => { const b = Buffer.alloc(size); b.write("RESET", 0x2700); b.write("ROMDIR", 0x2710); b.write("ROMVER", 0x2720); return b; };
+
+test("a PS2 BIOS is known by what's in it, under any name, in its own folder", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-ps2-"));
+  try {
+    const ps2 = () => biosStatus(dir, null).find(c => c.system === "PS2");
+    assert.equal(ps2().state, "missing");
+    fs.mkdirSync(path.join(dir, "pcsx2", "bios"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "pcsx2", "bios", "my console.bin"), Buffer.alloc(4194304));
+    assert.equal(ps2().state, "bad", "the right size but not a BIOS");
+    fs.writeFileSync(path.join(dir, "pcsx2", "bios", "SCPH-70012_BIOS_V12_USA_200.BIN"), ps2Bios());
+    assert.equal(ps2().state, "ok");
+    assert.deepEqual(ps2().files.filter(f => f.ok).map(f => f.name), ["SCPH-70012_BIOS_V12_USA_200.BIN"]);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a dropped PS2 BIOS goes to its folder; a game of the same size doesn't", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-drop2-"));
+  try {
+    fs.writeFileSync(path.join(dir, "ps2-0230a-20080220.bin"), ps2Bios());
+    fs.writeFileSync(path.join(dir, "Super Street Fighter II (USA).bin"), Buffer.alloc(5242880, 1));   // a 5 MB Genesis game
+    const { items, bios } = new Importer(config.systems).inspect([dir]);
+    assert.deepEqual(bios.map(b => b.dest), ["pcsx2/bios/ps2-0230a-20080220.bin"]);
+    assert.ok(items.some(i => i.name.startsWith("Super Street Fighter")), "the game is a game");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
