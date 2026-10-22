@@ -812,7 +812,18 @@ class Backend extends EventEmitter {
         else await this.mergeInto(saves, saves2);
       } catch { [p.name, p.folder] = was; return [500, { error: "Couldn't move their saves to the new name." }]; }
     }
-    try { if (journal !== journal2 && fs.existsSync(journal)) { fs.mkdirSync(path.dirname(journal2), { recursive: true }); fs.renameSync(journal, journal2); } } catch {}
+    if (journal !== journal2) {
+      try {
+        // one of that name there already (someone of that name taken off here, their play kept for other computers):
+        // put aside, not written over
+        if (fs.existsSync(journal2)) this.setAside(journal2);
+        if (fs.existsSync(journal)) { fs.mkdirSync(path.dirname(journal2), { recursive: true }); fs.renameSync(journal, journal2); }
+        // the codes it was written with go along with it, so it's still known as this computer's own (a name used
+        // before, by them or someone taken off, would otherwise look like another computer's, see writeJournalNow)
+        const marks = jload(this.files.journalMarks, {});
+        if (marks[journal] || marks[journal2]) { marks[journal2] = marks[journal] || []; delete marks[journal]; jsave(this.files.journalMarks, marks); }
+      } catch {}
+    }
     this.savePeople();
     if (this.people.active === id) { this.applyFolders(); this._remote = null; }
     return [200, this.peopleJson()];

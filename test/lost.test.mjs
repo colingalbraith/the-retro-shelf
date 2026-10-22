@@ -29,15 +29,16 @@ function run(seed, steps) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), `retro-shelf-lost-${seed}-`)), trash = path.join(home, "Trash"), cloud = path.join(home, "Dropbox");
   fs.mkdirSync(trash); fs.mkdirSync(cloud);
   let n = 0, clock = Math.floor(Date.now() / 1000) - 400 * 86400;
-  const made = new Map();                     // every piece of your data: its contents → what it was
+  const made = new Map(), replaced = [];      // every piece of your data: its contents → what it was
   // the newest battery save of each game, for each person on the first computer: what the app has to show them (by
   // person, console and file name)
   const latest = new Map(), keyOf = (person, system, stem) => person + "|" + system + "|" + stem;
   const log = [];
   const tick = () => (clock += 120);
   const write = (file, what) => {
-    // RetroArch (or you) writing a file: what was in it before is replaced, so it no longer has to be anywhere
-    try { made.delete(fs.readFileSync(file, "utf8")); } catch {}
+    // RetroArch (or you) writing a file: what was in it before is replaced there (a copy of it elsewhere, left by a
+    // game moved between consoles or a cloud folder, is still yours: it's looked for once the step's done)
+    try { const old = fs.readFileSync(file, "utf8"); if (made.has(old)) { replaced.push([old, made.get(old)]); made.delete(old); } } catch {}
     const body = `${what} #${++n}`;
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, body); const t = tick(); fs.utimesSync(file, t, t);
@@ -174,6 +175,7 @@ function run(seed, steps) {
   };
   return (async () => {
     try {
+      const ids = { a: be.machine() };
       for (let i = 0; i < 4; i++) await actions.add();
       for (const [k, nm] of SHARED) addGame(be.romsRoot(), KINDS[k], NAMES[nm]);
       be.scan();
@@ -182,10 +184,14 @@ function run(seed, steps) {
         const a = pick(bag);
         log.push(a);
         try { await actions[a](); } catch (e) { throw new Error(`step ${i} (${a}) threw: ${e.stack}\n  steps: ${log.join(", ")}`); }
-        const seen = everywhere(), lost = [...made].filter(([c]) => !seen.has(c)).map(([c, what]) => `${what} (${c})`);
+        const seen = everywhere();
+        for (const [c, what] of replaced.splice(0)) if (seen.has(c)) made.set(c, what);
+        const lost = [...made].filter(([c]) => !seen.has(c)).map(([c, what]) => `${what} (${c})`);
         // and the newest save of each game is the one the app shows whoever's playing
         const unseen = [...latest].filter(([k, v]) => { const [p, sys, stem] = k.split("|"), shown = shownSave(p, sys, stem); return shown !== undefined && shown !== v; })
           .map(([k, v]) => `${k}: shows ${JSON.stringify(shownSave(...k.split("|")))}, not ${v}`);
+        // and neither computer ever takes itself for two (only a copy of one's app data is another computer)
+        if (be.machine() !== ids.a || (other && other.machine() !== (ids.b = ids.b || other.machine()))) throw new Error(`seed ${seed}, after step ${i} (${a}), a computer split in two\n  steps: ${log.join(", ")}`);
         if (unseen.length) throw new Error(`seed ${seed}, after step ${i} (${a}), not shown: ${unseen.join("; ")}\n  steps: ${log.join(", ")}`);
         if (lost.length) throw new Error(`seed ${seed}, after step ${i} (${a}), lost: ${lost.join("; ")}\n  steps: ${log.join(", ")}`);
       }

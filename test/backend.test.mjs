@@ -1052,6 +1052,29 @@ test("a computer whose app data was copied to another: each gets its own name, a
   assert.deepEqual([seen(a)[0], seen(b)[0]], [17, 17]);
 });
 
+test("renaming someone while sharing play, even to a name used before, never makes this computer look like two", async () => {
+  const b = new Backend({ app: APP, data: path.join(home, "r", "data"), docs: path.join(home, "rdocs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init();
+  const f = path.join(b.romsRoot(), "snes", "Chrono Trigger (USA).sfc"); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, "x"); b.scan();
+  const trashed = []; b.trash = async p => { trashed.push(fs.readFileSync(p, "utf8")); fs.rmSync(p); };
+  assert.equal((await b.moveSaves(path.join(home, "rcloud")))[0], 200);
+  const id = b.machine(), g = [...b.games.values()][0];
+  const play = () => { b.state.plays[g.id] = (b.state.plays[g.id] || 0) + 1; b.saveState(); assert.equal(b.writeJournalNow(), true); };
+  // Kim plays here, and is taken off (their play stays in the shared folder, for other computers)
+  b.addPerson("Kim"); const kim = b.people.list.find(p => p.name === "Kim").id;
+  b.usePerson(kim); play(); b.usePerson("p1"); play();
+  const kims = fs.readFileSync(b.journalFileOf(b.people.list.find(p => p.id === kim)), "utf8");
+  assert.equal((await b.removePerson(kim))[0], 200);
+  // the first person takes Kim's name, then another, then Kim's again, playing in between
+  assert.equal((await b.renamePerson("p1", "Kim"))[0], 200); play();
+  assert.equal((await b.renamePerson("p1", "Lex"))[0], 200); play();
+  assert.equal((await b.renamePerson("p1", "Kim"))[0], 200); play();
+  assert.equal(b.machine(), id, "still one computer");
+  // what Kim had there went to the Trash, not written over
+  await new Promise(r => setImmediate(r));
+  assert.ok(trashed.includes(kims));
+});
+
 test("Game Gear and Master System saves are their own, never a Genesis game's of the same name", () => {
   put("genesis/Sonic (USA).md"); put("gg/Sonic (USA).gg"); put("gg/Columns (USA).gg"); be.scan();
   // the built-in emulators, as far as saves go: Genesis Plus GX plays all three

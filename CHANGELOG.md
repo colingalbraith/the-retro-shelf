@@ -22,7 +22,9 @@ that each game shows its newest save. It found these, now fixed:
 Also fixed:
 
 - **Two computers copied from one** (two Steam Decks set up from the same backup) are told apart by a code in each
-  play history they write, instead of by the computer's name.
+  play history they write, instead of by the computer's name. Renaming someone while sharing play, back to a name
+  they had or to one someone taken off had, no longer makes a computer take itself for a copy (which kept its newer
+  saves out of the cloud folder).
 - **Stop game on Windows** waits longer before it makes RetroArch stop, so a big resume point or a slow cloud folder
   finishes saving.
 - **Cheats:** ones the app chose stay the app's when you switch them on or off in RetroArch's menu; ones you add there
