@@ -126,6 +126,31 @@ function adopt(st, set) {
   return changed;
 }
 
+/** a journal's play totals by game key: {key: {plays, time}} */
+function totals(j) {
+  return Object.fromEntries(Object.entries(j.games || {}).filter(([, e]) => e && (e.plays || e.time)).map(([k, e]) => [k, { plays: e.plays || 0, time: e.time || 0 }]));
+}
+function addTotals(a, b) {
+  const out = structuredClone(a || {});
+  for (const [k, e] of Object.entries(b || {})) { const o = out[k] = out[k] || { plays: 0, time: 0 }; o.plays += e.plays || 0; o.time += e.time || 0; }
+  return out;
+}
+/**
+ * A journal less what's counted elsewhere already (base: {at, games: totals}): plays and time taken off, and sittings
+ * from before base.at left out. A computer whose app data was copied to another takes a new name, and what it wrote
+ * under the old one (now the other's) is taken off both what it writes from then on and what it reads there
+ */
+function minus(j, base) {
+  if (!base || !base.games) return j;
+  for (const [k, b] of Object.entries(base.games)) {
+    const e = j.games[k];
+    if (!e) continue;
+    for (const f of ["plays", "time"]) if (e[f]) { e[f] = Math.max(0, e[f] - (b[f] || 0)); if (!e[f]) delete e[f]; }
+  }
+  j.sessions = (j.sessions || []).filter(s => Array.isArray(s) && s[1] >= (base.at || 0));
+  return j;
+}
+
 /** a journal written whole or not at all (a cloud drive never sends half of one), and not when it hasn't changed */
 function writeJournal(file, j) {
   const text = JSON.stringify(j);
@@ -136,4 +161,4 @@ function writeJournal(file, j) {
   return true;
 }
 
-module.exports = { gameKey, keysFor, personKey, journalDir, journal, readJournals, combine, adopt, writeJournal, FIELDS };
+module.exports = { gameKey, keysFor, personKey, journalDir, journal, readJournals, combine, adopt, writeJournal, totals, addTotals, minus, FIELDS };

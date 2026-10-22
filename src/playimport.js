@@ -59,23 +59,30 @@ function parseList(text) {
   return null;
 }
 
+/** a moment for everything else the app is doing: a big LaunchBox folder or list doesn't hold it up */
+const breathe = () => new Promise(r => setImmediate(r));
+/** folders with no lists in them, only pictures, videos and the like (a LaunchBox folder's Images can be 100,000 files) */
+const NO_LISTS = /^(images|videos|manuals|music|sounds|themes|plugins|emulators|backups|logs|updates|core|cache|metadata|media|downloaded_images|downloaded_videos|downloaded_media|snaps|titles|boxart|box art|screenshots|marquees|wheel|fanart|thumbnails|bezels|saves|states|bios)$/i;
+
 /** the list files in what was chosen: the files themselves, or in a folder (a few levels down) gamelist.xml files and
     LaunchBox platform lists */
-function findLists(paths) {
+async function findLists(paths) {
   const out = new Set();
-  const walk = (dir, depth) => {
+  let seen = 0;
+  const walk = async (dir, depth) => {
     let es = [];
-    try { es = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    try { es = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
+    if (++seen % 50 === 0) await breathe();
     for (const e of es) {
       const p = path.join(dir, e.name);
-      if (e.isDirectory() && depth < 4 && !e.name.startsWith(".")) walk(p, depth + 1);
+      if (e.isDirectory()) { if (depth < 4 && seen < 20000 && !e.name.startsWith(".") && !NO_LISTS.test(e.name)) await walk(p, depth + 1); }
       else if (e.isFile() && (/^gamelist\.xml$/i.test(e.name) || (/\.xml$/i.test(e.name) && /platforms$/i.test(path.basename(dir))))) out.add(p);
     }
   };
   for (const p of paths) {
     let st;
-    try { st = fs.statSync(p); } catch { continue; }
-    if (st.isDirectory()) walk(p, 0); else if (/\.xml$/i.test(p)) out.add(p);
+    try { st = await fs.promises.stat(p); } catch { continue; }
+    if (st.isDirectory()) await walk(p, 0); else if (/\.xml$/i.test(p)) out.add(p);
   }
   return [...out].slice(0, 500);
 }
@@ -84,14 +91,15 @@ function findLists(paths) {
  * What would come in: each listed game matched to one here by file name (when two games here share one, the console
  * or folder decides, or it's left out). games: [{id, system, path}]
  */
-function plan(lists, games) {
+async function plan(lists, games) {
   const byFile = new Map();
   for (const g of games) { const k = fileKey(g.path); byFile.set(k, [...(byFile.get(k) || []), g]); }
   const found = [], seen = new Set();
   let listed = 0;
   for (const file of lists) {
     let items = null;
-    try { items = parseList(fs.readFileSync(file, "utf8")); } catch {}
+    await breathe();
+    try { items = parseList(await fs.promises.readFile(file, "utf8")); } catch {}
     if (!items) continue;
     const folder = path.basename(path.dirname(file)).toLowerCase();
     for (const it of items) {

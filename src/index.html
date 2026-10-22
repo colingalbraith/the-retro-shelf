@@ -2657,7 +2657,10 @@ function openWho(atStart) {
 }
 /* Settings: who plays here, to add, rename or take off (their play and saves go to the Trash) */
 function openPeople() {
-  openList(t("People"), t("Everyone here has their own play, pins, favorites, shelves and saves. The games and Settings are shared."), list => {
+  /* saves the app doesn't keep itself are everyone's: your own RetroArch's, and PCSX2's */
+  const shared = [PATHS.own && t("With your own RetroArch, saves are everyone's: it keeps them its own way."),
+    !PATHS.own && UI.pcsx2 && PATHS.pcsx2 && t("PS2 saves made in PCSX2 are everyone's: it keeps them its own way.")].filter(Boolean);
+  openList(t("People"), [t("Everyone here has their own play, pins, favorites, shelves and saves. The games and Settings are shared."), ...shared].join(" "), list => {
     for (const p of PEOPLE.list) {
       const buttons = [];
       if (p.id !== PEOPLE.active) buttons.push([t("Play"), () => usePerson(p.id).then(() => openPeople())]);

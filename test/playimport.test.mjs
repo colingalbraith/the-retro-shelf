@@ -20,7 +20,7 @@ const LB = `<?xml version="1.0" standalone="yes"?>
     <Favorite>false</Favorite><PlayCount>3</PlayCount><LastPlayedDate>2024-02-01T20:00:00.0000000-07:00</LastPlayedDate><StarRating>4</StarRating><PlayTime>1800</PlayTime><Completed>true</Completed></Game>
 </LaunchBox>`;
 
-test("EmulationStation's and LaunchBox's lists are read: favorite, plays, last played, rating, time, finished", () => {
+test("EmulationStation's and LaunchBox's lists are read: favorite, plays, last played, rating, time, finished", async () => {
   const es = parseList(ES);
   assert.equal(es.length, 3);
   assert.deepEqual([es[0].fav, es[0].plays, es[0].rating, es[0].time], [true, 12, 4, 5400]);
@@ -31,21 +31,21 @@ test("EmulationStation's and LaunchBox's lists are read: favorite, plays, last p
   assert.equal(parseList("<html></html>"), null);
 });
 
-test("lists in a folder are found, games matched by file name, and bringing a list in twice adds nothing", () => {
+test("lists in a folder are found, games matched by file name, and bringing a list in twice adds nothing", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-import-"));
   try {
     fs.mkdirSync(path.join(dir, "gamelists", "snes"), { recursive: true });
     fs.writeFileSync(path.join(dir, "gamelists", "snes", "gamelist.xml"), ES);
     fs.mkdirSync(path.join(dir, "LaunchBox", "Data", "Platforms"), { recursive: true });
     fs.writeFileSync(path.join(dir, "LaunchBox", "Data", "Platforms", "Sega Genesis.xml"), LB);
-    const lists = findLists([dir]);
+    const lists = await findLists([dir]);
     assert.equal(lists.length, 2);
     const games = [
       { id: "smw", system: "SNES", path: "/g/snes/Super Mario World (USA).sfc" },
       { id: "s1", system: "Genesis", path: "/g/genesis/Sonic The Hedgehog (USA, Europe).md" },
       { id: "pw", system: "SNES", path: "/g/snes/Pilotwings (USA).sfc" },
     ];
-    const p = plan(lists, games);
+    const p = await plan(lists, games);
     assert.deepEqual(p.found.map(f => f.id).sort(), ["s1", "smw"], "played games that are here (Pilotwings has no play, Mario & Wario isn't here)");
     assert.deepEqual(summary(p), { lists: 2, listed: 3, games: 2, favs: 1, plays: 15, time: 7200, ratings: 2, done: 1 });
     const st = { fav: [], plays: { smw: 2 }, time: {}, last: {}, rating: { s1: 5 }, progress: {} };
@@ -56,17 +56,17 @@ test("lists in a folder are found, games matched by file name, and bringing a li
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("two games here with the same file name: the list's console or folder decides, or it's left out", () => {
+test("two games here with the same file name: the list's console or folder decides, or it's left out", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-import2-"));
   try {
     fs.mkdirSync(path.join(dir, "snes"), { recursive: true });
     fs.writeFileSync(path.join(dir, "snes", "gamelist.xml"), `<gameList><game><path>./Tetris.bin</path><playcount>5</playcount></game></gameList>`);
     const games = [{ id: "a", system: "SNES", path: "/g/snes/Tetris.bin" }, { id: "b", system: "Atari 2600", path: "/g/atari2600/Tetris.bin" }];
-    assert.deepEqual(plan(findLists([dir]), games).found.map(f => f.id), ["a"]);
+    assert.deepEqual((await plan(await findLists([dir]), games)).found.map(f => f.id), ["a"]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("a list's console decides by its whole name, on Windows paths too; another console's game isn't this one", () => {
+test("a list's console decides by its whole name, on Windows paths too; another console's game isn't this one", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-import3-"));
   try {
     fs.mkdirSync(path.join(dir, "snes"), { recursive: true });
@@ -77,22 +77,34 @@ test("a list's console decides by its whole name, on Windows paths too; another 
       { id: "nes", system: "NES", path: "C:\\Games\\nes\\Tetris 2 (USA).zip" }, { id: "snes", system: "SNES", path: "C:\\Games\\snes\\Tetris 2 (USA).zip" },
       { id: "gc", system: "GameCube/Wii", path: "C:\\Games\\gc\\Game.iso" }, { id: "ps2", system: "PS2", path: "C:\\Games\\ps2\\Game.iso" },
     ];
-    assert.deepEqual(plan(findLists([dir]), games).found.map(f => f.id).sort(), ["gc", "snes"]);
+    assert.deepEqual((await plan(await findLists([dir]), games)).found.map(f => f.id).sort(), ["gc", "snes"]);
     // only the NES copy here: an SNES list's line isn't it
-    assert.deepEqual(plan(findLists([path.join(dir, "snes")]), [games[0]]).found, []);
+    assert.deepEqual((await plan(await findLists([path.join(dir, "snes")]), [games[0]])).found, []);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("bringing a list in again adds nothing, even after the game's file moved", () => {
+test("bringing a list in again adds nothing, even after the game's file moved", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-import4-"));
   try {
     fs.mkdirSync(path.join(dir, "snes"), { recursive: true });
     fs.writeFileSync(path.join(dir, "snes", "gamelist.xml"), ES);
     const st = { fav: [], plays: {}, time: {}, last: {}, rating: {}, progress: {} };
-    assert.equal(apply(st, plan(findLists([dir]), [{ id: "smw", system: "SNES", path: "/g/snes/Super Mario World (USA).sfc" }])), 1);
+    assert.equal(apply(st, await plan(await findLists([dir]), [{ id: "smw", system: "SNES", path: "/g/snes/Super Mario World (USA).sfc" }])), 1);
     // moved: a new id, the same game
     st.plays.moved = st.plays.smw; delete st.plays.smw;
-    assert.equal(apply(st, plan(findLists([dir]), [{ id: "moved", system: "SNES", path: "/h/snes/Super Mario World (USA).sfc" }])), 0);
+    assert.equal(apply(st, await plan(await findLists([dir]), [{ id: "moved", system: "SNES", path: "/h/snes/Super Mario World (USA).sfc" }])), 0);
     assert.equal(st.plays.moved, 12);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a LaunchBox folder's pictures and videos aren't looked through for lists", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-import5-"));
+  try {
+    fs.mkdirSync(path.join(dir, "Data", "Platforms"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "Data", "Platforms", "Sega Genesis.xml"), LB);
+    // a list-looking file deep in Images: never read
+    fs.mkdirSync(path.join(dir, "Images", "Platforms"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "Images", "Platforms", "Sega Genesis.xml"), LB);
+    assert.deepEqual((await findLists([dir])).map(f => path.relative(dir, f)), [path.join("Data", "Platforms", "Sega Genesis.xml")]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

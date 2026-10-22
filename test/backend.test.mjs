@@ -1010,3 +1010,39 @@ test("loose screenshots from before go on a game only when no other game here ha
   fs.writeFileSync(path.join(shots, "Contra (USA)-251001-200000.png"), "PNG");
   for (const g of be.games.values()) assert.equal(be.shotsOf(g).length, g.title.startsWith("Contra") ? 1 : 0, g.system);
 });
+
+test("a computer whose app data was copied to another: each gets its own name, and play counts once on both", async () => {
+  const cloud = path.join(home, "cloud");
+  // the new computer has the games where the old one had them, as moving to a new computer leaves them
+  const open = name => {
+    const b = new Backend({ app: APP, data: path.join(home, name, "data"), docs: path.join(home, "docs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+    b.init();
+    const f = path.join(b.romsRoot(), "snes", "Chrono Trigger (USA).sfc"); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, "x");
+    b.scan();
+    return b;
+  };
+  const play = (b, n, start) => { const g = [...b.games.values()][0]; b.state.plays[g.id] = (b.state.plays[g.id] || 0) + n; b.state.time[g.id] = (b.state.time[g.id] || 0) + n * 100; b.state.sessions.push([g.id, start, n * 100]); b.saveState(); return g; };
+  const seen = b => { b.remote(true); const g = b.libraryJson().games[0]; return [g.plays, b.allSessions().length]; };
+  const a = open("a"), t0 = Math.floor(Date.now() / 1000);
+  assert.equal((await a.moveSaves(cloud))[0], 200);
+  play(a, 10, t0 - 3600); a.writeJournalNow();
+  // a new computer, set up from a's app data: the same name for sharing play
+  fs.cpSync(path.join(home, "a", "data"), path.join(home, "b", "data"), { recursive: true });
+  const b = open("b");
+  assert.equal(b.machine(), a.machine());
+  await new Promise(r => setTimeout(r, 1100));
+  play(a, 2, t0 + 10); a.writeJournalNow();          // a plays on
+  await new Promise(r => setTimeout(r, 1100));
+  play(b, 3, t0 + 20); b.writeJournalNow();          // b sees a's writing under their name, and takes a new one
+  assert.notEqual(b.machine(), a.machine());
+  // 10 together, 2 on a, 3 on b: 15 on both, every sitting once
+  assert.deepEqual(seen(b), [15, 3]);
+  await new Promise(r => setTimeout(r, 1100));
+  a.writeJournalNow();
+  assert.deepEqual(seen(a), [15, 3]);
+  // more play on each still adds up, and a single computer never splits by itself
+  const id = a.machine();
+  play(a, 1, t0 + 30); a.writeJournalNow(); play(b, 1, t0 + 40); b.writeJournalNow();
+  assert.equal(a.machine(), id);
+  assert.deepEqual([seen(a)[0], seen(b)[0]], [17, 17]);
+});
