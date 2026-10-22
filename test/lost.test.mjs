@@ -74,30 +74,40 @@ function run(seed, steps) {
   };
 
   const actions = {
-    async add() { addGame(be.romsRoot(), pick(KINDS), pick(NAMES)); be.scan(); },
+    // (some zipped, as many games come: a .zip goes on any console)
+    async add() { const k = pick(KINDS); addGame(be.romsRoot(), rnd() < .3 ? [k[0], k[1], ".zip"] : k, pick(NAMES)); be.scan(); },
     async play() { const g = pick(games()); if (g) play(be, g); },
     async scan() { be.scan(); },
-    async moveTo(g = pick(games()), k = pick(KINDS)) {
+    // days the app's opened and quit without playing: each quit writes this computer's journal, with nothing new in it
+    async quit() { for (let k = 1 + Math.floor(rnd() * 8); k > 0; k--) { be.writeJournalNow(); if (other) other.writeJournalNow(); } },
+    async moveTo(g = pick(games()), k) {
       if (!g) return false;
+      // to a console that plays that kind of file, as the menu offers
+      k = k || pick(KINDS.filter(x => x[0] !== g.system && be.cfg.systems[x[0]].exts.includes(path.extname(g.path).toLowerCase())));
+      if (!k) return false;
       const stem = path.parse(g.path).name, same = be.cfg.systems[g.system].core === be.cfg.systems[k[0]].core;
+      // saves are known by name: one of that name already where it goes (left by a game that was there) is that
+      // console's save of it, and of the two the newer is the one shown, as for a game added there
+      const already = new Map(be.people.list.map(p => [p.id, theirSave(p.id, k[0], stem)]));
       // (a game of that name on that console already keeps its own saves: the moved one's don't go there)
       const taken = games().some(x => x.id !== g.id && x.system === k[0] && path.parse(x.path).name.toLowerCase() === stem.toLowerCase());
       if (be.moveTo(g.id, k[0])[0] !== 200) return false;
       for (const p of be.people.list) {
         const was = keyOf(p.id, g.system, stem), v = latest.get(was), to = keyOf(p.id, k[0], stem);
         latest.delete(was);
-        if (v && same && !taken) latest.set(to, v);
+        const there = already.get(p.id);
+        if (v && same && !taken) latest.set(to, there && num(there) > num(v) ? there : v);
       }
       return true;
     },
     // a game put on the wrong one of the consoles one emulator plays, maybe played there, and put back: its saves go
     // there and back, meeting the ones it left behind
     async moveBack() {
-      const sega = KINDS.filter(k => ["Genesis", "Master System", "Game Gear"].includes(k[0])), g = pick(games().filter(x => sega.some(k => k[0] === x.system)));
+      const sega = KINDS.filter(k => ["Genesis", "Master System", "Game Gear"].includes(k[0])), g = pick(games().filter(x => sega.some(k => k[0] === x.system) && /\.zip$/i.test(x.path)));
       if (!g) return;
-      const stem = path.parse(g.path).name, from = sega.find(k => k[0] === g.system), to = pick(sega.filter(k => k !== from));
+      const file = path.basename(g.path), from = sega.find(k => k[0] === g.system), to = pick(sega.filter(k => k !== from));
       if (!(await actions.moveTo(g, to))) return;
-      const there = games().find(x => x.system === to[0] && path.parse(x.path).name === stem);
+      const there = games().find(x => x.system === to[0] && path.basename(x.path) === file);
       if (there && rnd() < .7) play(be, there);
       if (there) await actions.moveTo(there, from);
     },
@@ -106,13 +116,23 @@ function run(seed, steps) {
     async addPerson() { be.addPerson(pick(["Sam", "Alex", "Ann Marie", "Саша", "Zoë", "Kim"])); },
     async usePerson() { be.usePerson(pick(be.people.list).id); },
     // a folder of the new name already there (one left in a shared folder by someone taken off): the newer saves win
-    async renamePerson() {
-      const p = pick(be.people.list), was = new Map(), walk = d => { let es = []; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch {} for (const e of es) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else was.set(f, fs.readFileSync(f, "utf8")); } };
-      walk(path.join(be.savesRoot(), "People"));
-      if ((await be.renamePerson(p.id, pick(["Samantha", "Lex", "Ann-Marie", "Маша", "Zoe", "Kimberly"])))[0] !== 200) return;
-      for (const [k, v] of [...latest]) { const [id, sys, stem] = k.split("|"), there = id === p.id && was.get(theirFile(id, sys, stem)); if (there && num(there) > num(v)) latest.set(k, there); }
+    async renamePerson() { await renameTo(pick(be.people.list), pick(["Samantha", "Lex", "Ann-Marie", "Маша", "Zoe", "Kimberly"])); },
+    // while sharing: two people play the same game, one is taken off (their saves stay in the shared folder, for other
+    // computers) and the other is given their name, so the two folders come together
+    async rejoin() {
+      const g = pick(games());
+      if (!be.syncOn() || !g || be.people.list.length > 5) return;
+      const name = pick(["Robin", "Casey", "Jordan"]);
+      if (be.people.list.some(p => p.name === name)) return;
+      const back = be.people.active;
+      be.addPerson(name); be.addPerson(name + " Jr");
+      const x = be.people.list.find(p => p.name === name), y = be.people.list.find(p => p.name === name + " Jr");
+      for (const p of rnd() < .5 ? [x, y] : [y, x]) { be.usePerson(p.id); play(be, g); }
+      be.usePerson(back);
+      await actions.removePerson(x);
+      await renameTo(y, name);
     },
-    async removePerson() { const p = pick(be.people.list); if (p.id !== "p1" && (await be.removePerson(p.id))[0] === 200) for (const k of [...latest.keys()]) if (k.startsWith(p.id + "|")) latest.delete(k); },
+    async removePerson(p = pick(be.people.list)) { if (p.id !== "p1" && (await be.removePerson(p.id))[0] === 200) for (const k of [...latest.keys()]) if (k.startsWith(p.id + "|")) latest.delete(k); },
     async share() {
       if ((await be.moveSaves(cloud))[0] !== 200) return;
       // a folder another computer may use keeps the saves in it: all of them the first time this one shares it; after
@@ -127,7 +147,8 @@ function run(seed, steps) {
       const r = await be.moveLibrary(path.join(home, "drive" + n));
       if (r[0] === 200 && rnd() < .5) await be.trash(r[1].from);          // and the old copy to the Trash, as offered
     },
-    async backup() { if (fs.existsSync(be.savesRoot())) { backup = path.join(home, `backup ${++n}.zip`); await zipFolder(be.savesRoot(), backup); } },
+    // (none made when there's nothing to back up yet, as the app says)
+    async backup() { if (fs.existsSync(be.savesRoot())) { const out = path.join(home, `backup ${++n}.zip`); if (await zipFolder(be.savesRoot(), out)) backup = out; } },
     // a restore puts back the backup's copy of a save older than it: a newer one than the one shown can come back
     async restore() { if (backup && fs.existsSync(be.savesRoot())) { await unzipInto(backup, be.savesRoot(), { aside: f => be.trash(f) }); be.afterRestore(); newerWins(); } },
     async trashSave() {
@@ -177,6 +198,14 @@ function run(seed, steps) {
     if (!be.people.list.some(p => p.id === person)) return undefined;
     try { return fs.readFileSync(theirFile(person, system, stem), "utf8"); } catch { return null; }
   };
+  // a rename: a folder of the new name already there (one left in a shared folder by someone taken off) brings the two
+  // together, the newer of each save winning
+  const renameTo = async (p, name) => {
+    const was = new Map(), walk = d => { let es = []; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch {} for (const e of es) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else was.set(f, fs.readFileSync(f, "utf8")); } };
+    walk(path.join(be.savesRoot(), "People"));
+    if ((await be.renamePerson(p.id, name))[0] !== 200) return;
+    for (const [k, v] of [...latest]) { const [id, sys, stem] = k.split("|"), there = id === p.id && was.get(theirFile(id, sys, stem)); if (there && num(there) > num(v)) latest.set(k, there); }
+  };
   const newerWins = () => { for (const [k, v] of [...latest]) { const there = theirSave(...k.split("|")); if (there && num(there) > num(v)) latest.set(k, there); } };
   const accept = (only = () => true) => { for (const k of [...latest.keys()].filter(only)) { const v = theirSave(...k.split("|")); if (v !== undefined) { if (v) latest.set(k, v); else latest.delete(k); } } };
   // everything that's yours, wherever it is: contents of every file under the home folder and in the Trash
@@ -195,7 +224,7 @@ function run(seed, steps) {
       for (let i = 0; i < steps; i++) {
         const a = pick(bag);
         log.push(a);
-        try { await actions[a](); } catch (e) { throw new Error(`step ${i} (${a}) threw: ${e.stack}\n  steps: ${log.join(", ")}`); }
+        try { await actions[a](); } catch (e) { throw new Error(`seed ${seed}, step ${i} (${a}) threw: ${e.stack}\n  steps: ${log.join(", ")}`); }
         const seen = everywhere();
         for (const [c, what] of replaced.splice(0)) if (seen.has(c)) made.set(c, what);
         const lost = [...made].filter(([c]) => !seen.has(c)).map(([c, what]) => `${what} (${c})`);

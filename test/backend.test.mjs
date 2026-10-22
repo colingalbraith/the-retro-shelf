@@ -1075,6 +1075,75 @@ test("renaming someone while sharing play, even to a name used before, never mak
   assert.ok(trashed.includes(kims));
 });
 
+test("writing play again and again with nothing new keeps this computer one computer", async () => {
+  const b = new Backend({ app: APP, data: path.join(home, "q", "data"), docs: path.join(home, "qdocs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init();
+  const f = path.join(b.romsRoot(), "nes", "Tetris (World).nes"); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, "x"); b.scan();
+  assert.equal((await b.moveSaves(path.join(home, "qcloud")))[0], 200);
+  const g = [...b.games.values()][0], id = b.machine();
+  b.state.plays[g.id] = 1; b.saveState(true);
+  assert.equal(b.writeJournalNow(), true);
+  // quitting, switching who's playing, hiding a game: the journal's asked for each time, with the same play in it
+  for (let i = 0; i < 12; i++) assert.equal(b.writeJournalNow(), false);
+  b.state.plays[g.id] = 2; b.saveState(true);
+  assert.equal(b.writeJournalNow(), true);
+  assert.equal(b.machine(), id, "still one computer");
+});
+
+test("a game in a watched folder moved from Genesis to Game Gear takes its saves along", async () => {
+  const b = new Backend({ app: APP, data: path.join(home, "w", "data"), docs: path.join(home, "wdocs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init();
+  b.ra = { info: path.join(home, "none") }; b._coreNames = { genesis_plus_gx_libretro: "Genesis Plus GX" };
+  const w = path.join(home, "watched"), rom = path.join(w, "Sonic (USA).zip");
+  fs.mkdirSync(w, { recursive: true }); fs.writeFileSync(rom, "PK");
+  fs.mkdirSync(b.savesRoot(), { recursive: true });
+  b.paths.watch = [w]; b.state.watchSys = { [rom]: "Genesis" }; b.scan();
+  // played on Genesis since the update
+  await new Promise(r => setTimeout(r, 1100));
+  const save = path.join(b.saveDirs("Genesis").saves, "Genesis Plus GX", "Sonic (USA).srm");
+  fs.mkdirSync(path.dirname(save), { recursive: true }); fs.writeFileSync(save, "sonic");
+  const g = [...b.games.values()][0];
+  assert.equal(b.moveTo(g.id, "Game Gear")[0], 200);
+  const there = [...b.games.values()][0];
+  assert.equal(there.system, "Game Gear");
+  assert.deepEqual(b.gameSaves(there).map(x => fs.readFileSync(x.file, "utf8")), ["sonic"]);
+});
+
+test("people from before folders were kept, whose names have one key, keep the saves they had", () => {
+  const data = path.join(home, "k", "data"), docs = path.join(home, "kdocs");
+  fs.mkdirSync(data, { recursive: true });
+  fs.writeFileSync(path.join(data, "people.json"), JSON.stringify({ active: "p1", list: [{ id: "p1", name: "Player 1" }, { id: "p2", name: "Ann Marie" }, { id: "p3", name: "Ann-Marie" }] }));
+  fs.writeFileSync(path.join(data, "state.json"), JSON.stringify({ peopleMoved: { p2: 1, p3: 1 } }));
+  for (const id of ["p2", "p3"]) { const d = path.join(docs, "Saves", "People", "ann-marie-" + id); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, "Zelda.srm"), "save of " + id); }
+  const b = new Backend({ app: APP, data, docs, emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init();
+  for (const id of ["p2", "p3"]) assert.equal(fs.readFileSync(path.join(b.personFolder(id), "Zelda.srm"), "utf8"), "save of " + id);
+});
+
+test("renaming someone to a name another computer plays as keeps that computer's saves; one with no cloud folder waits", async () => {
+  const b = new Backend({ app: APP, data: path.join(home, "n", "data"), docs: path.join(home, "ndocs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init();
+  const trashed = []; b.trash = async p => { trashed.push(p); fs.rmSync(p, { recursive: true, force: true }); };
+  const cloud = path.join(home, "ncloud");
+  assert.equal((await b.moveSaves(cloud))[0], 200);
+  b.addPerson("Rob"); const rob = b.people.list.find(p => p.name === "Rob").id;
+  // another computer's Robin: their play and an older save of Zelda in the shared folder
+  const root = b.savesRoot(), theirs = path.join(root, "People", "robin", "Snes9x", "Zelda (USA).srm"), mine = path.join(b.personFolder(rob), "Snes9x", "Zelda (USA).srm");
+  fs.mkdirSync(path.dirname(theirs), { recursive: true }); fs.writeFileSync(theirs, "robin's"); fs.utimesSync(theirs, 1e9, 1e9);
+  fs.mkdirSync(path.join(root, ".the-retro-shelf", "play", "robin"), { recursive: true }); fs.writeFileSync(path.join(root, ".the-retro-shelf", "play", "robin", "other.json"), "{}");
+  fs.mkdirSync(path.dirname(mine), { recursive: true }); fs.writeFileSync(mine, "rob's");
+  assert.equal((await b.renamePerson(rob, "Robin"))[0], 200);
+  assert.equal(fs.readFileSync(theirs, "utf8"), "robin's");
+  assert.equal(fs.readFileSync(mine, "utf8"), "rob's", "and this computer's copy stays where it was");
+  assert.deepEqual(trashed, []);
+  // the cloud folder gone for now: nothing's renamed until it's back
+  fs.renameSync(cloud, cloud + "-away");
+  const r = await b.renamePerson(rob, "Bobby");
+  assert.equal(r[0], 409);
+  assert.equal(b.people.list.find(p => p.id === rob).name, "Robin");
+  fs.renameSync(cloud + "-away", cloud);
+});
+
 test("Game Gear and Master System saves are their own, never a Genesis game's of the same name", () => {
   put("genesis/Sonic (USA).md"); put("gg/Sonic (USA).gg"); put("gg/Columns (USA).gg"); be.scan();
   // the built-in emulators, as far as saves go: Genesis Plus GX plays all three

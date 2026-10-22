@@ -1135,5 +1135,7 @@
  "Your trophy shelf": "トロフィー棚",
  "yours": "所持",
  "Yours": "マイコレクション",
- "Zip archive": "Zip アーカイブ"
+ "Zip archive": "Zip アーカイブ",
+ "Couldn't move their saves to the new name.": "セーブを新しい名前に移せませんでした。",
+ "Your saves folder isn't there right now. Open iCloud Drive, Dropbox or OneDrive so it's back, then try again.": "セーブフォルダが今は見つかりません。iCloud Drive、Dropbox、OneDrive を開いて戻してから、もう一度お試しください。"
 }

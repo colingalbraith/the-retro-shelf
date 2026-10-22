@@ -1135,5 +1135,7 @@
  "Your trophy shelf": "Dein Trophäenregal",
  "yours": "deins",
  "Yours": "Eigene",
- "Zip archive": "Zip-Archiv"
+ "Zip archive": "Zip-Archiv",
+ "Couldn't move their saves to the new name.": "Ihre Spielstände ließen sich nicht unter den neuen Namen verschieben.",
+ "Your saves folder isn't there right now. Open iCloud Drive, Dropbox or OneDrive so it's back, then try again.": "Dein Spielstand-Ordner ist gerade nicht da. Öffne iCloud Drive, Dropbox oder OneDrive, damit er wieder da ist, und versuch es dann noch mal."
 }

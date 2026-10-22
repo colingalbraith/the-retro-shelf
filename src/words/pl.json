@@ -1145,5 +1145,7 @@
  "days|few": "dni",
  "cheats|few": "kody",
  "BIOS files|few": "pliki BIOS",
- "stars|few": "gwiazdki"
+ "stars|few": "gwiazdki",
+ "Couldn't move their saves to the new name.": "Nie udało się przenieść zapisów pod nowe imię.",
+ "Your saves folder isn't there right now. Open iCloud Drive, Dropbox or OneDrive so it's back, then try again.": "Twojego folderu zapisów teraz nie ma. Otwórz iCloud Drive, Dropbox lub OneDrive, żeby wrócił, a potem spróbuj jeszcze raz."
 }

@@ -3685,7 +3685,7 @@ function fitTrophy() {
   if (tros.length) {
     /* from the start every time (a wider window shows them all again): full size, nothing hidden */
     tros.forEach(t => { t.hidden = false; t.style.minWidth = ""; t.style.setProperty("--th", t.dataset.h + "px"); });
-    const gap = parseFloat(getComputedStyle(top).columnGap) || 0, room = top.clientWidth - 40, gaps = gap * (tros.length - 1);
+    const gap = parseFloat(getComputedStyle(top).columnGap) || 0, room = top.clientWidth - 40;
     /* each is as wide as its box or its brass plate (the hours under it, longer in German), whichever is wider: the boxes
        shrink together, the plates don't, until they all fit */
     const box = tros.map(t => t.offsetWidth), plate = tros.map(t => { const pl = t.querySelector(".tplate"); return pl ? pl.offsetWidth + 8 : 0; });
@@ -3694,7 +3694,7 @@ function fitTrophy() {
     while (n > 1 && plate.slice(0, n).reduce((a, b) => a + b, 0) + gap * (n - 1) > room) n--;
     const need = k => box.slice(0, n).reduce((w, b, i) => w + Math.max(b * k, plate[i]), 0) + gap * (n - 1);
     let k = 1;
-    if (need(1) > room) { let lo = 0, hi = 1; for (let m = 0; m < 20; m++) { const mid = (lo + hi) / 2; if (need(mid) > room) hi = mid; else lo = mid; } k = lo; }
+    if (need(1) > room) { let lo = .3, hi = 1; for (let m = 0; m < 20; m++) { const mid = (lo + hi) / 2; if (need(mid) > room) hi = mid; else lo = mid; } k = lo; }
     tros.forEach((t, i) => { t.hidden = i >= n; t.style.setProperty("--th", Math.floor(t.dataset.h * k) + "px"); t.style.minWidth = plate[i] ? plate[i] + "px" : ""; });
     const shown = tros.slice(0, n);
     while (shown.length > 1 && top.scrollWidth > top.clientWidth) shown.pop().hidden = true;
