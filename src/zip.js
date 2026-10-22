@@ -127,11 +127,12 @@ async function zipFiles(list, out) {
 /**
  * Puts a backup's files back into dir. A backup holds one top folder ("Saves/…" as zipFolder writes them, or the
  * folder's own name in backups from before); its contents land in dir, and a save already there that's newer than
- * the one in the backup is kept. A zip that isn't laid out like that isn't a backup, and nothing is restored from it.
+ * the one in the backup is kept; an older one is handed to opts.aside (the Trash) before the backup's takes its place,
+ * and kept if it can't be. A zip that isn't laid out like that isn't a backup, and nothing is restored from it.
  * Nothing is written outside dir. A save that can't be written (a game has it open, a name this computer doesn't
  * allow) is counted as failed and the rest still go back. Reads the backup a piece at a time. Returns counts.
  */
-async function unzipInto(file, dir) {
+async function unzipInto(file, dir, opts = {}) {
   const fh = await fsp.open(file, "r");
   const read = async (pos, len) => { const b = Buffer.alloc(len); const { bytesRead } = await fh.read(b, 0, len, pos); return b.subarray(0, bytesRead); };
   const res = { restored: 0, kept: 0, skipped: 0, failed: 0 };
@@ -167,6 +168,11 @@ async function unzipInto(file, dir) {
       } catch { data = null; }
       if (!data || zlib.crc32(data) !== crc) { res.skipped++; continue; }
       try {
+        // one there already: the same one stays as it is; another goes to the Trash first, never written over
+        let there = null;
+        try { there = await fsp.readFile(to); } catch {}
+        if (there && there.equals(data)) { res.restored++; continue; }
+        if (there && opts.aside) { try { await opts.aside(to); } catch { res.kept++; continue; } }
         await fsp.mkdir(path.dirname(to), { recursive: true });
         await fsp.writeFile(to + ".part", data);
         await fsp.rename(to + ".part", to);

@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.5.0-beta.7
+
+A new test acts out thousands of days of use at random: adding games, playing, people coming and going, moving games
+between consoles, cloud folders, backups, a second computer. After every step it checks that no save is ever lost and
+that each game shows its newest save. It found these, now fixed:
+
+- **Restoring a backup never writes over a save:** one the backup's copy replaces goes to the Trash first.
+- **Going back to a cloud folder you used before** (and no other computer did) shows your newer saves, not the older
+  ones left there. Whether a folder is shared is now decided for each person, so another computer playing as someone
+  else doesn't keep your newer saves out.
+- **Moving a game to another console:** where that console already has a game of that name, each keeps its own saves.
+  Otherwise the moved game's newer saves win, and older ones go to the Trash.
+- **People:**
+  - Renaming someone to a name that already has a saves folder brings the two together, newer saves winning.
+  - Two people whose names would share a folder each keep a folder of their own, even after someone else is removed.
+- **Game Gear, Master System and SG-1000:** only saves made before these consoles had their own folders are copied
+  over, so a game added since with a Genesis game's name doesn't get that game's saves.
+- Copied saves keep their times, so the date on a box and which save is newer stay right.
+
+Also fixed:
+
+- **Two computers copied from one** (two Steam Decks set up from the same backup) are told apart by a code in each
+  play history they write, instead of by the computer's name. Renaming someone while sharing play, back to a name
+  they had or to one someone taken off had, no longer makes a computer take itself for a copy (which kept its newer
+  saves out of the cloud folder).
+- **Stop game on Windows** waits longer before it makes RetroArch stop, so a big resume point or a slow cloud folder
+  finishes saving.
+- **Cheats:** ones the app chose stay the app's when you switch them on or off in RetroArch's menu; ones you add there
+  are yours and kept.
+- **Smaller fixes:**
+  - Clearing a search goes back to the same box on the same shelf (Recently played, or its console's).
+  - A setting changed just as the library reloads is no longer undone.
+  - Trophies show as many as their plates fit, at a size that fits.
+  - Play moved from an .iso to its .cue doesn't hide the .cue's box.
+  - Discs whose tracks are in a folder of their own are no longer mixed up with another disc's.
+
 ## 0.5.0-beta.6
 
 A second review, of beta.5's own fixes, and more tests:

@@ -461,7 +461,8 @@ function ipc() {
     const [, res] = await backend.busyWith("restore", async () => {
       try {
         fs.mkdirSync(backend.savesRoot(), { recursive: true });
-        const res = await unzipInto(r.filePaths[0], backend.savesRoot());
+        // a save the backup's older copy replaces goes to the Trash first
+        const res = await unzipInto(r.filePaths[0], backend.savesRoot(), { aside: f => backend.trash(f) });
         // saves from a backup made before people's or consoles' folders changed go where they're read now
         backend.afterRestore();
         return [200, { ok: true, ...res }];
