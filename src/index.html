@@ -1451,9 +1451,12 @@ function fitBack(bk, inn) {
   if (nt) { nt.remove(); shrink(.7); }
 }
 /* what a screen reader says for a box: "Super Mario World, SNES, 1991, favorite, last played yesterday" */
+/* a box's description for screen readers; the "3 days ago" wording made once for a language, not for every box */
+let RELFMT = null;
 function cardLabel(g) {
+  if (!RELFMT || RELFMT.lang !== LOCALE) RELFMT = {lang: LOCALE, f: new Intl.RelativeTimeFormat(LOCALE, {numeric: "auto"})};
   const days = g.last ? Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(g.last * 1000).setHours(0, 0, 0, 0)) / 86400000) : null;
-  const when = days === null ? t("never played") : t("last played {when}", {when: new Intl.RelativeTimeFormat(LOCALE, {numeric: "auto"}).format(-days, "day")});
+  const when = days === null ? t("never played") : t("last played {when}", {when: RELFMT.f.format(-days, "day")});
   return [g.title, g.system, g.year, FAV.has(g.id) ? t("favorite") : "", g.hidden ? t("hidden") : "", g.progress ? t(PROGRESS[g.progress]) : "", g.rating ? plural(g.rating, "star", "stars") : "", when].filter(Boolean).join(", ");
 }
 function hookSlot(c) {
@@ -1586,12 +1589,10 @@ let farIO = null;
 function watchFar(root) {
   if (farIO) farIO.disconnect();
   farIO = new IntersectionObserver(es => es.forEach(e => { if (e.target !== sel) e.target.classList.toggle("far", !e.isIntersecting); }), {root, rootMargin: "60% 0px"});
-  const R = root.getBoundingClientRect(), m = R.height * .6;
-  slots().forEach(c => {
-    const r = c.getBoundingClientRect();
-    c.classList.toggle("far", c !== sel && (r.bottom < R.top - m || r.top > R.bottom + m));
-    farIO.observe(c);
-  });
+  /* every box measured first, then marked: a mark between two measurements makes the page lay itself out again for
+     each box (thousands of times, with a big library) */
+  const R = root.getBoundingClientRect(), m = R.height * .6, all = slots(), far = all.map(c => { const r = c.getBoundingClientRect(); return r.bottom < R.top - m || r.top > R.bottom + m; });
+  all.forEach((c, i) => { c.classList.toggle("far", c !== sel && far[i]); farIO.observe(c); });
 }
 /* a group narrower than its name plate gets a little extra shelf so plates never overlap. Only the part of the
    group on the plate's own line counts: a group that wraps onto the next shelf is already wide enough */

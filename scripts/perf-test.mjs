@@ -15,7 +15,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 9344, argv = process.argv.slice(2);
 const N = +(argv[argv.indexOf("--games") + 1] || 0) || 5000, given = argv.find(a => !a.startsWith("--") && !/^\d+$/.test(a));
-const LIMITS = { readyS: 15, scrollP95Ms: 100, keyMedianMs: 150, heapMB: 600 }, SOFTWARE = { scrollP95Ms: 300, keyMedianMs: 300 };
+const LIMITS = { readyS: 15, scrollP95Ms: 100, keyMedianMs: 150, heapMB: 600, favMs: 1200, searchMs: 1200, coversMs: 2500 },
+  SOFTWARE = { scrollP95Ms: 300, keyMedianMs: 300, favMs: 4000, searchMs: 4000, coversMs: 8000 };
 const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "config.json"), "utf8"));
 const series = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "data", "franchises.json"), "utf8"));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -81,6 +82,13 @@ try {
   out.key = await ev(`(async () => { setKb(true); document.querySelector('#shelves').scrollTop = 0; focusById(null); await new Promise(r => setTimeout(r, 400)); const r = [];
     for (let i = 0; i < 20; i++) { const t = performance.now(); moveH(1); await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res))); r.push(performance.now() - t); await new Promise(res => setTimeout(res, 120)); }
     r.sort((a, b) => a - b); return { medianMs: Math.round(r[10]), worstMs: Math.round(r[19]) }; })()`);
+  // things that draw the wall again: a favorite (the Favorites shelf changes), a search, and the Covers style (every box
+  // face-out), each until its next two frames are drawn
+  const frames = "new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)))";
+  out.favMs = await ev(`(async () => { const g = G[Math.floor(G.length / 2)], t = performance.now(); await toggleFav(g.id); await ${frames}; const ms = performance.now() - t; await toggleFav(g.id); return Math.round(ms); })()`);
+  out.searchMs = await ev(`(async () => { const t = performance.now(); setQ("mario"); await ${frames}; const ms = performance.now() - t; setQ(""); await ${frames}; return Math.round(ms); })()`);
+  out.coversMs = await ev(`(async () => { const was = UI.shelf, t = performance.now(); UI.shelf = "covers"; renderShelves(focusId); await ${frames}; const ms = performance.now() - t;
+    await new Promise(r => setTimeout(r, 1500)); const asked = [...document.querySelectorAll("#shelves .cv img")].length; UI.shelf = was; renderShelves(focusId); await ${frames}; return Math.round(ms); })()`);
   const m = Object.fromEntries((await send("Performance.getMetrics")).result.metrics.map(x => [x.name, x.value]));
   out.heapMB = Math.round(m.JSHeapUsedSize / 1048576); out.nodes = m.Nodes;
   ws.close();
@@ -89,6 +97,8 @@ try {
   if (out.scroll.p95Ms > LIMITS.scrollP95Ms) over.push(`scrolling: 95% of frames within ${out.scroll.p95Ms} ms (limit ${LIMITS.scrollP95Ms})`);
   if (out.key.medianMs > LIMITS.keyMedianMs) over.push(`a key press takes ${out.key.medianMs} ms (limit ${LIMITS.keyMedianMs})`);
   if (out.heapMB > LIMITS.heapMB) over.push(`memory ${out.heapMB} MB (limit ${LIMITS.heapMB})`);
+  for (const [k, what] of [["favMs", "a favorite"], ["searchMs", "a search"], ["coversMs", "the Covers style"]])
+    if (out[k] > LIMITS[k]) over.push(`${what} takes ${out[k]} ms (limit ${LIMITS[k]})`);
 } catch (e) {
   over.push("the test stopped: " + e.message);
 } finally {
