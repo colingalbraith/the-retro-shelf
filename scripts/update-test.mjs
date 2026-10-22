@@ -16,7 +16,7 @@ import { createRequire } from "node:module";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = process.env.DIST_DIR || path.join(ROOT, "dist"), REPO = "colingalbraith/the-retro-shelf", PORT = 9341, FEED = 9342;
 const require = createRequire(import.meta.url);
-const { compare } = require("../src/version.js"), asar = require("@electron/asar");
+const { compare, isTest } = require("../src/version.js"), asar = require("@electron/asar");
 const NEW = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const step = s => console.log("· " + s);
@@ -84,8 +84,9 @@ async function page() {
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-update-")), work = path.join(home, "old");
 fs.mkdirSync(path.join(home, "data"), { recursive: true });
 fs.mkdirSync(work, { recursive: true });
-// no checks of its own: this test starts the one that matters
-fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: { welcomed: true, updates: false } }));
+// no checks of its own: this test starts the one that matters. A test version only goes in with test versions on
+// (as for anyone: since 0.4, an app with them off leaves one it downloaded)
+fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: { welcomed: true, updates: false, beta: isTest(NEW) } }));
 
 let app = null, server = null, failed = false;
 try {
