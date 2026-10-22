@@ -336,6 +336,13 @@ function ipc() {
       .map(f => ({ name: "Saves/" + path.relative(backend.savesRoot(), f).split(path.sep).join("/"), full: f }));
     try { return { ok: true, count: await zipFiles(list, r.filePath), path: r.filePath }; } catch (e) { return { ok: false, error: "Couldn't export them: " + e.message }; }
   });
+  // lists of play from EmulationStation or LaunchBox: a folder (or, on a Mac, files too)
+  ipcMain.handle("pick-play-lists", async () => {
+    const r = await dialog.showOpenDialog(win, { title: tm("Play from another app"), buttonLabel: tm("Choose"),
+      message: tm("Choose EmulationStation's gamelists folder, a gamelist.xml, or your LaunchBox folder."),
+      properties: ["openDirectory", "multiSelections", ...(process.platform === "darwin" ? ["openFile"] : [])], filters: [{ name: "XML", extensions: ["xml"] }] });
+    return r.canceled ? [] : r.filePaths;
+  });
   // the list of games as a spreadsheet; with only a controller, straight into Documents
   ipcMain.handle("export-list", async (_, quick) => {
     const name = `The Retro Shelf games ${new Date().toISOString().slice(0, 10)}`;
@@ -479,6 +486,8 @@ app.on("will-quit", () => { if (updater) updater.applyOnQuit(); });
 
 // Quitting mid-game: let RetroArch save and close first.
 app.on("before-quit", e => {
+  // the play on this computer, for the others (with saves in a cloud folder), as it is now
+  if (backend) try { backend.writeJournalNow(); } catch {}
   // the games half moved to another drive: quitting would leave a partial copy there
   if (!quitting && backend && backend.moving && win && !win.isDestroyed()) {
     const r = dialog.showMessageBoxSync(win, { type: "warning", buttons: [tm("Keep Moving"), tm("Quit Anyway")], defaultId: 0, cancelId: 0,
