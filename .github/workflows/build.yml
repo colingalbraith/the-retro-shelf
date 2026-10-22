@@ -145,9 +145,34 @@ jobs:
             dist/latest*.yml
           if-no-files-found: error
 
+  # the Intel Mac build, opened on an Intel Mac and its test games played: the build machine is Apple silicon, so this
+  # build is never opened there, and one that's broken would otherwise be released
+  intel-mac:
+    needs: build
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: the-retro-shelf-mac
+          path: dist
+      - name: Open the Intel build and play a game
+        run: |
+          Z=$(ls dist/*-mac-x64.zip); mkdir -p dist/intel && ditto -x -k "$Z" dist/intel
+          node scripts/smoke.mjs "dist/intel/The Retro Shelf.app/Contents/MacOS/The Retro Shelf"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-intel-mac
+          path: dist/smoke
+          if-no-files-found: ignore
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, intel-mac]
     runs-on: ubuntu-latest
     permissions:
       contents: write
