@@ -208,13 +208,13 @@ function gameMenu(id) {
       { label: "New Shelf…", click: () => send({ cmd: "new-shelf", id: g.id }) },
     ] },
     // this game's own picture, screen shape and fast-forward speed (the app's own emulators), over the ones in Settings
-    ...Object.entries({ picture: "Picture", shape: "Screen Shape", ...(!sys[g.system].emulator && !backend.ownEmu() ? { ffSpeed: "Fast-Forward Speed" } : {}) }).map(([k, label]) => ({ label, submenu: [
+    ...Object.entries({ picture: "Picture", shape: "Screen Shape", ...(!backend.standalone(g.system) && !backend.ownEmu() ? { ffSpeed: "Fast-Forward Speed" } : {}) }).map(([k, label]) => ({ label, submenu: [
       { label: "Same as Settings", type: "radio", checked: !(backend.state.gameOpts[g.id] || {})[k], click: () => { backend.setGameOpts(g.id, { [k]: null }); send({ cmd: "refresh", focus: g.id }); } },
       { type: "separator" },
       ...GAME_CHOICES[k].map(([v, name]) => ({ label: name, type: "radio", checked: (backend.state.gameOpts[g.id] || {})[k] === v,
         click: () => { backend.setGameOpts(g.id, { [k]: v }); send({ cmd: "refresh", focus: g.id }); } })),
     ] })),
-    ...(!sys[g.system].emulator && !backend.ownEmu() ? [{ label: "Cheats…", click: () => send({ cmd: "cheats", id: g.id }) }] : []),
+    ...(!backend.standalone(g.system) && !backend.ownEmu() ? [{ label: "Cheats…", click: () => send({ cmd: "cheats", id: g.id }) }] : []),
     // how far you are with it, how good it is, and a note
     { label: "Progress", submenu: [["", "Not Set"], ["backlog", "Backlog"], ["playing", "Playing"], ["beaten", "Beaten"], ["complete", "100%"]].map(([v, label]) => ({ label, type: "radio",
       checked: (backend.state.progress[g.id] || "") === v, click: () => { backend.setGameInfo(g.id, { progress: v || null }); send({ cmd: "refresh", focus: g.id }); } })) },

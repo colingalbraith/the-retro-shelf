@@ -124,7 +124,7 @@ function cleanUi(d) {
   if (["auto", "xbox", "nintendo"].includes(d.buttons)) out.buttons = d.buttons;
   if (["console", "genre", "decade", "status"].includes(d.arrange)) out.arrange = d.arrange;
   if (Array.isArray(d.hiddenSeries)) out.hiddenSeries = d.hiddenSeries.map(String).slice(0, 1000);
-  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "beta", "tv", "rewind", "lessLag", "hardcore", "autoBackup", "music"]) if (typeof d[k] === "boolean") out[k] = d[k];
+  for (const k of ["sound", "hints", "autoCovers", "tint", "fullscreen", "resume", "ownEmu", "welcomed", "showHidden", "updates", "beta", "tv", "rewind", "lessLag", "hardcore", "autoBackup", "music", "pcsx2"]) if (typeof d[k] === "boolean") out[k] = d[k];
   if (typeof d.card === "number" && isFinite(d.card)) out.card = Math.max(110, Math.min(280, Math.round(d.card)));
   if (Array.isArray(d.hidden)) out.hidden = d.hidden.map(String).slice(0, 100);
   return out;
@@ -414,6 +414,14 @@ class Backend extends EventEmitter {
     return path.isAbsolute(x) ? x : path.join(this.dirs.docs, x);
   }
   ownEmu() { return this.ui.ownEmu || !this.ra; }
+  /** whether a console's games go to an emulator installed on its own (PCSX2) rather than a built-in one: when this
+      build has no built-in one for it, or it's chosen in Settings */
+  standalone(system) {
+    const s = this.cfg.systems[system] || {};
+    if (!s.emulator) return false;
+    const builtIn = s.core && this.ra && fs.existsSync(ra.corePath(this.ra.cores, s.core));
+    return !builtIn || (system === "PS2" && !!this.ui.pcsx2);
+  }
 
   // ---------------------------------------------------------------- scanning
   findCover(rom, root, folder) {
@@ -901,7 +909,7 @@ class Backend extends EventEmitter {
 
   buildCmd(g, opts = {}) {
     const s = this.cfg.systems[g.system];
-    if (s.emulator) {
+    if (this.standalone(g.system)) {
       // a function, so a path with "$$" or "$&" in it is put in as it is
       const args = s.emulator.map(a => a.replace("{rom}", () => g.path));
       const exe = this.resolveApp(args[0]);
@@ -923,6 +931,9 @@ class Backend extends EventEmitter {
       const triggers = play.freeTriggers ? ra.triggerProfiles(this.ra, dirs.private, play.ffTrigger === "toggle") : null;
       ra.writeConfig(this.files.raCfg, ra.enforced(this.ra, dirs, { ...play, cheats: !!opts.cheats, cheevos, discs: /\.m3u$/i.test(g.path), load: !(opts.fresh || slot !== null), pads: opts.pads, triggers, lang }));
       ra.linkSystemData(this.ra, this.folders.bios, s.core);
+      // PS2: memory cards for each game, in the Saves folder (where the saves list and backups find them), not one
+      // shared card in the BIOS folder; on a Mac, the renderer that's quick there (through Vulkan), until changed
+      if (s.core === "pcsx2_libretro") ra.coreOptions(dirs.private, "LRPS2", { pcsx2_shared_memory_cards: "disabled" }, process.platform === "darwin" ? { pcsx2_renderer: "paraLLEl-GS" } : {});
       fs.mkdirSync(path.dirname(this.files.raLog), { recursive: true });
       fs.writeFileSync(this.files.raLog, "");
       const shader = { crt: this.ra.crt, lcd: this.ra.lcd }[play.picture], crt = shader && fs.existsSync(shader) ? ["--set-shader", shader] : [];
@@ -952,8 +963,8 @@ class Backend extends EventEmitter {
       return [409, { error: `Your saves folder isn't there right now (${this.paths.saves_dir}). Open iCloud Drive, Dropbox or OneDrive so it's back, then play.` }];
     let built;
     // chosen cheats, written for the built-in RetroArch to switch on as the game starts
-    const cheats = !this.ownEmu() && !this.cfg.systems[g.system].emulator ? await this.writeCheats(g).catch(() => false) : false;
-    if (!this.ownEmu() && !this.cfg.systems[g.system].emulator) try { this.writeRemap(g); } catch {}
+    const cheats = !this.ownEmu() && !this.standalone(g.system) ? await this.writeCheats(g).catch(() => false) : false;
+    if (!this.ownEmu() && !this.standalone(g.system)) try { this.writeRemap(g); } catch {}
     try { built = this.buildCmd(g, { ...opts, cheats }); } catch (e) { return [400, { error: e.message }]; }
     const [exe, ...args] = built.cmd;
     const cwd = path.isAbsolute(exe) && fs.existsSync(path.dirname(exe)) ? path.dirname(exe) : undefined;
@@ -1811,6 +1822,7 @@ class Backend extends EventEmitter {
     return { ui: this.ui, paths: {
       roms_dir: this.paths.roms_dir || root, exe: r.exe || "", cores_dir: r.cores_dir || "", args: (r.args || ["-f"]).join(" "),
       roms_ok: fs.existsSync(root), exe_ok: this.exeOk(), cores_ok: this.coresOk(),
+      pcsx2: !!(this.cfg.systems.PS2 && this.cfg.systems.PS2.emulator && this.resolveApp(this.cfg.systems.PS2.emulator[0])),
       builtin: this.ra ? { version: this.ra.version, systems } : null, own: this.ownEmu(),
       folders: { games: root, saves: this.folders.saves, bios: this.folders.bios },
       saves_dir: this.paths.saves_dir || "", backup_dir: this.backupDir(), last_backup: this.state.lastAutoBackup || 0,
@@ -1965,7 +1977,7 @@ class Backend extends EventEmitter {
       fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES,
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
       // how each console's games look on the shelf: the kind of box, its short name, packaging and the color of its pile
-      consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null, light: !!v.light, freeTriggers: !!v.freeTriggers, builtin: !v.emulator, buttons: v.buttons || null, remap: st.remaps[k] || null }])),
+      consoles: Object.fromEntries(Object.entries(this.cfg.systems).map(([k, v]) => [k, { media: v.media || "cart", abbr: v.abbr || "", look: v.look || null, pile: v.pile || null, light: !!v.light, freeTriggers: !!v.freeTriggers, builtin: !this.standalone(k), buttons: v.buttons || null, remap: st.remaps[k] || null }])),
       settings: this.settingsJson(), status: this.statusJson(),
     };
   }

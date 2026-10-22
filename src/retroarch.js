@@ -323,4 +323,12 @@ function explain(logFile, exit = {}) {
   return "";
 }
 
-module.exports = { bundled, corePath, enforced, players, neededDirs, writeConfig, readConfigKey, linkSystemData, explain, withTriggers, triggerProfiles, CORE_EXT };
+/** a core's own options, in RetroArch's file for that core (config/<core>/<core>.opt): the enforced ones every time, the
+    initial ones only while they aren't there, so a change made in RetroArch's menu stays */
+function coreOptions(privateDir, core, enforce, initial = {}) {
+  const file = path.join(privateDir, "config", core, core + ".opt"), keys = { ...enforce };
+  for (const [k, v] of Object.entries(initial)) if (!readConfigKey(file, k)) keys[k] = v;
+  writeConfig(file, keys);
+}
+
+module.exports = { bundled, corePath, enforced, players, neededDirs, writeConfig, readConfigKey, linkSystemData, explain, withTriggers, triggerProfiles, coreOptions, CORE_EXT };
