@@ -114,7 +114,7 @@ const PROGRESS = ["backlog", "playing", "beaten", "complete"];
 // settings, button layouts, watched folders, the backup clock) is the computer's. The first person's is in state.json
 // with the rest, as it always was, so one person sees no change; others' are in people/<id>.json
 const PERSONAL = ["fav", "last", "plays", "time", "sessions", "events", "pins", "pinKeys", "progress", "rating", "notes", "shelves", "cheevos", "recapSeen", "edited", "imported",
-  "journalLast", "journalBase", "former", "consoleSaves"];
+  "journalLast", "journalBase", "former", "consoleMoved"];
 const STATE_DEFAULTS = [["fav", []], ["last", {}], ["plays", {}], ["time", {}], ["names", {}], ["hidden", []], ["shelves", []], ["sessions", []], ["events", {}], ["gameOpts", {}], ["cheats", {}], ["cheevos", {}], ["progress", {}], ["rating", {}], ["notes", {}], ["remaps", {}], ["notCounted", {}]];
 
 // what one game can have of its own (setGameOpts): each setting's choices, with the words menus show for them
@@ -436,10 +436,10 @@ class Backend extends EventEmitter {
   // ---------------------------------------------------------------- play on more than one computer
   /** with saves in a cloud folder, play goes along too (sync.js): this computer's journal there, the others' read */
   syncOn() { return !!this.paths.saves_dir && !this.paths.oldSaves; }
-  journalFile() {
-    const p = this.people.list.find(x => x.id === this.people.active);
-    return path.join(sync.journalDir(this.savesRoot(), p ? p.name : "player"), this.machine() + ".json");
-  }
+  /** this computer's name, as other computers are told it */
+  hostName() { return os.hostname(); }
+  journalFile() { return this.journalFileOf(this.people.list.find(x => x.id === this.people.active)); }
+  journalFileOf(p) { return path.join(this.savesRoot(), ".the-retro-shelf", "play", p ? this.personSlug(p) : "player", this.machine() + ".json"); }
   /** written a moment after a change (a burst of changes is one write) */
   journalSoon() {
     if (!this.syncOn() || !this.people) return;
@@ -459,9 +459,11 @@ class Backend extends EventEmitter {
       if (st.journalLast) {
         let cur = null;
         try { cur = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
-        if (cur && cur.machine === this.machine() && cur.at > st.journalLast.at) return this.splitMachine();
+        // (another computer: written later than this one last did, and by a computer of another name, so a state file
+        // brought back from its .bak, or a save that didn't finish, never makes one computer two)
+        if (cur && cur.machine === this.machine() && cur.at > st.journalLast.at && cur.host && cur.host !== this.hostName()) return this.splitMachine();
       }
-      const at = Math.floor(now()), j = sync.minus(sync.journal(st, this.keysKnown(), this.machine(), os.hostname(), at), st.journalBase);
+      const at = Math.floor(now()), j = sync.minus(sync.journal(st, this.keysKnown(), this.machine(), this.hostName(), at), st.journalBase);
       if (!sync.writeJournal(file, j)) return false;
       st.journalLast = { at, games: sync.totals(j) };
       this.saveState(true);
@@ -475,8 +477,14 @@ class Backend extends EventEmitter {
    */
   splitMachine() {
     const old = this.machine();
+    const keys = this.keysKnown(), at = Math.floor(now());
     const mark = st => {
-      if (!st.journalLast) return;
+      // someone with no journal yet: what they've played so far is all in common with the other computer (both have it
+      // from the copy), so it's taken off both sides as for someone who'd written one
+      if (!st.journalLast) {
+        if (!st.plays || !Object.keys(st.plays).length) return;
+        st.journalLast = { at, games: sync.totals(sync.minus(sync.journal(st, keys, old, "", at), st.journalBase)) };
+      }
       st.former = { ...(st.former || {}), [old]: st.journalLast };
       st.journalBase = { at: st.journalLast.at, games: sync.addTotals(st.journalBase && st.journalBase.games, st.journalLast.games) };
       delete st.journalLast;
@@ -519,7 +527,10 @@ class Backend extends EventEmitter {
     const { at, sig } = this.journalSig(path.dirname(this.journalFile()));
     // any change at all: a cloud drive keeps a file's own time, so one written before the last look can arrive after it
     if (this._remote && this._remote.sig !== sig) this._remote = null;
-    return Math.floor(at);
+    // a number that changes whenever any of them does (a journal arriving with an older time too): the page looks again
+    let h = Math.floor(at) % 1e9;
+    for (let i = 0; i < sig.length; i++) h = (h * 31 + sig.charCodeAt(i)) % 2147483647;
+    return sig ? h : 0;
   }
   /** the other computers' journals as they are now: the newest one's time, and every one's name, size and time */
   journalSig(dir) {
@@ -565,27 +576,40 @@ class Backend extends EventEmitter {
   personFolder(id) {
     if (id === "p1") return this.savesRoot();
     const p = this.people && this.people.list.find(x => x.id === id);
-    return path.join(this.savesRoot(), "People", sync.personKey(p ? p.name : id));
+    return path.join(this.savesRoot(), "People", this.personSlug(p || { id, name: id }));
   }
-  /** saves kept by this computer's numbering (People/p2, before 0.5.0-beta.4, or from a backup made then) go to the
-      name's folder: moved whole, or file by file where a save is newer than the one there */
+  /** a person's folder name, for their saves and their journal: their name as other computers know it, or with their
+      number too when two people here have names that would share one ("Ann Marie" and "Ann-Marie", from before such
+      names were refused) */
+  personSlug(p) {
+    const k = sync.personKey(p.name), list = this.people ? this.people.list : [];
+    return list.some(x => x.id !== p.id && sync.personKey(x.name) === k) ? k + "-" + p.id : k;
+  }
+  /** a person's saves kept by this computer's numbering (People/p2: before 0.5.0-beta.4, or from a backup made then)
+      brought into their name's folder: only what isn't there yet, never over a save (and copied, never moved, from a
+      folder shared with other computers, where another computer may still read People/p2). Once for each person, and
+      again after a restore (peopleMoved cleared) */
   peopleFolders() {
+    const done = this._base.peopleMoved = this._base.peopleMoved || {};
+    let changed = false;
     for (const p of this.people.list) {
-      if (p.id === "p1") continue;
+      if (p.id === "p1" || done[p.id]) continue;
       const old = path.join(this.savesRoot(), "People", p.id), to = this.personFolder(p.id);
-      if (old === to || !fs.existsSync(old)) continue;
-      try {
-        if (!fs.existsSync(to)) { fs.renameSync(old, to); continue; }
-        for (const rel of zip.filesIn(old)) {
-          const a = path.join(old, ...rel.split("/")), b = path.join(to, ...rel.split("/"));
-          let newer = true;
-          try { newer = fs.statSync(a).mtimeMs > fs.statSync(b).mtimeMs; } catch {}
-          if (!newer) continue;
-          fs.mkdirSync(path.dirname(b), { recursive: true });
-          fs.copyFileSync(a, b);
-        }
-      } catch {}
+      if (!fs.existsSync(this.savesRoot())) continue;          // a cloud folder that isn't there yet: next time
+      if (old !== to && fs.existsSync(old)) {
+        try {
+          if (!fs.existsSync(to) && !this.syncOn()) fs.renameSync(old, to);
+          else for (const rel of zip.filesIn(old)) {
+            const a = path.join(old, ...rel.split("/")), b = path.join(to, ...rel.split("/"));
+            if (fs.existsSync(b)) continue;
+            fs.mkdirSync(path.dirname(b), { recursive: true });
+            fs.copyFileSync(a, b);
+          }
+        } catch { continue; }
+      }
+      done[p.id] = 1; changed = true;
     }
+    if (changed) { this.state.peopleMoved = done; try { jsave(this.files.state, this._base); } catch {} }
   }
   applyFolders() { this.folders.saves = this.personFolder(this.people.active); this.folders.states = path.join(this.folders.saves, "States"); }
   /**
@@ -597,32 +621,59 @@ class Backend extends EventEmitter {
     const s = this.cfg.systems[system] || {}, saves = s.ownSaves ? path.join(base, "Consoles", safe(s.folder || system)) : base;
     return { saves, states: path.join(saves, "States") };
   }
-  /** once for each person: saves of consoles with a folder of their own (above) go there from the emulator's shared one.
-      Moved, or copied where another console's game of the same name could be using it too */
+  /** for each person, once for each game: saves of a console with a folder of its own (above) are copied there from
+      the emulator's shared one (copied, never moved: a Genesis game of the same name, here or on another computer
+      sharing the saves, may be using them). A game not here right now, or a saves folder that isn't (a cloud drive not
+      started yet), waits for next time; a restore lets it all happen again */
   consoleSaves() {
-    // (with the built-in emulators, whose folder names it knows)
-    if (this.state.consoleSaves || !this.games.size || this.ownEmu() || !this.ra) return;
-    const games = [...this.games.values()], base = this.saveDirs("", this.folders.saves);
-    for (const g of games) {
-      const s = this.cfg.systems[g.system] || {};
-      if (!s.ownSaves) continue;
+    if (!this.games.size || this.ownEmu() || !this.ra || !fs.existsSync(this.folders.saves)) return;
+    const done = this.state.consoleMoved = this.state.consoleMoved || {}, base = this.saveDirs("", this.folders.saves);
+    let changed = false;
+    for (const g of this.games.values()) {
+      const s = this.cfg.systems[g.system] || {}, stem = path.parse(g.path).name, key = g.system + "/" + stem.toLowerCase();
+      if (!s.ownSaves || done[key]) continue;
       this.resumeAt(g);
       const cn = s.core && this._coreNames && this._coreNames[s.core];
       if (!cn) continue;
-      const stem = path.parse(g.path).name, sd = this.saveDirs(g.system);
-      const shared = games.some(x => x !== g && x.system !== g.system && (this.cfg.systems[x.system] || {}).core === s.core && path.parse(x.path).name === stem);
+      const sd = this.saveDirs(g.system);
       for (const [from, to] of [[path.join(base.saves, cn), path.join(sd.saves, cn)], [path.join(base.states, cn), path.join(sd.states, cn)]]) {
         let names = [];
         try { names = fs.readdirSync(from).filter(f => f.startsWith(stem + ".") && /^(\.[^.\s]+)+$/.test(f.slice(stem.length))); } catch {}
         for (const f of names) {
-          const a = path.join(from, f), b = path.join(to, f);
+          const b = path.join(to, f);
           if (fs.existsSync(b)) continue;
-          try { fs.mkdirSync(to, { recursive: true }); if (shared) fs.copyFileSync(a, b); else fs.renameSync(a, b); } catch {}
+          try { fs.mkdirSync(to, { recursive: true }); fs.copyFileSync(path.join(from, f), b); const st = fs.statSync(path.join(from, f)); fs.utimesSync(b, st.atime, st.mtime); } catch {}
         }
       }
+      done[key] = 1; changed = true;
     }
-    this.state.consoleSaves = 1;
+    if (changed) this.saveState(true);
+  }
+  /** a game moved to a console whose saves are kept apart (Genesis to Game Gear, say): everyone's saves of it are
+      copied along, so they're there where the game looks now (the ones where it was stay) */
+  carrySaves(g, system) {
+    const core = (this.cfg.systems[g.system] || {}).core;
+    if (!core || core !== (this.cfg.systems[system] || {}).core) return;
+    this.resumeAt(g);
+    const cn = this._coreNames && this._coreNames[core], stem = path.parse(g.path).name;
+    if (!cn) return;
+    for (const p of this.people.list) {
+      const base = this.personFolder(p.id), a = this.saveDirs(g.system, base), b = this.saveDirs(system, base);
+      if (a.saves === b.saves) continue;
+      for (const [from, to] of [[path.join(a.saves, cn), path.join(b.saves, cn)], [path.join(a.states, cn), path.join(b.states, cn)]]) {
+        let names = [];
+        try { names = fs.readdirSync(from).filter(f => f.startsWith(stem + ".") && /^(\.[^.\s]+)+$/.test(f.slice(stem.length))); } catch {}
+        for (const f of names) { const t = path.join(to, f); if (fs.existsSync(t)) continue; try { fs.mkdirSync(to, { recursive: true }); fs.copyFileSync(path.join(from, f), t); } catch {} }
+      }
+    }
+  }
+  /** after a restore: saves from a backup made before people's or consoles' folders changed go where they're read now */
+  afterRestore() {
+    this._base.peopleMoved = {}; this.state.peopleMoved = {};
+    delete this.state.consoleMoved; this.otherPeople(st => { delete st.consoleMoved; });
     this.saveState(true);
+    this.peopleFolders();
+    this.consoleSaves();
   }
   /** the state as someone other than the first person has it: the computer's part and their own */
   personState(id) {
@@ -650,6 +701,7 @@ class Backend extends EventEmitter {
     if (!this.people.list.some(p => p.id === id)) return [404, { error: "There's no one by that name here." }];
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
     if (id === this.people.active) return [200, this.peopleJson()];
+    if (this.busy) return [409, { error: "Wait for the saves or games to finish moving, then play." }];
     // the one stopping: everything theirs saved, and in their own journal, before anything changes
     this.saveState();
     this.writeJournalNow();
@@ -682,14 +734,20 @@ class Backend extends EventEmitter {
     if (!name) return [400, { error: "Give them a name." }];
     if (this.people.list.some(x => x !== p && sync.personKey(x.name) === sync.personKey(name))) return [409, { error: "There's someone with that name already." }];
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
-    // this computer's journal of their play, and their saves folder (not the first person's: theirs is the saves folder
-    // itself), go by the new name
-    const moves = [[path.join(sync.journalDir(this.savesRoot(), p.name), this.machine() + ".json"), path.join(sync.journalDir(this.savesRoot(), name), this.machine() + ".json")]];
-    if (id !== "p1") moves.push([this.personFolder(id), path.join(this.savesRoot(), "People", sync.personKey(name))]);
-    for (const [a, b] of moves) {
-      try { if (a !== b && fs.existsSync(a) && !fs.existsSync(b)) { fs.mkdirSync(path.dirname(b), { recursive: true }); fs.renameSync(a, b); } } catch {}
-    }
+    if (this.busy) return [409, { error: "Wait for the saves or games to finish moving, then play." }];
+    // this computer's journal of their play goes by the new name; so does their saves folder (not the first person's:
+    // theirs is the saves folder itself), copied in a folder shared with other computers, where the old name's may
+    // still be in use
+    const journal = this.journalFileOf(p), saves = this.personFolder(id), was = p.name;
     p.name = name;
+    const journal2 = this.journalFileOf(p), saves2 = this.personFolder(id);
+    try { if (journal !== journal2 && fs.existsSync(journal) && !fs.existsSync(journal2)) { fs.mkdirSync(path.dirname(journal2), { recursive: true }); fs.renameSync(journal, journal2); } } catch {}
+    if (id !== "p1" && saves !== saves2 && fs.existsSync(saves)) {
+      try {
+        if (this.syncOn() || fs.existsSync(saves2)) fs.cpSync(saves, saves2, { recursive: true, force: false, errorOnExist: false });
+        else { fs.mkdirSync(path.dirname(saves2), { recursive: true }); fs.renameSync(saves, saves2); }
+      } catch { p.name = was; return [500, { error: "Couldn't move their saves to the new name." }]; }
+    }
     this.savePeople();
     if (this.people.active === id) { this.applyFolders(); this._remote = null; }
     return [200, this.peopleJson()];
@@ -701,6 +759,7 @@ class Backend extends EventEmitter {
     const i = this.people.list.findIndex(x => x.id === id);
     if (i < 0) return [404, { error: "There's no one by that name here." }];
     if ((this.running && this.running.alive) || this.launching) return [409, { error: "Close the game first." }];
+    if (this.busy) return [409, { error: "Wait for the saves or games to finish moving, then play." }];
     if (this.people.active === id) this.usePerson("p1");
     // saves in a folder shared with other computers stay: the same person may play on those
     const shared = this.syncOn(), keep = shared && fs.existsSync(this.personFolder(id));
@@ -1223,7 +1282,7 @@ class Backend extends EventEmitter {
   }
 
   scan() {
-    const found = new Map(), root = this.romsRoot(), adopt = [];
+    const found = new Map(), root = this.romsRoot(), adopt = [], hiddenBy = [];
     // the games folder watched, and a previous one (before it was changed or moved) not any more
     if (this._root && this._root !== root && this._watchers && !(this.paths.watch || []).includes(this._root)) {
       const w = this._watchers.get(this._root); if (w) { try { w.close(); } catch {} this._watchers.delete(this._root); }
@@ -1236,12 +1295,12 @@ class Backend extends EventEmitter {
       if (s.discLists && exts.includes(".m3u")) for (const x of this.makeDiscLists(path.join(root, folder))) adopt.push([name, x]);
       // files a list on the shelf names show up once, as the list: discs in an .m3u, a .cue's .iso, wherever they sit
       // and however their names are written. A list this console can't show (an .m3u for Saturn) hides nothing
-      const listed = new Set(), ids = [], sheets = [".m3u", ".cue", ".gdi"].filter(x => exts.includes(x));
+      const listed = new Map(), ids = [], sheets = [".m3u", ".cue", ".gdi"].filter(x => exts.includes(x));
       const walk = (dir, depth) => {
         let ents;
         try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const e of ents) if (e.isFile() && sheets.some(x => e.name.toLowerCase().endsWith(x)))
-          for (const f of sheetFiles(path.join(dir, e.name))) listed.add(pathKey(f));
+          for (const f of sheetFiles(path.join(dir, e.name))) listed.set(pathKey(f), path.join(dir, e.name));
         for (const e of ents) {
           if (hiddenEntry(e)) continue;
           const p = path.join(dir, e.name);
@@ -1253,7 +1312,7 @@ class Backend extends EventEmitter {
         }
       };
       walk(path.join(root, folder), 0);
-      for (const id of ids) if (listed.has(pathKey(found.get(id).path))) found.delete(id);
+      for (const id of ids) { const by = listed.get(pathKey(found.get(id).path)); if (by) { found.delete(id); hiddenBy.push([id, gid(by)]); } }
     }
     // games in watched folders, where they are
     for (const dir of this.watchedDirs()) for (const it of this.watchedItems(dir).items) {
@@ -1262,6 +1321,12 @@ class Backend extends EventEmitter {
     }
     this.games = found;
     if (adopt.length) { for (const [system, x] of adopt) this.adoptDiscs(system, x.m3u, x.discs); this.saveState(); }
+    // a file a list on the shelf names (a .cue's .iso), which was a box of its own before: its play history goes to the
+    // list's box, once
+    const moved = this._base.sheetMoved = this._base.sheetMoved || {};
+    let carried = false;
+    for (const [id, to] of hiddenBy) if (!moved[id] && found.has(to)) { this.moveStats(id, to); moved[id] = 1; carried = true; }
+    if (carried) { this.state.sheetMoved = moved; this.saveState(); }
     try { this.consoleSaves(); } catch {}
   }
 
@@ -1297,10 +1362,19 @@ class Backend extends EventEmitter {
       const play = this.playOpts(g);
       // RetroAchievements as whoever's playing: their own sign-in (the token RetroArch gave them), never the last person's
       const cv = this.state.cheevos;
-      if (cv.user && !cv.token) {
-        // signed in before tokens were kept for each person: the one in RetroArch's settings, when it's theirs
-        try { if (ra.readConfigKey(this.files.raCfg, "cheevos_username") === cv.user) cv.token = ra.readConfigKey(this.files.raCfg, "cheevos_token") || undefined; } catch {}
+      if (!this._tokensKept) {
+        // signed in before tokens were kept for each person: RetroArch's settings hold one sign-in, given (once) to
+        // whoever it's for, here or another person, before a launch replaces it
+        this._tokensKept = true;
+        try {
+          const cu = ra.readConfigKey(this.files.raCfg, "cheevos_username"), ct = ra.readConfigKey(this.files.raCfg, "cheevos_token");
+          const give = st => { if (cu && ct && st.cheevos && st.cheevos.user === cu && !st.cheevos.token) st.cheevos.token = ct; };
+          give(this.state); this.saveState(true); this.otherPeople(give);
+        } catch {}
       }
+      // signed in with no token kept anywhere (another person's sign-in took its place): signed out, to sign in again,
+      // rather than shown as signed in with achievements going nowhere
+      if (cv.user && !cv.token && !this.raPending) { delete cv.user; this.saveState(true); }
       const cheevos = this.raPending || (cv.user && cv.token ? { user: cv.user, token: cv.token } : null);
       // RetroArch's menu and messages in the app's language: the one chosen, or the computer's
       const loc = this.dirs.locale || "", lang = this.ui.lang && this.ui.lang !== "auto" ? this.ui.lang : /^zh-(hant|tw|hk|mo)/i.test(loc) ? "zh-Hant" : loc.slice(0, 2).toLowerCase();
@@ -1428,7 +1502,10 @@ class Backend extends EventEmitter {
     return new Promise(done => {
       r.proc.once("exit", done);
       if (r.builtIn) {
-        try { r.proc.stdin.write("QUIT\n"); } catch {}
+        // RetroArch reads commands from its input on Mac and Linux; on Windows it doesn't, so its window is asked to
+        // close, as its own X does: either way it saves where you left off first, and is only made to stop if it hangs
+        if (process.platform === "win32") { try { spawn("taskkill", ["/PID", String(r.proc.pid)], { windowsHide: true, stdio: "ignore" }).on("error", () => {}); } catch {} }
+        else try { r.proc.stdin.write("QUIT\n"); } catch {}
         setTimeout(() => { if (r.alive) r.proc.kill(); }, 5000);
       } else r.proc.kill();
       setTimeout(done, 7000);
@@ -1574,7 +1651,7 @@ class Backend extends EventEmitter {
     const target = path.join(path.dirname(this.files.raCfg), "cheats", cn, path.parse(g.path).name + ".cht");
     const keys = this.state.cheats[g.id] || [];
     let chosen = [];
-    if (keys.length && !(this.ui.hardcore && this.state.cheevos.user)) {
+    if (keys.length && !this.hardcoreOn()) {
       try {
         const idx = await this.cheatIndex(), byFile = new Map();
         for (const k of keys) { const i = k.lastIndexOf("#"), f = k.slice(0, i); if (idx.entries.has(f)) (byFile.get(f) || byFile.set(f, []).get(f)).push(+k.slice(i + 1)); }
@@ -1583,12 +1660,22 @@ class Backend extends EventEmitter {
     }
     // the app's own file says so on its first line. One without it (made in RetroArch's menu, or from before the mark)
     // is never deleted: it's left as it is, or set aside as .cht.before-retro-shelf when cheats chosen here take its place
+    // (RetroArch writes the file again as a game closes, without the mark: the files the app wrote are remembered too)
+    const written = this._base.cheatFiles = this._base.cheatFiles || {}, aside = target + ".before-retro-shelf";
+    const keep = () => { this.state.cheatFiles = written; try { jsave(this.files.state, this._base); } catch {} };
     let mine = true;
-    try { mine = fs.readFileSync(target, "utf8").startsWith(CHEAT_MARK); } catch {}
-    if (!chosen.length) { if (mine) fs.rmSync(target, { force: true }); return false; }
-    if (!mine) { const aside = target + ".before-retro-shelf"; if (fs.existsSync(aside)) return false; fs.renameSync(target, aside); }
+    try { mine = fs.readFileSync(target, "utf8").startsWith(CHEAT_MARK) || !!written[target]; } catch {}
+    // cheats chosen but not to be had right now (offline, the collection not downloaded yet): everything stays as it is
+    if (!chosen.length && keys.length && !this.hardcoreOn()) return false;
+    if (!chosen.length) {
+      // none chosen any more: the app's file goes, and one of yours it had set aside comes back
+      if (mine) { fs.rmSync(target, { force: true }); delete written[target]; keep(); try { if (fs.existsSync(aside) && !fs.existsSync(target)) fs.renameSync(aside, target); } catch {} }
+      return false;
+    }
+    if (!mine) fs.renameSync(target, freeName(aside));
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, CHEAT_MARK + "\n" + cheatFiles.write(chosen));
+    if (!written[target]) { written[target] = 1; keep(); }
     return true;
   }
 
@@ -1740,6 +1827,7 @@ class Backend extends EventEmitter {
         newPath = path.join(destDir, path.basename(g.path));
       }
       this.moveStats(id, gid(newPath));
+      this.carrySaves(g, system);
       this.saveState();
       this.scan();
       return [200, { ok: true, id: gid(newPath) }];
@@ -2171,8 +2259,9 @@ class Backend extends EventEmitter {
     const root = this.romsRoot();
     return [200, {
       items: items.map(it => {
-        // a game dropped from the games folder itself (or a copy already there) is there already
-        let exists = within(it.src, root);
+        // a game dropped from the shelves themselves (or a copy already there) is there already; one sitting loose in
+        // the games folder, not on a shelf, can be sorted
+        let exists = this.games.has(gid(it.src));
         if (!exists && it.system) { try { const d = this.importer.plan(it, root).main; exists = fs.existsSync(d); } catch {} }
         return { id: it.id, name: it.name, size: it.size, system: it.system, choices: it.choices, exists };
       }),
@@ -2186,7 +2275,7 @@ class Backend extends EventEmitter {
     const items = [];
     for (const p of Array.isArray(picks) ? picks : []) {
       const it = this.pending.get(String(p.id));
-      if (it && within(it.src, this.romsRoot())) continue;
+      if (it && this.games.has(gid(it.src))) continue;
       const sys = p.system ? String(p.system) : it && it.system;
       if (!it || !sys || !it.choices.includes(sys)) continue;
       items.push({ ...it, system: sys });
@@ -2261,7 +2350,7 @@ class Backend extends EventEmitter {
       folders: { games: root, saves: this.savesRoot(), bios: this.folders.bios },
       saves_dir: this.paths.saves_dir || "", backup_dir: this.backupDir(), last_backup: this.state.lastAutoBackup || 0,
       watch: this.watchedDirs().map(dir => { const c = this.watchedItems(dir); return { dir, games: c.items.length, unsure: c.unsure.length }; }),
-    }, app: { version: this.dirs.version || "" },
+    }, app: { version: this.dirs.version || "", shotButton: process.platform !== "win32" },
     cheevos: { user: this.state.cheevos.user || "", pending: this.raPending ? this.raPending.user : "", failed: !!this.raFailed } };
   }
 
@@ -2342,7 +2431,7 @@ class Backend extends EventEmitter {
     const out = { resume: 0, rpic: false, slots: [] };
     // what a launch can start from: no resume point with "pick up where you left off" off, and nothing but the start
     // with hardcore achievements (RetroArch won't load a save then)
-    const hardcore = !!(this.ui.hardcore && this.state.cheevos.user), resume = this.playOpts(g).resume !== false;
+    const hardcore = this.hardcoreOn(), resume = this.playOpts(g).resume !== false;
     if (hardcore) return out;
     if (resume && files.has(stem + ".state.auto")) { out.resume = at(stem + ".state.auto"); out.rpic = files.has(stem + ".state.auto.png") && !this.blankPic(files.get(stem + ".state.auto.png")); }
     for (let n = 0; n <= 9; n++) {
@@ -2438,6 +2527,9 @@ class Backend extends EventEmitter {
     this._shots.set(dir, { mt, by, t: Date.now() });
     return by;
   }
+  /** hardcore achievements in the next game, as RetroArch will have them: hardcore chosen, and someone signed in (with a
+      sign-in waiting, or a user with a token) */
+  hardcoreOn() { const cv = this.state.cheevos || {}; return !!(this.ui.hardcore && (this.raPending || (cv.user && cv.token))); }
   /** a game's screenshots, newest first: its console's folder, and older ones still loose in Screenshots when no other
       game here has its name (they could be from either) */
   shotsOf(g) {
@@ -2473,6 +2565,8 @@ class Backend extends EventEmitter {
   takeShot() {
     const r = this.running;
     if (!r || !r.alive || !r.builtIn) return [409, { error: "No game is playing in a built-in emulator." }];
+    // (Windows: RetroArch doesn't read commands there; F8 in the game takes one)
+    if (process.platform === "win32") return [409, { error: "F8 takes a screenshot." }];
     try { r.proc.stdin.write("SCREENSHOT\n"); } catch (e) { return [500, { error: "Couldn't take a screenshot." }]; }
     this.event("screenshot");
     return [200, { ok: true }];

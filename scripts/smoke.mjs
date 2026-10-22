@@ -205,10 +205,54 @@ try {
     if (!st.running) throw new Error(`${system}: the game closed by itself` + (st.exit && st.exit.error ? ": " + st.exit.error : "") + (st.exit ? ` (exit code ${st.exit.code}${st.exit.signal ? ", " + st.exit.signal : ""})` : ""));
     const look = PICTURE[system] === "lcd" ? "handheld" : PICTURE[system] === "crt" ? "old-TV" : "sharp", shader = { handheld: "zfast_lcd", "old-TV": "zfast_crt" }[look];
     if (shader && !new RegExp(`\\[Slang\\] Compiling shader: "[^"]*${shader}`).test(ra)) throw new Error(`${system}: the game runs, but without the ${look} picture (see its retroarch log)`);
+    const asked = Date.now();
     await page.evaluate(`api("/api/stop", {})`);
     const ex = await until(`${system}: the game didn't close when asked`, () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
     if (ex.error) throw new Error(`${system}: the game closed with: ${ex.error}`);
+    // asked to stop, RetroArch closes itself (saving where you left off); one that's still there after 5 s is made to
+    // stop. On Windows that's by force, without saving, so it mustn't come to that there (on Mac and Linux it's the
+    // signal RetroArch takes as quitting, and it saves). Counted from the asking
+    const took = (Date.now() - asked) / 1000;
+    if (process.platform === "win32" && took > 4.8) throw new Error(`${system}: RetroArch didn't close when asked (it was stopped by force after ${took.toFixed(1)} s, so nothing was saved)`);
     step(`${system}: running with the ${look} picture, closed after ${Math.round(ex.dt)} s`);
+  }
+
+  // what playing leaves, where the app reads it: each game's resume point (Game Gear's in a folder of its own, apart
+  // from the Genesis games that share its emulator), a screenshot taken in a game, and Continue starting from it
+  if (played === "runs them") {
+    const lib = await page.evaluate(`api("/api/library").then(r => r.data.games.map(g => ({title: g.title, system: g.system, id: g.id, resume: (g.saves || {}).resume || 0})))`);
+    for (const t of ["Smoke Test", "Smoke Test GG", "Smoke Test MD"]) {
+      const g = lib.find(x => x.title === t);
+      if (!g || !g.resume) throw new Error(`${g ? g.system : t}: no resume point found after playing (the app looks for it where RetroArch didn't put it)`);
+    }
+    const gg = lib.find(x => x.title === "Smoke Test GG"), files = await page.evaluate(`api("/api/saves/list", {id: ${JSON.stringify(gg.id)}}).then(r => r.data.saves.map(s => s.file))`);
+    if (!files.some(f => /[\\/]Consoles[\\/]gg[\\/]/.test(f))) throw new Error("Game Gear: its saves aren't in its own folder: " + files.join(", "));
+    step("resume points are where the app reads them (Game Gear's in its own folder)");
+    const nes = lib.find(x => x.title === "Smoke Test");
+    const again = await page.evaluate(`api("/api/launch", {id: ${JSON.stringify(nes.id)}}).then(r => r.ok ? "" : r.data.error || "error")`);
+    if (again) throw new Error("NES: didn't start again: " + again);
+    await sleep(6000);
+    const ra2 = fs.readFileSync(log, "utf8");
+    // RetroArch says so: "Auto-loading save state from "…Smoke Test (World).state.auto" succeeded"
+    if (!/Auto-loading save state from "[^"]*Smoke Test \(World\)\.state\.auto" succeeded/.test(ra2)) throw new Error("NES: Continue didn't load the resume point (see its retroarch log)");
+    // a screenshot from the playing screen's button (not on Windows, where RetroArch takes no commands from the app)
+    const button = process.platform !== "win32";
+    if (button) {
+      const shot = await page.evaluate(`api("/api/shot/take", {}).then(r => r.ok ? "" : r.data.error || "error")`);
+      if (shot) throw new Error("NES: couldn't take a screenshot: " + shot);
+      await sleep(2500);
+    }
+    const asked = Date.now();
+    await page.evaluate(`api("/api/stop", {})`);
+    await until("NES: the game didn't close when asked", () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
+    // Stop closes RetroArch the way it closes itself (so it saves first), not by force after waiting
+    if (process.platform === "win32" && (Date.now() - asked) / 1000 > 4.8) throw new Error("NES: RetroArch didn't close when asked, and was made to");
+    if (button) {
+      const shots = await page.evaluate(`api("/api/library").then(r => (r.data.games.find(g => g.title === "Smoke Test") || {}).shots || 0)`);
+      if (!shots) throw new Error("NES: the screenshot isn't on its box (not found in Screenshots/NES)");
+      if (!fs.readdirSync(path.join(home, "The Retro Shelf", "Screenshots", "NES")).some(f => /\.png$/i.test(f))) throw new Error("NES: the screenshot wasn't put in its console's folder");
+    }
+    step("Continue loads the resume point" + (button ? ", and a screenshot goes in its console's folder and on the box" : ""));
   }
 
   if (page.errors.length) throw new Error("the page had errors:\n  " + page.errors.join("\n  "));

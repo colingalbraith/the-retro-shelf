@@ -9,6 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -119,18 +120,47 @@ const BACKS = `(async () => {
 /* the panel that's open: anything off the side of the window or cut off (rows of boxes that scroll sideways and
    text boxes, which scroll their own text, are fine) */
 const PANEL = `(() => { const out = [], vis = e => e.offsetWidth && getComputedStyle(e).visibility !== "hidden";
-  const root = [...document.querySelectorAll("#settings,#getg,#pick,#colls,#trophy,.over,#opts,#osk,#imp")].find(e => e.classList.contains("show")) || document.body;
-  for (const e of root.querySelectorAll("button,h2,h3,b,.tplate,label,kbd")) {
-    if (!vis(e) || e.closest(".strip,#pgrid")) continue;
+  /* the panel on top (a list over Settings is the one to look at), else the page */
+  const tp = typeof topPanel === "function" && topPanel(), root = (tp && document.getElementById(tp[0])) || document.body;
+  const scrolls = e => { const o = getComputedStyle(e).overflowY; return /(auto|scroll)/.test(o) && e.scrollHeight > e.clientHeight; };
+  const canScroll = e => { for (let x = e.parentElement; x; x = x.parentElement) { if (scrolls(x)) return true; if (x === root) break; } return scrolls(root); };
+  /* every bit of text, not just headings and buttons: a line in a paragraph runs off as easily */
+  for (const e of root.querySelectorAll("button,h2,h3,b,.tplate,label,kbd,p,dd,dt,li,figcaption,small,span")) {
+    if (!vis(e) || e.closest(".strip,#pgrid,#shelves,.card,svg")) continue;
+    if (!["BUTTON", "H2", "H3", "B", "LABEL", "KBD"].includes(e.tagName) && !e.classList.contains("tplate") && ![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
     const r = e.getBoundingClientRect(), name = (e.textContent || e.id || e.tagName).trim().slice(0, 30);
-    /* below the window, with nothing to scroll it into view */
-    let sc = e.parentElement; while (sc && sc !== root && !(/(auto|scroll)/.test(getComputedStyle(sc).overflowY) && sc.scrollHeight > sc.clientHeight)) sc = sc.parentElement;
-    if (r.top > innerHeight - 4 && (!sc || sc === root) && !/(auto|scroll)/.test(getComputedStyle(root).overflowY)) out.push(name + " below the window");
+    /* out of the window with nothing to scroll it in: below, part below (a button cut in half), or above */
+    if (!canScroll(e)) {
+      if (r.top > innerHeight - 4) out.push(name + " below the window");
+      else if (e.tagName === "BUTTON" && r.bottom > innerHeight + 1) out.push(name + " half below the window");
+      else if (r.bottom < 4 || (e.tagName === "BUTTON" && r.top < -1)) out.push(name + " above the window");
+    }
     if (r.right > innerWidth + 1 || r.left < -1) out.push(name + " off the side");
     else if (e.scrollWidth > e.clientWidth + 2 && getComputedStyle(e).overflow !== "visible") out.push(name + " cut off");
   }
+  /* brass plates (hours under the trophies, shelf names) side by side never run into each other */
+  const plates = [...root.querySelectorAll(".tplate")].filter(vis).map(e => [e, e.getBoundingClientRect()]);
+  for (let i = 0; i < plates.length; i++) for (let j = i + 1; j < plates.length; j++) {
+    const [a, ra] = plates[i], [b, rb] = plates[j];
+    if (ra.left < rb.right - 2 && rb.left < ra.right - 2 && ra.top < rb.bottom - 2 && rb.top < ra.bottom - 2) out.push("plates " + a.textContent.trim().slice(0, 20) + " and " + b.textContent.trim().slice(0, 20) + " overlap");
+  }
   if (document.documentElement.scrollWidth > innerWidth + 1) out.push("the window scrolls sideways");
   return out; })()`;
+/* in another language, a piece of the app's English still showing where that language has its own words (WORDS_LEFT:
+   the English of each, set before) */
+const ENGLISH_LEFT = `(() => { const out = new Set(), skip = "#shelves,script,style,.card,.ci,.tro,.lslot,#saver,#nlist,#oskv,[translate=no],#lstl .lrow span";
+  const tp = typeof topPanel === "function" && topPanel(), root = (tp && document.getElementById(tp[0])) || document.getElementById("app") || document.body;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    const e = n.parentElement, s = n.textContent.trim();
+    if (!s || !e || e.closest(skip) || !e.getClientRects().length || getComputedStyle(e).visibility === "hidden") continue;
+    if (WORDS_LEFT.has(s)) out.add(s.slice(0, 50));
+  }
+  for (const e of root.querySelectorAll("[aria-label],[title],[placeholder]")) {
+    if (e.closest(skip)) continue;
+    for (const a of ["aria-label", "title", "placeholder"]) { const v = (e.getAttribute(a) || "").trim(); if (v && WORDS_LEFT.has(v)) out.add(a + " " + v.slice(0, 40)); }
+  }
+  return [...out]; })()`;
 /* for screen readers: every control that can be reached has a name to read out, every picture says what it is (or
    alt="" when it's decoration), and no two elements share an id */
 const A11Y = `(() => { const out = new Set(), vis = e => e.getClientRects().length && getComputedStyle(e).visibility !== "hidden";
@@ -176,7 +206,7 @@ const CONTRAST = `(() => {
   }
   return [...out]; })()`;
 const SCREENS = [
-  ["settings", "openSettings()", "closeSettings()"],
+  ["settings", "openSettings(); setTimeout(() => { $('#spanel').scrollTop = 0; }, 60)", "closeSettings()"],
   ["settings-end", "openSettings(); setTimeout(() => { $('#spanel').scrollTop = 1e6; }, 100)", "closeSettings()"],
   ["collections", "openColls('series')", "closeColls()"],
   ["collections-yours", "openColls('mine')", "closeColls()"],
@@ -203,6 +233,11 @@ const SCREENS = [
   // more than one person: who's playing, and the list of people (a long name, the hardest to fit)
   ["who", "(PEOPLE.list.length > 1 ? Promise.resolve() : api('/api/people/add', {name: 'Alexandria-Rosemary'}).then(r => { PEOPLE = r.data; })).then(() => openWho())", "closeList()"],
   ["people", "openPeople()", "closeList()"],
+  ["playing", "showLaunch(G[0])", "hideLaunch()"],
+  ["no-match", "setQ('zzqqxxnothing')", "setQ('')"],
+  ["picked", "togglePick(G[0].id); togglePick(G[1].id); togglePick(G[2].id)", "clearPicks()"],
+  ["hidden-games", "openHidden()", "closeList()"],
+  ["saves", "openSaves(G.slice().sort((a, b) => (b.plays || 0) - (a.plays || 0))[0].id)", "closeList()"],
   ["screenshots", "openShots(G.slice().sort((a, b) => (b.shots || 0) - (a.shots || 0))[0].id)", "closeList()"],
   ["screensaver", "UI.tv = true; startSaver()", "stopSaver(); UI.tv = false"],
   ["what-counts", "openColls('series'); setTimeout(() => openCounts(COLL.series[0].name), 700)", "closeList(); closeColls()"],
@@ -220,7 +255,26 @@ made.filter(f => !f.endsWith(".zip")).sort((a, b) => b.length - a.length).slice(
 fs.mkdirSync(path.join(home, "data"), { recursive: true });
 // no downloads (the same boxes every run), no sounds, and seen as an update from 0.2.0 so What's new shows
 fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: { welcomed: true, autoCovers: false, updates: false, sound: false } }));
-fs.writeFileSync(path.join(home, "data", "state.json"), JSON.stringify({ seenVersion: "0.2.0" }));
+// a library that's been played: covers for some, hours, sittings, ratings, progress, notes and favorites for others, so
+// the trophy shelf, the time card, recaps and filled box backs are drawn and checked too
+const gamesDir = path.join(home, "The Retro Shelf", "Games"), files = [];
+const walkGames = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walkGames(p); else files.push(p); } };
+walkGames(gamesDir);
+const roms = files.filter(f => !/\.(png|xml)$/i.test(f)).sort();
+roms.filter((f, i) => i % 3 === 0).forEach(f => fs.writeFileSync(f.replace(/\.[^.]+$/, ".png"), png(160, 220)));
+const gidOf = f => createHash("sha1").update(f).digest("hex").slice(0, 12), now = Math.floor(Date.now() / 1000);
+const st = { seenVersion: "0.2.0", plays: {}, time: {}, last: {}, sessions: [], rating: {}, progress: {}, notes: {}, fav: [] };
+roms.filter((f, i) => i % 4 === 1).slice(0, 40).forEach((f, i) => {
+  const id = gidOf(f), hours = (40 - i) * 3600;
+  st.plays[id] = 3 + i; st.time[id] = hours; st.last[id] = now - i * 86400;
+  for (let k = 0; k < 3; k++) st.sessions.push([id, now - (i * 3 + k) * 86400 - 3600, Math.floor(hours / 3)]);
+  if (i % 2) st.rating[id] = 1 + (i % 5);
+  if (i % 3 === 0) st.progress[id] = ["playing", "beaten", "complete", "backlog"][i % 4];
+  if (i % 5 === 0) st.notes[id] = "Stuck on the water temple, the key is behind the waterfall in the second room";
+  if (i % 6 === 0) st.fav.push(id);
+});
+st.sessions.sort((a, b) => a[1] - b[1]);
+fs.writeFileSync(path.join(home, "data", "state.json"), JSON.stringify(st));
 
 const given = process.argv[2], electron = path.join(ROOT, "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
 const args = [...(given ? [] : ["."]), `--remote-debugging-port=${PORT}`, ...(process.platform === "linux" ? ["--no-sandbox"] : [])];
@@ -308,12 +362,17 @@ try {
   for (const [code, lname] of [["de", "German"], ["ru", "Russian"], ["pl", "Polish"]]) {
   if (!harvest && fs.existsSync(path.join(ROOT, "src", "words", code + ".json"))) {
     await p.ev(`(async () => { await setLang("${code}"); renderHints(); renderShelves(focusId); return 1; })()`); await sleep(800);
+    // the English this language has words of its own for (not words that read the same in it, like "OK" or "Pins")
+    const table = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "words", code + ".json"), "utf8"));
+    const left = Object.keys(table).filter(k => !k.includes("|") && !/\{\w+\}/.test(k) && table[k] && table[k] !== k && /[a-z]{3}/.test(k));
+    await p.ev(`(window.WORDS_LEFT = new Set(${JSON.stringify(left)}), 1)`);
     await p.send("Emulation.setDeviceMetricsOverride", { width: 720, height: 520, deviceScaleFactor: 1, mobile: false }); await sleep(600);
     const bad = await p.ev(BACKS);
     for (const b of bad) problems.push(`${lname}, 720×520: ${b}`);
     for (const [name, open, close] of SCREENS) {
       await p.ev(open + "; 1"); await sleep(1300);
       for (const b of await p.ev(PANEL)) problems.push(`${name} in ${lname} at 720×520: ${b}`);
+      for (const w of await p.ev(ENGLISH_LEFT)) problems.push(`${name} in ${lname}: still in English: "${w}"`);
       const shot = await p.send("Page.captureScreenshot", { format: "jpeg", quality: 70 });
       fs.writeFileSync(path.join(OUT, `${code}-${name}-720x520.jpg`), Buffer.from(shot.result.data, "base64"));
       await p.ev(close + "; 1"); await sleep(400);

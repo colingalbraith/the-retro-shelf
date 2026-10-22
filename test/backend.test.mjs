@@ -1033,6 +1033,7 @@ test("a computer whose app data was copied to another: each gets its own name, a
   // a new computer, set up from a's app data: the same name for sharing play
   fs.cpSync(path.join(home, "a", "data"), path.join(home, "b", "data"), { recursive: true });
   const b = open("b");
+  b.hostName = () => "the-new-mac";                 // a computer of its own name, as a new one is
   assert.equal(b.machine(), a.machine());
   await new Promise(r => setTimeout(r, 1100));
   play(a, 2, t0 + 10); a.writeJournalNow();          // a plays on
@@ -1061,15 +1062,26 @@ test("Game Gear and Master System saves are their own, never a Genesis game's of
   fs.writeFileSync(path.join(states, "Columns (USA).state.auto"), "resume");
   be.consoleSaves();
   const gg = path.join(saves, "Consoles", "gg");
-  // a Game Gear game's own save moves to the Game Gear's folder; one a Genesis game of that name may be using is copied
+  // a Game Gear game's saves are copied to the Game Gear's folder (copied, never moved: a Genesis game of that name,
+  // here or on a computer sharing the saves, may be using them)
   assert.equal(fs.readFileSync(path.join(gg, "Genesis Plus GX", "Columns (USA).srm"), "utf8"), "columns");
-  assert.ok(!fs.existsSync(path.join(gpgx, "Columns (USA).srm")));
+  assert.ok(fs.existsSync(path.join(gpgx, "Columns (USA).srm")));
   assert.ok(fs.existsSync(path.join(gg, "States", "Genesis Plus GX", "Columns (USA).state.auto")));
   assert.ok(fs.existsSync(path.join(gg, "Genesis Plus GX", "Sonic (USA).srm")) && fs.existsSync(path.join(gpgx, "Sonic (USA).srm")));
   const of = sys => be.gameSaves([...be.games.values()].find(g => g.system === sys && g.title.startsWith("Sonic"))).map(s => s.file);
   assert.deepEqual(of("Genesis"), [path.join(gpgx, "Sonic (USA).srm")]);
   assert.deepEqual(of("Game Gear"), [path.join(gg, "Genesis Plus GX", "Sonic (USA).srm")]);
   assert.ok(be.resumeAt([...be.games.values()].find(g => g.title.startsWith("Columns"))) > 0);
+  // once: a save played since in the Game Gear's folder isn't copied over again, nor one put in the Trash brought back
+  fs.rmSync(path.join(gg, "Genesis Plus GX", "Columns (USA).srm"));
+  be.consoleSaves();
+  assert.ok(!fs.existsSync(path.join(gg, "Genesis Plus GX", "Columns (USA).srm")));
+  // a game moved from Genesis to Game Gear takes its saves along
+  const md = byTitle("Sonic"); fs.writeFileSync(path.join(gpgx, "Sonic (USA).srm"), "genesis save");
+  const smsGame = [...be.games.values()].find(g => g.system === "Genesis");
+  be.carrySaves(smsGame, "Master System");
+  assert.equal(fs.readFileSync(path.join(saves, "Consoles", "sms", "Genesis Plus GX", "Sonic (USA).srm"), "utf8"), "genesis save");
+  void md;
 });
 
 test("joining a shared saves folder keeps the saves already there; going back home, the newer wins and the other goes to the Trash", async () => {
@@ -1120,7 +1132,7 @@ test("a play history from another computer's journal is checked: odd values and 
   const c = combine([{ j: { v: 1, machine: "x", games: { "k": { plays: -5, rating: [9, now], progress: ["constructor", now], notes: ["ok", now * 2] } }, sessions: [["k", now, 999999]] } }], new Map([["g", "k"]]), now);
   assert.equal(c.add.get("g").plays, 0);
   assert.ok(!c.set.has("rating:g") && !c.set.has("progress:g"));
-  assert.equal(c.set.get("notes:g")[1], now + 86400, "a time past tomorrow is tomorrow");
+  assert.ok(!c.set.has("notes:g"), "a change dated past tomorrow is left out");
   assert.equal(c.sessions[0][2], 12 * 3600);
 });
 
@@ -1134,4 +1146,57 @@ test("the portable copy's games, back on another drive letter, keep their play",
   const b = new Backend({ app: APP, data: path.join(home, "data"), docs: moved, emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
   b.init(); b.followRoot();
   assert.equal(b.state.plays[[...b.games.values()].find(x => x.title === "Chrono Trigger").id], 9);
+});
+
+test("people's saves from numbered folders: never written over, names that collide keep their own folders", () => {
+  // two people from before such names were refused, and their numbered folders
+  fs.mkdirSync(path.join(home, "data"), { recursive: true });
+  fs.writeFileSync(path.join(home, "data", "people.json"), JSON.stringify({ active: "p1", list: [{ id: "p1", name: "Player 1" }, { id: "p2", name: "Ann Marie" }, { id: "p3", name: "Ann-Marie" }] }));
+  const ppl = path.join(home, "docs", "Saves", "People");
+  for (const [id, data] of [["p2", "ANN MARIE'S 40 HOURS"], ["p3", "ANN-MARIE'S"]]) { fs.mkdirSync(path.join(ppl, id, "Snes9x"), { recursive: true }); fs.writeFileSync(path.join(ppl, id, "Snes9x", "Game.srm"), data); }
+  const b = new Backend({ app: APP, data: path.join(home, "data"), docs: path.join(home, "docs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init();
+  const f2 = path.join(b.personFolder("p2"), "Snes9x", "Game.srm"), f3 = path.join(b.personFolder("p3"), "Snes9x", "Game.srm");
+  assert.notEqual(b.personFolder("p2"), b.personFolder("p3"));
+  assert.equal(fs.readFileSync(f2, "utf8"), "ANN MARIE'S 40 HOURS");
+  assert.equal(fs.readFileSync(f3, "utf8"), "ANN-MARIE'S");
+  // and a save already in the name's folder is never replaced from the numbered one
+  fs.mkdirSync(path.join(ppl, "p2", "Snes9x"), { recursive: true }); fs.writeFileSync(path.join(ppl, "p2", "Snes9x", "Game.srm"), "OLD COPY");
+  b.afterRestore();
+  assert.equal(fs.readFileSync(f2, "utf8"), "ANN MARIE'S 40 HOURS");
+});
+
+test("Game Gear saves wait for a saves folder that isn't there, and for a game that isn't, rather than being given up on", () => {
+  put("gg/Columns (USA).gg"); be.scan();
+  be.ra = { info: path.join(home, "none") }; be._coreNames = { genesis_plus_gx_libretro: "Genesis Plus GX" };
+  const saves = path.join(home, "docs", "Saves");
+  fs.rmSync(saves, { recursive: true, force: true });
+  be.consoleSaves();                                         // no saves folder yet (a cloud drive not started)
+  assert.ok(!be.state.consoleMoved || !Object.keys(be.state.consoleMoved).length);
+  fs.mkdirSync(path.join(saves, "Genesis Plus GX"), { recursive: true });
+  fs.writeFileSync(path.join(saves, "Genesis Plus GX", "Columns (USA).srm"), "columns");
+  be.consoleSaves();
+  assert.ok(fs.existsSync(path.join(saves, "Consoles", "gg", "Genesis Plus GX", "Columns (USA).srm")));
+});
+
+test("the app's own cheat file is still its own after RetroArch writes it again, and one of yours comes back when cheats are cleared", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const g = byTitle("Chrono Trigger");
+  be.ra = { info: path.join(home, "none") }; be._coreNames = { snes9x_libretro: "Snes9x" };
+  const target = path.join(path.dirname(be.files.raCfg), "cheats", "Snes9x", "Chrono Trigger (USA).cht");
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, "cheats = 1\ncheat0_desc = \"mine\"\n");                  // made in RetroArch's own menu
+  // cheats chosen in the app (as if read from the collection)
+  be.state.cheats[g.id] = ["x#0"]; be.cheatIndex = async () => ({ file: "", entries: new Map([["x", {}]]) });
+  const zipMod = createRequire(import.meta.url)("../src/zip.js"); const read = zipMod.readEntry; zipMod.readEntry = async () => Buffer.from('cheats = 1\ncheat0_desc = "Infinite HP"\ncheat0_code = "7E0000:FF"\ncheat0_enable = false\n');
+  try {
+    assert.equal(await be.writeCheats(g), true);
+    assert.ok(fs.existsSync(target + ".before-retro-shelf"), "yours set aside");
+    fs.writeFileSync(target, "cheats = 1\ncheat0_desc = \"Infinite HP\"\n");          // RetroArch writes it again, unmarked
+    assert.equal(await be.writeCheats(g), true, "still the app's");
+    assert.ok(!fs.existsSync(target + ".before-retro-shelf 2"), "not set aside a second time");
+    be.state.cheats[g.id] = [];
+    await be.writeCheats(g);
+    assert.equal(fs.readFileSync(target, "utf8"), "cheats = 1\ncheat0_desc = \"mine\"\n", "yours back");
+  } finally { zipMod.readEntry = read; }
 });
