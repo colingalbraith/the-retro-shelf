@@ -65,3 +65,34 @@ test("two games here with the same file name: the list's console or folder decid
     assert.deepEqual(plan(findLists([dir]), games).found.map(f => f.id), ["a"]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("a list's console decides by its whole name, on Windows paths too; another console's game isn't this one", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-import3-"));
+  try {
+    fs.mkdirSync(path.join(dir, "snes"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "snes", "gamelist.xml"), `<gameList><game><path>./Tetris 2 (USA).zip</path><playcount>5</playcount></game></gameList>`);
+    fs.mkdirSync(path.join(dir, "gc"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "gc", "gamelist.xml"), `<gameList><game><path>./Game.iso</path><playcount>2</playcount></game></gameList>`);
+    const games = [
+      { id: "nes", system: "NES", path: "C:\\Games\\nes\\Tetris 2 (USA).zip" }, { id: "snes", system: "SNES", path: "C:\\Games\\snes\\Tetris 2 (USA).zip" },
+      { id: "gc", system: "GameCube/Wii", path: "C:\\Games\\gc\\Game.iso" }, { id: "ps2", system: "PS2", path: "C:\\Games\\ps2\\Game.iso" },
+    ];
+    assert.deepEqual(plan(findLists([dir]), games).found.map(f => f.id).sort(), ["gc", "snes"]);
+    // only the NES copy here: an SNES list's line isn't it
+    assert.deepEqual(plan(findLists([path.join(dir, "snes")]), [games[0]]).found, []);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("bringing a list in again adds nothing, even after the game's file moved", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-import4-"));
+  try {
+    fs.mkdirSync(path.join(dir, "snes"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "snes", "gamelist.xml"), ES);
+    const st = { fav: [], plays: {}, time: {}, last: {}, rating: {}, progress: {} };
+    assert.equal(apply(st, plan(findLists([dir]), [{ id: "smw", system: "SNES", path: "/g/snes/Super Mario World (USA).sfc" }])), 1);
+    // moved: a new id, the same game
+    st.plays.moved = st.plays.smw; delete st.plays.smw;
+    assert.equal(apply(st, plan(findLists([dir]), [{ id: "moved", system: "SNES", path: "/h/snes/Super Mario World (USA).sfc" }])), 0);
+    assert.equal(st.plays.moved, 12);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

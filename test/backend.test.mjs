@@ -765,7 +765,7 @@ test("each person has their own play, pins, favorites and saves; the games' own 
   assert.equal(be.state.plays[ct], undefined, "Sam hasn't played it");
   assert.deepEqual(be.state.fav, []);
   assert.equal(be.state.names[ct], "CT", "a game's name is everyone's");
-  assert.equal(be.folders.saves, path.join(home, "docs", "Saves", "People", "p2"));
+  assert.equal(be.folders.saves, path.join(home, "docs", "Saves", "People", "sam"), "their saves by their name, as other computers know them");
   be.state.plays[ct] = 1; be.state.rating[ct] = 4; be.state.names[ct] = "Chrono"; be.saveState();
   // back to the first person: theirs, and the name Sam gave the game
   be.usePerson("p1");
@@ -804,7 +804,7 @@ test("taking someone off moves their play and saves to the Trash; the first pers
   assert.equal(r[0], 200);
   assert.equal(be.people.active, "p1", "back to the first person");
   assert.deepEqual(r[1].list.map(p => p.id), ["p1"]);
-  assert.deepEqual(trashed.map(f => path.relative(home, f)).sort(), [path.join("data", "people", id + ".json"), path.join("docs", "Saves", "People", id)].sort());
+  assert.deepEqual(trashed.map(f => path.relative(home, f)).sort(), [path.join("data", "people", id + ".json"), path.join("docs", "Saves", "People", "sam")].sort());
 });
 
 test("no changing who's playing while a game is open", () => {
@@ -859,4 +859,154 @@ test("without a shared saves folder, nothing is written for other computers", ()
   be.setGameInfo(byTitle("Chrono Trigger").id, { rating: 4 });
   assert.equal(be.writeJournalNow(), false);
   assert.ok(!fs.existsSync(path.join(home, "docs", "Saves", ".the-retro-shelf")));
+});
+
+test("screenshots taken in a game go on its box and into its console's folder, never another game's", async () => {
+  put("snes/Super Mario World (USA).sfc"); put("snes/Super Mario World 2 (USA).sfc"); put("gb/Tetris.gb"); put("nes/Tetris.nes");
+  be.scan();
+  const smw = byTitle("Super Mario World"), gb = [...be.games.values()].find(g => g.system === "Game Boy");
+  const shots = be.folders.screenshots, shot = (name, at) => { fs.mkdirSync(shots, { recursive: true }); const f = path.join(shots, name); fs.writeFileSync(f, "PNG"); fs.utimesSync(f, at, at); return f; };
+  const t0 = Math.floor(Date.now() / 1000);
+  shot("Super Mario World (USA)-251001-200000.png", t0 - 86400);    // from before: still found where it is
+  shot("Super Mario World 2 (USA)-251002-200000.png", t0 - 3600);   // a sequel's, not this game's
+  shot("Tetris-251003-200000.png", t0 - 60);
+  assert.deepEqual(be.shotsOf(smw).map(s => path.basename(s.file)), ["Super Mario World (USA)-251001-200000.png"]);
+  // a sitting: what was taken in it goes in the console's folder, and the newest is on the box
+  const rec = { id: smw.id, since: t0 - 30, alive: true };
+  shot("Super Mario World (USA)-251021-200000.png", t0 - 10);
+  assert.equal(be.sortShots(rec), 1);
+  assert.ok(fs.existsSync(path.join(shots, "SNES", "Super Mario World (USA)-251021-200000.png")));
+  assert.ok(fs.existsSync(path.join(shots, "Super Mario World (USA)-251001-200000.png")), "older ones stay");
+  const lib = be.libraryJson().games.find(g => g.id === smw.id);
+  assert.deepEqual([lib.shots, lib.shv], [2, t0 - 10]);
+  assert.equal((await be.route("GET", `/shot/${smw.id}/0`)).code, 200);
+  assert.equal((await be.route("GET", `/shot/${smw.id}/5`)).code, 404);
+  // Tetris on the Game Boy, once its sitting sorted it: not the NES Tetris's
+  assert.equal(be.sortShots({ id: gb.id, since: t0 - 120 }), 1);
+  assert.equal(be.shotsOf([...be.games.values()].find(g => g.system === "NES")).length, 0);
+  assert.equal(be.shotsOf(gb).length, 1);
+  // a picture chosen for the box wins over screenshots
+  put("snes/Super Mario World (USA).snap.png", "PNG"); be.scan();
+  const again = be.libraryJson().games.find(g => g.id === smw.id);
+  assert.deepEqual([again.shots, again.shv], [2, undefined]);
+  // to the Trash, only its own
+  const trashed = [];
+  be.trash = async p => { trashed.push(path.basename(p)); fs.rmSync(p); };
+  assert.equal((await be.route("POST", "/api/shot/trash", { id: smw.id, name: "Tetris-251003-200000.png" })).code, 404);
+  assert.equal((await be.route("POST", "/api/shot/trash", { id: smw.id, name: "Super Mario World (USA)-251001-200000.png" })).code, 200);
+  assert.deepEqual(trashed, ["Super Mario World (USA)-251001-200000.png"]);
+  assert.equal((await be.route("POST", "/api/shots", { id: smw.id })).body.shots.length, 1);
+  // nothing playing: nothing to take
+  assert.equal((await be.route("POST", "/api/shot/take", {})).code, 409);
+});
+
+test("switching people: each one's play goes in their own journal for other computers, never the next person's", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const ct = byTitle("Chrono Trigger").id, cloud = path.join(home, "cloud");
+  assert.equal((await be.moveSaves(cloud))[0], 200);
+  be.state.plays[ct] = 40; be.state.time[ct] = 99999; be.saveState();
+  const sam = be.addPerson("Sam")[1].added;
+  be.usePerson(sam);
+  const dir = path.join(cloud, "The Retro Shelf Saves", ".the-retro-shelf", "play"), mine = be.machine() + ".json";
+  const read = who => JSON.parse(fs.readFileSync(path.join(dir, who, mine), "utf8"));
+  assert.equal(read("player-1").games["SNES/chrono trigger (usa).sfc"].plays, 40, "Player 1's own");
+  assert.ok(!fs.existsSync(path.join(dir, "sam", mine)) || !Object.keys(read("sam").games).length, "nothing of Player 1's in Sam's");
+  // a name other computers would take for Sam's is Sam's
+  assert.equal(be.addPerson("SAM!")[0], 409);
+  // renamed: their saves folder and journal go by the new name
+  be.state.plays[ct] = 3; be.saveState(); be.writeJournalNow();
+  fs.mkdirSync(path.join(be.folders.saves, "Snes9x"), { recursive: true });
+  assert.equal(be.renamePerson(sam, "Samantha")[0], 200);
+  assert.equal(be.folders.saves, path.join(cloud, "The Retro Shelf Saves", "People", "samantha"));
+  assert.ok(fs.existsSync(path.join(be.folders.saves, "Snes9x")));
+  assert.ok(fs.existsSync(path.join(dir, "samantha", mine)) && !fs.existsSync(path.join(dir, "sam", mine)));
+  // taken off: with saves shared between computers, their saves stay there
+  be.trash = async f => fs.rmSync(f, { recursive: true, force: true });
+  const r = await be.removePerson(sam);
+  assert.equal(r[1].savesKept, true);
+  assert.ok(fs.existsSync(path.join(cloud, "The Retro Shelf Saves", "People", "samantha")));
+});
+
+test("saves kept by this computer's numbering move to the person's name", () => {
+  be.addPerson("Alex");
+  const old = path.join(home, "docs", "Saves", "People", "p2");
+  fs.mkdirSync(path.join(old, "Snes9x"), { recursive: true });
+  const b = new Backend({ app: APP, data: path.join(home, "data"), docs: path.join(home, "docs"), emu: path.join(home, "none"), version: "test" }, async () => { throw new Error("offline"); });
+  b.init();
+  assert.ok(fs.existsSync(path.join(home, "docs", "Saves", "People", "alex", "Snes9x")));
+  assert.ok(!fs.existsSync(old));
+});
+
+test("a shared saves folder that isn't there isn't made again by the journal; a game played elsewhere still counts", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); put("snes/Secret of Mana (USA).sfc"); be.scan();
+  const cloud = path.join(home, "cloud");
+  assert.equal((await be.moveSaves(cloud))[0], 200);
+  const ct = byTitle("Chrono Trigger").id, som = byTitle("Secret of Mana").id;
+  be.state.plays[som] = 4; be.saveState(); be.writeJournalNow();
+  // Secret of Mana's file is gone (a drive unplugged): its play stays in the journal
+  fs.rmSync(path.join(games, "snes", "Secret of Mana (USA).sfc")); be.scan();
+  be.state.plays[ct] = 1; be.saveState(); be.writeJournalNow();
+  const file = be.journalFile(), j = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(j.games["SNES/secret of mana (usa).sfc"].plays, 4);
+  // the cloud folder goes away: nothing makes it again
+  fs.rmSync(cloud, { recursive: true, force: true });
+  be.state.plays[ct] = 2; be.saveState();
+  assert.equal(be.writeJournalNow(), false);
+  assert.ok(!fs.existsSync(cloud));
+});
+
+test("a game that moves keeps when its rating and favorite were chosen", () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const g = byTitle("Chrono Trigger");
+  be.setGameInfo(g.id, { rating: 5 });
+  const when = be.state.edited["rating:" + g.id];
+  assert.ok(when > 0);
+  be.moveStats(g.id, "newid");
+  assert.equal(be.state.edited["rating:newid"], when);
+  assert.equal(be.state.edited["rating:" + g.id], undefined);
+});
+
+test("another computer's journal arriving with an older time still shows on the shelf", async () => {
+  put("snes/Chrono Trigger (USA).sfc"); be.scan();
+  const cloud = path.join(home, "cloud");
+  assert.equal((await be.moveSaves(cloud))[0], 200);
+  be.remote(true);
+  const dir = path.dirname(be.journalFile()), f = path.join(dir, "other.json");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(f, JSON.stringify({ v: 1, machine: "other", host: "Den", at: 1, games: { "SNES/chrono trigger (usa).sfc": { plays: 6 } }, sessions: [] }));
+  fs.utimesSync(f, 1000, 1000);    // a cloud drive keeps the time it was written, long before
+  be.farAt();
+  assert.equal(be.libraryJson().games.find(x => x.title === "Chrono Trigger").plays, 6);
+});
+
+test("each person's pins are theirs: a pin added in an update is quiet for everyone it's new to", () => {
+  const b = be.addPerson("Sam")[1].added;
+  be.state.pinKeys = ["a"]; be.saveState();
+  be.usePerson(b);
+  assert.ok(be.state.pinKeys.length > 1, "Sam's own, from the check as they start");
+  assert.deepEqual(be._base.pinKeys, ["a"], "Player 1's untouched");
+});
+
+test("a damaged PS2 BIOS of the same name makes way for a good one", () => {
+  const ps2Bios = () => { const b = Buffer.alloc(4194304); b.write("RESET", 0x2700); b.write("ROMDIR", 0x2710); b.write("ROMVER", 0x2720); return b; };
+  const drop = path.join(home, "drop"); fs.mkdirSync(drop, { recursive: true });
+  fs.writeFileSync(path.join(drop, "SCPH-70012.bin"), ps2Bios());
+  const there = path.join(be.folders.bios, "pcsx2", "bios", "SCPH-70012.bin");
+  fs.mkdirSync(path.dirname(there), { recursive: true });
+  fs.writeFileSync(there, ps2Bios().subarray(0, 1048576));    // cut short
+  const r = be.importCheck([path.join(drop, "SCPH-70012.bin")])[1];
+  assert.deepEqual([r.biosAdded, r.biosKept], [["SCPH-70012.bin"], []]);
+  assert.equal(fs.statSync(there).size, 4194304);
+  assert.ok(fs.existsSync(there + ".old"), "the damaged one set aside, not deleted");
+  // a good one there already stays
+  fs.writeFileSync(path.join(drop, "SCPH-70012.bin"), (() => { const b = ps2Bios(); b[100] = 1; return b; })());
+  assert.deepEqual(be.importCheck([path.join(drop, "SCPH-70012.bin")])[1].biosKept, ["SCPH-70012.bin"]);
+});
+
+test("loose screenshots from before go on a game only when no other game here has its name", () => {
+  put("gg/Mortal Kombat (USA, Europe).gg"); put("gb/Mortal Kombat (USA, Europe).gb"); put("nes/Contra (USA).nes"); be.scan();
+  const shots = be.folders.screenshots; fs.mkdirSync(shots, { recursive: true });
+  fs.writeFileSync(path.join(shots, "Mortal Kombat (USA, Europe)-251001-200000.png"), "PNG");
+  fs.writeFileSync(path.join(shots, "Contra (USA)-251001-200000.png"), "PNG");
+  for (const g of be.games.values()) assert.equal(be.shotsOf(g).length, g.title.startsWith("Contra") ? 1 : 0, g.system);
 });

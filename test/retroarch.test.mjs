@@ -181,6 +181,9 @@ test("achievements: signing in hands RetroArch the password once; hardcore turns
   const later = ra.enforced(emu, dirs, { cheevos: { user: "P" } });
   assert.equal(later.cheevos_enable, "true");
   assert.ok(!("cheevos_password" in later) && !("cheevos_token" in later));      // RetroArch's own token stays
+  // whoever's playing, with their own token: never the last person's
+  const theirs = ra.enforced(emu, dirs, { cheevos: { user: "Q", token: "TQ" } });
+  assert.deepEqual([theirs.cheevos_username, theirs.cheevos_token, theirs.cheevos_password], ["Q", "TQ", ""]);
   const off = ra.enforced(emu, dirs, {});
   assert.deepEqual([off.cheevos_enable, off.cheevos_token, off.cheevos_password], ["false", "", ""]);
   const hc = ra.enforced(emu, dirs, { cheevos: { user: "P" }, hardcore: true, light: true, resume: true, cheats: true });

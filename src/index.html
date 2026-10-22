@@ -531,6 +531,12 @@ html:not([data-fx="off"]) #settings.show .panel{animation:rise .22s ease}
 #lstl .lrow small{display:block;color:var(--ink2);font-size:12.5px;font-weight:400}
 #lstl .lrow .btn{padding:6px 10px;font-size:13px}
 #lstl .lrow img{flex:none;width:72px;aspect-ratio:4/3;object-fit:cover;background:#141312;border:1px solid rgba(28,25,22,.3)}
+/* a game's screenshots, big */
+#lstl .shot{margin:12px 0 0;padding-bottom:12px;border-bottom:1px solid rgba(28,25,22,.1)}
+#lstl .shot img{display:block;width:100%;max-height:38vh;object-fit:contain;background:#141312;border:1px solid rgba(28,25,22,.3);image-rendering:pixelated}
+#lstl .shot figcaption{display:flex;align-items:center;gap:10px;margin-top:8px;font:500 14px var(--disp);color:var(--ink2)}
+#lstl .shot figcaption .btn{padding:6px 10px;font-size:13px}
+#lstl .shot figcaption .btn:first-of-type{margin-left:auto}
 /* a game's cheats: a box to tick for each */
 #cheatl{max-height:46vh;overflow-y:auto;margin:10px 0 14px;border-top:1px solid rgba(28,25,22,.15);scrollbar-width:thin;scrollbar-color:#b5ab98 transparent}
 #cheatl button{display:flex;width:100%;gap:12px;align-items:baseline;padding:9px 4px;border:0;border-bottom:1px solid rgba(28,25,22,.1);background:none;text-align:left;color:var(--ink);font:500 15px var(--disp)}
@@ -740,6 +746,7 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
     <p id="lplayers"></p>
     <div class="lbtns">
       <button class="btn" id="lhide">Back to the shelf</button>
+      <button class="btn" id="lshot">Take a screenshot</button>
       <button class="btn danger" id="lstop">Stop game</button>
     </div>
   </div>
@@ -857,10 +864,10 @@ html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after
   <div class="btns"><button class="btn primary" id="notesok">Save</button><button class="btn" id="notesno">Cancel</button></div></div></div>
 
 <div id="nsh" class="over"><div class="slip"><h2 id="nsht">New shelf</h2><p id="nshp">Name it, like Couch co-op or To finish.</p>
-  <input type="text" id="nshname" spellcheck="false" autocomplete="off" maxlength="40"><div class="btns"><button class="btn primary" id="nshok">Make shelf</button><button class="btn" id="nshcancel">Cancel</button></div></div></div>
+  <input type="text" id="nshname" spellcheck="false" autocomplete="off" maxlength="40" aria-labelledby="nsht"><div class="btns"><button class="btn primary" id="nshok">Make shelf</button><button class="btn" id="nshcancel">Cancel</button></div></div></div>
 
-<div id="ren" class="over"><div class="slip"><h2>Rename</h2><p>The name on the box and spine. Leave it empty to go back to the original.</p>
-  <input type="text" id="rname" spellcheck="false" autocomplete="off"><div class="btns"><button class="btn primary" id="rok">Save</button><button class="btn" id="rcancel">Cancel</button></div></div></div>
+<div id="ren" class="over"><div class="slip"><h2 id="rent">Rename</h2><p>The name on the box and spine. Leave it empty to go back to the original.</p>
+  <input type="text" id="rname" spellcheck="false" autocomplete="off" aria-labelledby="rent"><div class="btns"><button class="btn primary" id="rok">Save</button><button class="btn" id="rcancel">Cancel</button></div></div></div>
 
 <div id="welcome" class="over"><div class="slip"><h2>Welcome to The Retro Shelf</h2>
   <ol>
@@ -1344,12 +1351,13 @@ function fillBack(c, g) {
   inn.appendChild(el("div", "sub", [g.system, g.tag, g.year].filter(Boolean).join(" · ")));
   const who = [g.pub, g.dev && g.dev !== g.pub ? t("by {dev}", {dev: g.dev}) : "", g.genre].filter(Boolean).join(" · ");
   if (who) inn.appendChild(el("div", "sub2", who));
-  const src = resume && sv.rpic ? "/state/" + g.id + "/auto?v=" + resume : g.sv ? "/snap/" + g.id + "?v=" + g.sv : "";
+  const left = resume && sv.rpic, src = left ? "/state/" + g.id + "/auto?v=" + resume : g.shv ? "/shot/" + g.id + "/0?v=" + g.shv + "." + g.shots : g.sv ? "/snap/" + g.id + "?v=" + g.sv : "";
   if (src) {
     const pic = el("div", "pic"), im = new Image(); im.alt = ""; im.decoding = "async"; im.src = src;
     im.onerror = () => pic.remove();
     pic.appendChild(im);
-    if (resume && sv.rpic) pic.appendChild(el("i", "", t("Where you left off · {when}", {when: fmtWhen(resume)})));
+    if (left) pic.appendChild(el("i", "", t("Where you left off · {when}", {when: fmtWhen(resume)})));
+    else if (g.shv) pic.appendChild(el("i", "", t("Your screenshot · {when}", {when: fmtWhen(g.shv)})));
     inn.appendChild(pic);
   }
   inn.appendChild(el("div", "ms", g.last ? t("Last played {when}", {when: fmtWhen(g.last, true)}) + (played ? " · " + played : "")
@@ -1393,6 +1401,7 @@ function fillBack(c, g) {
   const link = (text, fn) => { const u = el("u", "", text); u.onclick = e => { e.stopPropagation(); fn(); }; fine.appendChild(document.createTextNode(" · ")); fine.appendChild(u); };
   link(t("More…"), () => APP.gameMenu(g.id));
   if (g.plays && cons(g.system).builtin && !PATHS.own) link(t("Saves…"), () => openSaves(g.id));
+  if (g.shots) link(t("Screenshots ({n})…", {n: g.shots}), () => openShots(g.id));
   link(g.cv ? t("Change cover") : t("Find cover art"), () => openPicker(g.id));
   inn.appendChild(fine);
   const bar = el("div", "bar"); bar.appendChild(el("i", "", g.id.slice(0, 8).toUpperCase())); inn.appendChild(bar);
@@ -1815,6 +1824,10 @@ function showLaunch(g) {
     : !c2.light ? "" : c2.freeTriggers && UI.ffTrigger === "toggle" ? (rw ? t("Hold the left trigger (or R) to rewind. The right one (or Space) switches fast-forward on and off.") : t("The right trigger (or Space) switches fast-forward on and off."))
     : c2.freeTriggers ? (rw ? t("Hold the left trigger (or R) to rewind, the right one (or L) to fast-forward.") : t("Hold the right trigger (or L) to fast-forward."))
     : (rw ? t("Hold R to rewind, L to fast-forward.") : t("Hold L to fast-forward."));
+  /* a screenshot: F8 in the game, or the button here (built-in emulators) */
+  const shots = c2.builtin && !PATHS.own;
+  $("#lshot").hidden = !shots;
+  if (shots) $("#lhint2").textContent = [$("#lhint2").textContent, t("F8 takes a screenshot.")].filter(Boolean).join(" ");
   $("#lhint2").style.visibility = "hidden";
   /* the controllers in the order they were connected: RetroArch numbers players the same way */
   const pads = connectedPads();
@@ -1858,7 +1871,7 @@ function tick() {
   $("#launch").classList.toggle("starting", starting);
   const s = $("#lstat"); clear(s);
   if (starting) s.textContent = t((g ? MEDIA_VERB[media(g)] : "Starting") + "…");
-  else { s.appendChild(document.createTextNode("Playing  ")); s.appendChild(el("span", "clk", clock(e))); }
+  else { s.appendChild(document.createTextNode(t("Playing") + "  ")); s.appendChild(el("span", "clk", clock(e))); }
   $("#lhint").style.visibility = $("#lhint2").style.visibility = starting ? "hidden" : "visible";
 }
 function updatePill() {
@@ -2111,6 +2124,7 @@ function openOpts(sub) {
       item(g.rating ? t("Rating: {s}…", {s: stars(g.rating)}) : t("Rate it…"), () => setTimeout(() => openOpts("rating"), 30));
       item(g.note ? t("Edit note…") : t("Add a note…"), () => openNote(g.id));
       if (cons(g.system).builtin && !PATHS.own) item(t("Saves…"), () => openSaves(g.id));
+      if (g.shots) item(t("Screenshots ({n})…", {n: g.shots}), () => openShots(g.id));
       item(t("Picture…"), () => setTimeout(() => openOpts("picture"), 30));
       item(t("Screen shape…"), () => setTimeout(() => openOpts("shape"), 30));
       if (cons(g.system).builtin && !PATHS.own) item(t("Fast-forward speed…"), () => setTimeout(() => openOpts("ffSpeed"), 30));
@@ -2427,6 +2441,7 @@ function saverPics() {
     if (g.hidden) continue;
     const sv = g.saves || {}, cap = [g.title, g.system];
     if (sv.resume && sv.rpic && !hardcore()) shots.push(["/state/" + g.id + "/auto?v=" + sv.resume, cap]);
+    else if (g.shv) shots.push(["/shot/" + g.id + "/0?v=" + g.shv + "." + g.shots, cap]);
     else if (g.sv) shots.push(["/snap/" + g.id + "?v=" + g.sv, cap]);
     if (g.cv) covers.push(["/cover/" + g.id + "?v=" + g.cv, cap]);
   }
@@ -2550,7 +2565,7 @@ function openKeys() {
   fill($("#kkb"), [[t("On the shelves")], ["← → ↑ ↓", t("Browse")], ["Enter", t("Play")], [t("Space"), t("Turn the box over")], ["F", t("Favorite")],
     ["Q  E", t("Previous or next shelf")], ["/", t("Search")], ["O", t("Options for the game")], ["S", t("Settings")], ["R", t("Surprise me")],
     ["X", t("Pick (to do things to several at once)")], ["?", t("This sheet")], ["Esc", t("Back")],
-    [t("In a game")], ["Esc", t("Back to the shelves")], ["F1", t("The emulator's menu")], [t("Hold R"), t("Rewind")], [t("Hold L"), t("Fast-forward")], ["E  D  E", t("Change discs")]]);
+    [t("In a game")], ["Esc", t("Back to the shelves")], ["F1", t("The emulator's menu")], [t("Hold R"), t("Rewind")], [t("Hold L"), t("Fast-forward")], ["F8", t("Take a screenshot")], ["E  D  E", t("Change discs")]]);
   $("#kpadh").textContent = t("Controller ({style})", {style: {xbox: "Xbox", playstation: "PlayStation", nintendo: "Nintendo"}[padStyle()]});
   fill($("#kpad"), [[t("On the shelves")], [t("D-pad"), t("Browse")], [nm[nin ? 1 : 0], t("Play")], [nm[nin ? 0 : 1], t("Back")], [nm[nin ? 2 : 3], t("Turn the box over")],
     [nm[nin ? 3 : 2], t("Favorite")], [nm[4] + "  " + nm[5], t("Previous or next shelf")], [nm[8], t("Options, and this sheet")], [nm[9], t("Settings")],
@@ -2583,6 +2598,33 @@ function openPlayImport(paths, s) {
       toast(r.data.added ? t("Brought in play for {n}.", {n: plural(r.data.added, "game", "games")}) : t("That was brought in already."));
     };
     list.appendChild(go);
+  });
+}
+
+/* a game's screenshots, newest first: each to see in its folder or put in the Trash */
+async function openShots(id) {
+  const g = byId.get(id); if (!g) return;
+  let shots = [];
+  const still = listTicket();
+  const load = async () => { const r = await api("/api/shots", {id}); shots = r.ok ? r.data.shots : []; };
+  await load(); if (!still()) return;
+  const how = t("F8 takes one while you play. With a controller, hold Select, then Take Screenshot.");
+  openList(t("Screenshots of {title}", {title: g.title}), how, list => {
+    if (!shots.length) list.appendChild(el("p", "", t("No screenshots yet.")));
+    shots.forEach((s, i) => {
+      const f = el("figure", "shot"), im = new Image(); im.alt = t("Screenshot · {when}", {when: fmtWhen(s.at)}); im.loading = "lazy"; im.decoding = "async";
+      im.src = "/shot/" + id + "/" + i + "?v=" + encodeURIComponent(s.name);
+      f.appendChild(im);
+      const cap = el("figcaption", "", fmtWhen(s.at));
+      if (APP && APP.revealShot) { const b = el("button", "btn", APP.platform === "darwin" ? t("Show in Finder") : t("Show in folder")); b.onclick = () => APP.revealShot(id, s.name); cap.appendChild(b); }
+      const tr = el("button", "btn", t("Move to Trash"));
+      tr.onclick = async () => {
+        const r = await api("/api/shot/trash", {id, name: s.name});
+        if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't move it to the Trash."), true);
+        await load(); await refresh(true); redrawList();
+      };
+      cap.appendChild(tr); f.appendChild(cap); list.appendChild(f);
+    });
   });
 }
 
@@ -2626,7 +2668,10 @@ function openPeople() {
         if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = t("Sure? Their play and saves go to the Trash"); return; }
         const r = await api("/api/people/remove", {id: p.id});
         if (!r.ok) return toast(r.data.error ? t(r.data.error) : t("Couldn't take them off."), true);
-        PEOPLE = r.data; await refresh(true); redrawList(); toast(t("{name} is off the list. Their things are in the Trash.", {name: shownName(p)}));
+        PEOPLE = r.data; await refresh(true); redrawList();
+        /* saves shared with other computers stay there, for the same person playing on those */
+        toast(r.data.savesKept ? t("{name} is off the list. Their play is in the Trash; their saves stay in the shared folder for other computers.", {name: shownName(p)})
+          : t("{name} is off the list. Their things are in the Trash.", {name: shownName(p)}));
       }]);
       listRow(list, shownName(p), p.id === PEOPLE.active ? t("Playing now") : "", buttons, null, true);
     }
@@ -3073,7 +3118,10 @@ function renderSettings() {
   const H = t => b.appendChild(el("h3", "", t));
   /* a row: its label, a line about it, its control. A label that's someone's own name (a shelf, a folder) comes as
      {own: "…"}, and isn't translated */
-  const R = (label, desc, ctl) => { const r = el("div", "row2"), l = el("div", "rl"), lb = el("b", "", label && label.own !== undefined ? label.own : label); if (label && label.own !== undefined) lb.translate = false; l.appendChild(lb); if (desc) l.appendChild(el("span", "", desc)); r.appendChild(l); if (ctl) r.appendChild(ctl); b.appendChild(r); return r; };
+  const R = (label, desc, ctl) => { const r = el("div", "row2"), l = el("div", "rl"), lb = el("b", "", label && label.own !== undefined ? label.own : label); if (label && label.own !== undefined) lb.translate = false; l.appendChild(lb); if (desc) l.appendChild(el("span", "", desc)); r.appendChild(l); if (ctl) r.appendChild(ctl); b.appendChild(r);
+    /* a switch, slider or field is read out with its row's label */
+    if (ctl) for (const i of ctl.matches("input,select") ? [ctl] : ctl.querySelectorAll("input,select")) if (!i.hasAttribute("aria-label")) i.setAttribute("aria-label", lb.textContent);
+    return r; };
   const sw = (on, fn) => { const l = el("label", "sw"), i = document.createElement("input"); i.type = "checkbox"; i.checked = on; i.onchange = () => fn(i.checked); l.appendChild(i); l.appendChild(el("span", "sl")); return l; };
   const seg = (opts, val, fn) => { const s = el("div", "seg"); opts.forEach(o => { const bt = el("button", o[0] === val ? "on" : "", o[1]); bt.onclick = () => { fn(o[0]); renderSettings(); }; s.appendChild(bt); }); return s; };
   const field = (val, ok, ph) => { const w = el("div", "fld"), i = document.createElement("input"); i.type = "text"; i.value = val || ""; i.placeholder = ph || ""; i.spellcheck = false; w.appendChild(i); w.appendChild(el("i", "dot " + (ok ? "ok" : "bad"))); w.input = i; return w; };
@@ -3587,6 +3635,10 @@ $("#ndone").onclick = closeNews;
 $("#getg").addEventListener("mousedown", e => { if (e.target === $("#getg")) closeGetGames(); });
 $("#settings").addEventListener("mousedown", e => { if (e.target === $("#settings")) closeSettings(); });
 $("#lhide").onclick = hideLaunch;
+$("#lshot").onclick = async () => {
+  const r = await api("/api/shot/take", {});
+  toast(r.ok ? t("Screenshot taken. It goes on the back of the box.") : t("Couldn't take a screenshot."), !r.ok);
+};
 $("#lstop").onclick = async () => { stopping = true; await api("/api/stop", {}); };
 $("#nowpill").onclick = () => { if (STATUS.running) showLaunch(byId.get(STATUS.running.id)); };
 $("#updpill").onclick = updAction;

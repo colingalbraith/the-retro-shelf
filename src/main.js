@@ -40,9 +40,35 @@ if (!HOME) {
   let ours = false, oursDocs = false;
   try { const st = JSON.parse(fs.readFileSync(path.join(oldData, "settings.json"), "utf8")); ours = !!(st && st.ui && "accent" in st.ui); } catch {}
   try { oursDocs = fs.readFileSync(path.join(oldDocs, "Games", "README.txt"), "utf8").startsWith("Your games go here, one folder per system"); } catch {}
-  if (ours) move(oldData, app.getPath("userData"), ["settings.json", "state.json", "covers", "retroarch"]);
+  const movedData = ours && move(oldData, app.getPath("userData"), ["settings.json", "state.json", "covers", "retroarch"]);
+  const settingsFile = path.join(app.getPath("userData"), "settings.json");
+  const editPaths = fn => {
+    try {
+      const st = JSON.parse(fs.readFileSync(settingsFile, "utf8")), paths = st.paths = st.paths || {};
+      if (fn(paths) === false) return;
+      fs.writeFileSync(settingsFile + ".part", JSON.stringify(st, null, 2)); fs.renameSync(settingsFile + ".part", settingsFile);
+    } catch {}
+  };
   // games are known by their path, so their play history is moved over to the new paths once the backend is up
-  if ((ours || oursDocs) && move(oldDocs, DOCS, ["Games"])) OLD_GAMES = path.join(oldDocs, "Games");
+  if ((ours || oursDocs) && move(oldDocs, DOCS, ["Games"])) {
+    OLD_GAMES = path.join(oldDocs, "Games");
+    // settings that pointed at the folder where it was (see below, from a start when it couldn't move) follow it
+    editPaths(paths => {
+      let changed = false;
+      for (const k of ["roms_dir", "saves_dir"]) if (paths[k] && within(paths[k], oldDocs)) { paths[k] = path.join(DOCS, path.relative(oldDocs, paths[k])); changed = true; }
+      if (paths.oldSaves) { delete paths.oldSaves; changed = true; }
+      return changed;
+    });
+  }
+  // the settings moved but the games folder couldn't (in use, or a folder of the new name was already there): the
+  // settings point at the games and saves where they are, so the shelf isn't empty and their play history still fits.
+  // oldSaves: that saves folder isn't one shared with other computers
+  else if (movedData && fs.existsSync(path.join(oldDocs, "Games"))) {
+    editPaths(paths => {
+      if (!paths.roms_dir) paths.roms_dir = path.join(oldDocs, "Games");
+      if (!paths.saves_dir && fs.existsSync(path.join(oldDocs, "Saves"))) { paths.saves_dir = path.join(oldDocs, "Saves"); paths.oldSaves = true; }
+    });
+  }
 }
 if (!app.requestSingleInstanceLock()) app.quit();
 const EMU = app.isPackaged ? path.join(process.resourcesPath, "emulators")
@@ -264,6 +290,10 @@ function ipc() {
   });
   ipcMain.handle("licenses", () => openLicenses());
   ipcMain.handle("reveal-game", (_, id) => { const g = backend.games.get(String(id)); if (g) shell.showItemInFolder(g.path); });
+  ipcMain.handle("reveal-shot", (_, id, name) => {
+    const g = backend.games.get(String(id)), s = g && backend.shotsOf(g).find(x => path.basename(x.file) === String(name));
+    if (s) shell.showItemInFolder(s.file);
+  });
   ipcMain.handle("game-menu", (_, id) => gameMenu(String(id)));
   ipcMain.handle("open-url", (_, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
   // where automatic backups go
