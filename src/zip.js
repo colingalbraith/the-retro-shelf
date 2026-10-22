@@ -8,7 +8,7 @@ const zlib = require("zlib");
 
 /** what's never a save: the app's own notes for other computers, and what Macs and Windows leave in folders. Other
     names starting with a dot are saves too (".hack//Infection.srm") */
-const NOT_SAVES = name => /^(\.the-retro-shelf|\.in-play|\.DS_Store|\._.*|\.Spotlight-V100|\.Trashes|\.fseventsd|\.TemporaryItems|\.dropbox.*|desktop\.ini|Thumbs\.db)$/i.test(name);
+const NOT_SAVES = name => /^(\.the-retro-shelf|\.in-play|\.DS_Store|\._.*|\.Spotlight-V100|\.Trashes|\.Trash(-\d+)?|\.fseventsd|\.TemporaryItems|\.dropbox.*|\.stversions|\.stfolder|\.stignore|\.sync|\.git|\..*\.icloud|desktop\.ini|Thumbs\.db)$/i.test(name);
 
 /** every file under dir (not the ones above), as paths relative to it; a link to a file counts as that file */
 function filesIn(dir, rel = "") {

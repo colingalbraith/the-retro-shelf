@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.0-beta.6
+
+A second review, of beta.5's own fixes, and more tests:
+
+- **Stop game on Windows saves first:** it closes RetroArch the way RetroArch closes itself, so Continue picks up
+  where you stopped. Before, Windows waited, then made RetroArch stop without saving. (F8 in a game takes a
+  screenshot there; the playing screen's button is for Mac and Linux.)
+- **Saves moving to their new folders, made safe:** nothing is ever written over, saves in a folder shared with other
+  computers are copied instead of moved, two people whose names would share a folder each keep their own, and saves
+  wait for a cloud folder or a drive that isn't there yet instead of being skipped. Moving a game between Genesis and
+  Master System or Game Gear takes its saves along, and restoring an older backup puts them where they're read now.
+- **RetroAchievements:** two people signed in from before each kept their own sign-in no longer both get signed out.
+  The app's chosen cheats keep working after RetroArch rewrites their file, and one you made yourself comes back when
+  you clear the app's.
+- **Test versions off means off:** a test version downloaded before you turned them off is never installed on quit.
+- **Smaller fixes:**
+  - Hidden games you choose to show no longer vanish from face-out shelves.
+  - Clearing a search goes back to the right game.
+  - Spine titles on black boxes are crisp again.
+  - A favorite set on another computer always shows.
+  - Trophies fit their shelf.
+  - Discs with tracks of the same name no longer get mixed up.
+  - Play brought in from another app is never counted twice.
+  - A play list with a broken character no longer stops the import.
+
 ## 0.5.0-beta.5
 
 A full review of the app, with about 90 fixes. The ones you'd notice most:

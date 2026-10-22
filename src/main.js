@@ -56,7 +56,13 @@ if (!HOME) {
     // settings that pointed at the folder where it was (see below, from a start when it couldn't move) follow it
     editPaths(paths => {
       let changed = false;
-      for (const k of ["roms_dir", "saves_dir"]) if (paths[k] && within(paths[k], oldDocs)) { paths[k] = path.join(DOCS, path.relative(oldDocs, paths[k])); changed = true; }
+      // (to the usual place, it's no longer a setting: a saves folder of your own means one shared with other computers)
+      const usual = { roms_dir: path.join(DOCS, "Games"), saves_dir: path.join(DOCS, "Saves") };
+      for (const k of ["roms_dir", "saves_dir"]) if (paths[k] && within(paths[k], oldDocs)) {
+        const to = path.join(DOCS, path.relative(oldDocs, paths[k]));
+        if (path.resolve(to) === path.resolve(usual[k])) delete paths[k]; else paths[k] = to;
+        changed = true;
+      }
       if (paths.oldSaves) { delete paths.oldSaves; changed = true; }
       return changed;
     });
@@ -76,7 +82,15 @@ const EMU = app.isPackaged ? path.join(process.resourcesPath, "emulators")
   : path.join(__dirname, "..", "vendor", { darwin: "mac", win32: "win" }[process.platform] || "linux");
 const WINDOW = () => path.join(app.getPath("userData"), "window.json");
 
-let win = null, backend = null, updater = null, quitting = false;
+let win = null, backend = null, updater = null, quitting = false, quitMidMove = false;
+/** the games half moved to another drive: asked once whether to quit anyway (closing the window or quitting asks the
+    same question once). True to keep moving */
+function askMidMove() {
+  const r = dialog.showMessageBoxSync(win, { type: "warning", buttons: [tm("Keep Moving"), tm("Quit Anyway")], defaultId: 0, cancelId: 0,
+    message: tm("The games are still being moved."), detail: tm("Quitting now leaves a partial copy in the new place. Your games stay where they were.") });
+  if (r !== 0) quitMidMove = true;
+  return r === 0;
+}
 
 async function fetchUrl(url, timeout) {
   const r = await net.fetch(url, { headers: { "User-Agent": "TheRetroShelf/1.0" }, signal: AbortSignal.timeout(timeout || 20000) });
@@ -163,10 +177,8 @@ function createWindow() {
   win.on("close", e => {
     saveBounds();
     // the games half moved to another drive: closing (and with it quitting) would leave a partial copy there
-    if (!quitting && backend && backend.moving && !win.isDestroyed()) {
-      const r = dialog.showMessageBoxSync(win, { type: "warning", buttons: [tm("Keep Moving"), tm("Quit Anyway")], defaultId: 0, cancelId: 0,
-        message: tm("The games are still being moved."), detail: tm("Quitting now leaves a partial copy in the new place. Your games stay where they were.") });
-      if (r === 0) e.preventDefault(); else win._asked = true;
+    if (!quitting && !quitMidMove && backend && backend.moving && !win.isDestroyed()) {
+      if (askMidMove()) e.preventDefault();
     }
   });
   win.on("closed", () => { win = null; });
@@ -450,8 +462,8 @@ function ipc() {
       try {
         fs.mkdirSync(backend.savesRoot(), { recursive: true });
         const res = await unzipInto(r.filePaths[0], backend.savesRoot());
-        // people's saves from a backup made when their folders were numbered go where they're read now
-        backend.peopleFolders();
+        // saves from a backup made before people's or consoles' folders changed go where they're read now
+        backend.afterRestore();
         return [200, { ok: true, ...res }];
       }
       catch (e) { return [500, { ok: false, error: "Couldn't restore from that file: " + e.message }]; }
@@ -494,7 +506,8 @@ function start() {
   backend.trash = p => shell.trashItem(p);
   // backups by themselves: weekly, when that's on, never while a game is open; the last five kept, older ones to the Trash
   const autoBackup = async () => {
-    if (!backend.backupDue() || (backend.running && backend.running.alive)) return;
+    // not while a game is open (it writes its saves as it goes), nor while the saves are being moved or restored
+    if (!backend.backupDue() || (backend.running && backend.running.alive) || backend.launching || backend.busy) return;
     // everyone's saves (the first person's and People/…)
     const saves = backend.savesRoot();
     let any = false;
@@ -547,10 +560,8 @@ app.on("before-quit", e => {
   // the play on this computer, for the others (with saves in a cloud folder), as it is now
   if (backend) try { backend.writeJournalNow(); } catch {}
   // the games half moved to another drive: quitting would leave a partial copy there
-  if (!quitting && backend && backend.moving && win && !win.isDestroyed() && !win._asked) {
-    const r = dialog.showMessageBoxSync(win, { type: "warning", buttons: [tm("Keep Moving"), tm("Quit Anyway")], defaultId: 0, cancelId: 0,
-      message: tm("The games are still being moved."), detail: tm("Quitting now leaves a partial copy in the new place. Your games stay where they were.") });
-    if (r === 0) { e.preventDefault(); return; }
+  if (!quitting && !quitMidMove && backend && backend.moving && win && !win.isDestroyed()) {
+    if (askMidMove()) { e.preventDefault(); return; }
   }
   if (updater) updater.dropUnwanted();
   if (quitting || !backend || !backend.running || !backend.running.alive) return;

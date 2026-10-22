@@ -126,7 +126,7 @@ button{cursor:pointer}
    --gm/--ga/--gt/--gd/--gl: the game's main color, accent, text on main, main as dark text, main as light text */
 .card,.lslot{--body:var(--gm);--si:var(--gt);--band:#161514;--foot:var(--ga);--bh:.8}
 /* a hidden game, shown because Settings says to: faded, as it says, until it's picked */
-.card.hid:not(.sel) .box{opacity:.45;filter:saturate(.4)}
+.card.hid:not(.sel) .f{opacity:.45;filter:saturate(.4)}
 .sp{display:flex;flex-direction:column;align-items:center;background:var(--sa, none) var(--sx, 50%) 46% / auto 150% no-repeat,var(--body);color:var(--si)}
 /* a strip of the box art runs down the spine: zoomed to the middle of the cover, where the artwork is (covers print
    their title at the top and console branding along the edges), dimmed a touch at the edges so the logo stands out */
@@ -1140,7 +1140,7 @@ function setGameColors(c, m, a, q) {
   /* the title in the game's own accent where it reads well against the spine (4.5:1, as for small text), or else in
      cream or ink, whichever stands out more: a red label's light red, or slate's, isn't readable on it */
   const body = DARK_BODY.test(lv) ? [20, 20, 20] : LIGHT_BODY.test(lv) ? [236, 230, 214] : m, want = darkBody ? pop : gd;
-  const wm = contrast(want, body) >= 4.5 ? want : contrast(CREAM, body) >= contrast(INK, body) ? CREAM : INK, lightText = rlum(wm) > .4;
+  const wm = contrast(want, body) >= 4.5 ? want : contrast(CREAM, body) >= contrast(INK, body) ? CREAM : INK, lightText = rlum(wm) > rlum(body);
   s.setProperty("--wm", css(wm));
   s.setProperty("--wk", lightText ? "-1px 0 0 rgba(0,0,0,.55),1px 0 0 rgba(0,0,0,.55),0 -1px 0 rgba(0,0,0,.55),0 1px 0 rgba(0,0,0,.55),0 2px 2px rgba(0,0,0,.35)"
                                   : "-1px 0 0 rgba(255,255,255,.6),1px 0 0 rgba(255,255,255,.6),0 -1px 0 rgba(255,255,255,.6),0 1px 0 rgba(255,255,255,.6)");
@@ -1495,7 +1495,7 @@ function renderShelves(keep) {
   const root = $("#shelves"), st = root.scrollTop, wasFlip = sel && sel.classList.contains("flip");
   /* where the picked box is: its shelf, and its place among all the boxes (the one picked, not the game's first copy
      on Recently played or Favorites) */
-  const keepSec = sel ? sel.dataset.group : null, keepAt = keep ? (sel && sel.dataset.id === keep ? slots().indexOf(sel) : slots().findIndex(x => x.dataset.id === keep)) : -1;
+  const onIt = !!(sel && keep && sel.dataset.id === keep), keepSec = onIt ? sel.dataset.group : null, keepAt = onIt ? slots().indexOf(sel) : -1;
   if (io) io.disconnect();
   POOL = new Map();
   $$("img", root).forEach(im => { const k = im.getAttribute("src"); if (k && im.complete && im.naturalWidth) (POOL.get(k) || POOL.set(k, []).get(k)).push(im); });
@@ -1699,12 +1699,15 @@ function pickAndScroll(c, by, wait) {
   const root = $("#shelves");
   by = Math.max(-root.scrollTop, Math.min(root.scrollHeight - root.clientHeight - root.scrollTop, Math.round(by)));
   pendingScroll = by;
-  try { c.focus({preventScroll: true}); } finally { pendingScroll = 0; }
+  try {
+    if (sel === c && by && !c._manual && !c.classList.contains("flat") && !c.closest(".lslot")) { c._lsel = placeBox(c, "--zs", 18, "--px", "--py"); if (c.classList.contains("flip")) placeFlip(c); }
+    c.focus({preventScroll: true});
+  } finally { pendingScroll = 0; }
   if (by) { root.scrollBy({top: by, behavior: fxMode() === "off" ? "auto" : "smooth"}); setTimeout(light, wait || 450); }
 }
 /* how far to scroll for a box to be in view, just enough */
 function revealBy(c) {
-  const root = $("#shelves"), r = c.getBoundingClientRect(), R = root.getBoundingClientRect();
+  const root = $("#shelves"), r = (c.closest(".stack") || c).getBoundingClientRect(), R = root.getBoundingClientRect();
   return r.top - R.top < 70 ? r.top - R.top - 70 : r.bottom > R.bottom ? r.bottom - R.bottom + 10 : 0;
 }
 function placeFlip(c) { c._lit = placeBox(c, "--zf", 22, "--fx", "--fy"); }
@@ -1861,6 +1864,7 @@ function wordFits(g, w) {
 /* a search cleared goes back to the game you were on before it, or the result you moved to */
 let preSearch = null, movedInSearch = false;
 function setQ(v) {
+  clearTimeout(qT);
   const clearing = !v.trim() && q, back = clearing ? (movedInSearch ? focusId : preSearch) : null;
   if (!q && v.trim()) { preSearch = focusId; movedInSearch = false; }
   $("#q").value = v; q = v.trim().toLowerCase(); renderShelves(back); paintQ();
@@ -1885,7 +1889,8 @@ function showLaunch(g) {
     : (rw ? t("Hold R to rewind, L to fast-forward.") : t("Hold L to fast-forward."));
   /* a screenshot: F8 in the game, or the button here (built-in emulators) */
   const shots = c2.builtin && !PATHS.own;
-  $("#lshot").hidden = !shots;
+  /* the button where RetroArch takes commands from the app (not on Windows: F8 there) */
+  $("#lshot").hidden = !shots || APPINFO.shotButton === false;
   if (shots) $("#lhint2").textContent = [$("#lhint2").textContent, t("F8 takes a screenshot.")].filter(Boolean).join(" ");
   $("#lhint2").style.visibility = "hidden";
   /* the controllers in the order they were connected: RetroArch numbers players the same way */
@@ -1912,6 +1917,8 @@ function showGame(id) {
 /* a panel opened from another one (settings → a list) gives focus back to the button that opened it */
 function opener() { const a = document.activeElement; return a && a !== document.body && !a.closest("#shelves") ? a : null; }
 function backTo(e) {
+  /* a button drawn again meanwhile (Settings redrawn under a list) is found again by its id */
+  if (e && !e.isConnected && e.id) e = document.getElementById(e.id);
   /* only a button that's really there: shown, and in a panel that's still open (one fading out takes no focus) */
   const usable = e && e.isConnected && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden"
     && PANELS.every(([id]) => { const p = document.getElementById(id); return !p || !p.contains(e) || isOpen(id); });
@@ -2049,7 +2056,9 @@ async function loadLibrary(force) {
   /* (art isn't in it: new covers, as they download, are drawn into their own boxes below, not the whole wall again) */
   const sig = () => G.map(g => [g.id, g.last, g.plays, g.title, g.hidden ? 1 : 0].join(":")).join("|") + "#" + [...FAV].join() + "#" + UI.hidden.join() + UI.shelf + UI.showHidden + UI.sort + UI.arrange + JSON.stringify(SHELVES);
   const before = sig(), art = new Map(G.map(g => [g.id, g.cv + "/" + g.lv]));
-  ingest(r.data, at !== EDITS);
+  const stale = at !== EDITS;
+  ingest(r.data, stale);
+  if (stale) setTimeout(() => refresh(), 600);
   if (force || sig() !== before) renderShelves(focusId);
   else {
     let drew = false;
@@ -3422,6 +3431,7 @@ function renderSettings() {
 
   H("Your play");
   const ppl = el("div", "btns"), pplWho = el("button", "btn", t("Who's playing…")), pplAll = el("button", "btn", t("People…"));
+  pplWho.id = "spwho"; pplAll.id = "sppeople";
   pplWho.onclick = () => openWho(); pplAll.onclick = openPeople;
   if (PEOPLE.list.length > 1) ppl.appendChild(pplWho);
   ppl.appendChild(pplAll);
@@ -3668,13 +3678,17 @@ function fitTrophy() {
   if (!isOpen("trophy")) return;
   const top = $("#ttop"), con = $("#tcon"), tros = [...top.children];
   if (tros.length) {
-    tros.forEach(t => t.style.setProperty("--th", t.dataset.h + "px"));
-    const gap = parseFloat(getComputedStyle(top).columnGap) || 0, room = top.clientWidth - 40;
-    const need = tros.reduce((w, t) => w + t.offsetWidth, 0) + gap * (tros.length - 1);
-    if (need > room) { const k = (room - gap * (tros.length - 1)) / (need - gap * (tros.length - 1)); tros.forEach(t => t.style.setProperty("--th", Math.floor(t.dataset.h * k) + "px")); }
-    /* each as wide as its brass plate at least (the hours under it, longer in German), and the last ones go when that's
-       more than the shelf holds */
-    tros.forEach(t => { t.hidden = false; const pl = t.querySelector(".tplate"); t.style.minWidth = pl ? pl.offsetWidth + 8 + "px" : ""; });
+    /* from the start every time (a wider window shows them all again): full size, nothing hidden */
+    tros.forEach(t => { t.hidden = false; t.style.minWidth = ""; t.style.setProperty("--th", t.dataset.h + "px"); });
+    const gap = parseFloat(getComputedStyle(top).columnGap) || 0, room = top.clientWidth - 40, gaps = gap * (tros.length - 1);
+    /* each is as wide as its box or its brass plate (the hours under it, longer in German), whichever is wider: the boxes
+       shrink together, the plates don't, until they all fit */
+    const box = tros.map(t => t.offsetWidth), plate = tros.map(t => { const pl = t.querySelector(".tplate"); return pl ? pl.offsetWidth + 8 : 0; });
+    const need = k => tros.reduce((w, t, i) => w + Math.max(box[i] * k, plate[i]), 0) + gaps;
+    let k = 1;
+    if (need(1) > room) { let lo = .3, hi = 1; for (let n = 0; n < 20; n++) { const m = (lo + hi) / 2; if (need(m) > room) hi = m; else lo = m; } k = lo; }
+    tros.forEach((t, i) => { t.style.setProperty("--th", Math.floor(t.dataset.h * k) + "px"); t.style.minWidth = plate[i] ? plate[i] + "px" : ""; });
+    /* still more than the shelf holds (the plates alone): the last ones go */
     const shown = [...tros];
     while (shown.length > 1 && top.scrollWidth > top.clientWidth) shown.pop().hidden = true;
   }

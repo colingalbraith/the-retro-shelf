@@ -103,7 +103,9 @@ class Updater extends EventEmitter {
     autoUpdater.on("update-available", i => this.set({ status: "downloading", version: i.version, progress: 0 }));
     autoUpdater.on("update-not-available", () => this.set({ status: "current" }));
     autoUpdater.on("download-progress", p => this.set({ progress: Math.round(p.percent || 0) }));
-    autoUpdater.on("update-downloaded", i => this.set({ status: "ready", version: i.version }));
+    // ready to go in on quit: this download, not one dropped before (a test version, once test versions are off), which
+    // electron-updater would keep and put in when the app quits
+    autoUpdater.on("update-downloaded", i => { autoUpdater.autoInstallOnAppQuit = true; this.set({ status: "ready", version: i.version }); });
     autoUpdater.on("error", e => this.set({ status: "error", error: "Update failed: " + (e && e.message || e) }));
     // Linux: an AppImage named after its version gets the new one's name; where the old one was (a Steam shortcut points
     // there), a link to the new one. Named without a version since 0.4.0, later ones are replaced in place
@@ -118,8 +120,6 @@ class Updater extends EventEmitter {
     if (process.env.RETRO_SHELF_UPDATE_FEED) au.setFeedURL({ provider: "generic", url: FEED });
     // test versions are GitHub prereleases; their update file has the same name as a release's (latest.yml)
     else au.allowPrerelease = !!this.beta();
-    // a test version dropped earlier turned installing on quit off: whatever this check finds goes in on quit again
-    au.autoInstallOnAppQuit = true;
     await au.checkForUpdates();
   }
 

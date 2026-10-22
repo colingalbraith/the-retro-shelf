@@ -208,6 +208,8 @@ try {
     await page.evaluate(`api("/api/stop", {})`);
     const ex = await until(`${system}: the game didn't close when asked`, () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
     if (ex.error) throw new Error(`${system}: the game closed with: ${ex.error}`);
+    // asked to stop, RetroArch closes itself (saving where you left off) within a few seconds; 12 s means it was made to
+    if (ex.dt > 10.5) throw new Error(`${system}: RetroArch didn't close when asked (it was stopped by force after ${Math.round(ex.dt)} s, so nothing was saved)`);
     step(`${system}: running with the ${look} picture, closed after ${Math.round(ex.dt)} s`);
   }
 
@@ -229,15 +231,23 @@ try {
     const ra2 = fs.readFileSync(log, "utf8");
     // RetroArch says so: "Auto-loading save state from "…Smoke Test (World).state.auto" succeeded"
     if (!/Auto-loading save state from "[^"]*Smoke Test \(World\)\.state\.auto" succeeded/.test(ra2)) throw new Error("NES: Continue didn't load the resume point (see its retroarch log)");
-    const shot = await page.evaluate(`api("/api/shot/take", {}).then(r => r.ok ? "" : r.data.error || "error")`);
-    if (shot) throw new Error("NES: couldn't take a screenshot: " + shot);
-    await sleep(2500);
+    // a screenshot from the playing screen's button (not on Windows, where RetroArch takes no commands from the app)
+    const button = process.platform !== "win32";
+    if (button) {
+      const shot = await page.evaluate(`api("/api/shot/take", {}).then(r => r.ok ? "" : r.data.error || "error")`);
+      if (shot) throw new Error("NES: couldn't take a screenshot: " + shot);
+      await sleep(2500);
+    }
     await page.evaluate(`api("/api/stop", {})`);
-    await until("NES: the game didn't close when asked", () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
-    const shots = await page.evaluate(`api("/api/library").then(r => (r.data.games.find(g => g.title === "Smoke Test") || {}).shots || 0)`);
-    if (!shots) throw new Error("NES: the screenshot isn't on its box (not found in Screenshots/NES)");
-    if (!fs.readdirSync(path.join(home, "The Retro Shelf", "Screenshots", "NES")).some(f => /\.png$/i.test(f))) throw new Error("NES: the screenshot wasn't put in its console's folder");
-    step("Continue loads the resume point, and a screenshot goes in its console's folder and on the box");
+    const ex = await until("NES: the game didn't close when asked", () => page.evaluate(`api("/api/status").then(r => !r.data.running && r.data.exit)`), 20000);
+    // Stop closes RetroArch the way it closes itself (so it saves first), not by force after waiting
+    if (ex.dt > 11.5) throw new Error(`NES: Stop took ${Math.round(ex.dt)} s: RetroArch didn't close when asked, and was made to`);
+    if (button) {
+      const shots = await page.evaluate(`api("/api/library").then(r => (r.data.games.find(g => g.title === "Smoke Test") || {}).shots || 0)`);
+      if (!shots) throw new Error("NES: the screenshot isn't on its box (not found in Screenshots/NES)");
+      if (!fs.readdirSync(path.join(home, "The Retro Shelf", "Screenshots", "NES")).some(f => /\.png$/i.test(f))) throw new Error("NES: the screenshot wasn't put in its console's folder");
+    }
+    step("Continue loads the resume point" + (button ? ", and a screenshot goes in its console's folder and on the box" : ""));
   }
 
   if (page.errors.length) throw new Error("the page had errors:\n  " + page.errors.join("\n  "));

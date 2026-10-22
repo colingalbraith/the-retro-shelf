@@ -96,7 +96,19 @@ function csoSystemId(fd) {
 }
 
 /** a disc's track or image, by its kind of file */
-const TRACK = /\.(bin|img|iso|raw|wav|ogg|flac|mp3|ape|wv|cue|gdi|chd|cdi|mds|mdf|ccd|sub|pbp|cso|zso|nrg|toc|ecm)$/i;
+const TRACK = /\.(bin|img|iso|raw|wav|ogg|flac|mp3|ape|wv|cue|gdi|chd|cdi|mds|mdf|ccd|sub|pbp|cso|zso|nrg|toc|ecm|rvz|gcz|wbfs|ciso|wia|gcm)$/i;
+/** whether two files are the same, near enough to tell without reading all of a disc: as big, and alike at the start
+    and the end */
+function sameFile(a, b) {
+  try {
+    const sa = fs.statSync(a), sb = fs.statSync(b);
+    if (sa.size !== sb.size) return false;
+    const n = Math.min(65536, sa.size), part = (f, at) => { const fd = fs.openSync(f, "r"); try { const buf = Buffer.alloc(n); fs.readSync(fd, buf, 0, n, at); return buf; } finally { fs.closeSync(fd); } };
+    return part(a, 0).equals(part(b, 0)) && part(a, Math.max(0, sa.size - n)).equals(part(b, Math.max(0, sb.size - n)));
+  } catch { return false; }
+}
+/** whether two disc sheets name the same tracks (one the app rewrote, with the tracks beside it, is the same sheet) */
+const sameSheet = (a, b) => { const l = f => sheetFiles(f).map(leaf).join("|").toLowerCase(); try { return l(a) === l(b) && l(a) !== ""; } catch { return false; } };
 /** whether p is in dir (or is it) */
 const within = (p, dir) => { const r = path.relative(path.resolve(dir), path.resolve(p)); return r === "" || (!path.isAbsolute(r) && r !== ".." && !r.startsWith(".." + path.sep)); };
 
@@ -338,7 +350,11 @@ class Importer {
     const stem = path.parse(it.name).name, nested = it.makeCue || it.extras.some(x => !IMG.includes(path.extname(x).toLowerCase()));
     // a game's discs added one by one ("… (Disc 1).cue", "… (Disc 2).cue") share one folder, named for the game, where
     // they're made into one box with a disc list
-    const base = nested ? path.join(dir, stem.replace(/\s*\((?:Disc|Disk|CD) ?\d+(?: of \d+)?\)/i, "").trim() || stem) : dir, srcDir = path.dirname(it.src);
+    let base = nested ? path.join(dir, stem.replace(/\s*\((?:Disc|Disk|CD) ?\d+(?: of \d+)?\)/i, "").trim() || stem) : dir;
+    const srcDir = path.dirname(it.src);
+    // …unless one of this disc's files would meet a different one of the same name there ("Track 01.bin" in each): then
+    // the disc keeps a folder of its own
+    if (nested && base !== path.join(dir, stem) && it.extras.some(x => { const to = path.join(base, path.basename(x)); return fs.existsSync(to) && !sameFile(x, to); })) base = path.join(dir, stem);
     // the files the game needs first, the game itself last: a copy that fails halfway leaves no game that looks whole
     const copies = [], moved = [];
     for (const x of it.extras) {
@@ -369,7 +385,8 @@ class Importer {
           let there = null;
           try { there = fs.statSync(dest); } catch {}
           if (there) {
-            if (there.size === fs.statSync(src).size) continue;
+            // the same file (or the same disc sheet, rewritten when it came in before) is there already
+            if (sameFile(src, dest) || (SHEETS.includes(path.extname(dest).toLowerCase()) && sameSheet(src, dest))) continue;
             // a cover picture of that name there already stays (the game still comes in); a game's own file never
             // replaces another
             if (IMG.includes(path.extname(dest).toLowerCase())) continue;

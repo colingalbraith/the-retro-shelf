@@ -146,7 +146,9 @@ function apply(st, p) {
     // marked by the list and the game's line in it, not the game's id here, which changes when its file moves (marks
     // from before were by id: they still count)
     const mark = f.source + "|" + fileKey(f.file);
-    if (st.imported[mark] || st.imported[f.source + "|" + f.id]) continue;
+    if (st.imported[mark]) continue;
+    // brought in before marks were by the list's line: marked the new way too, so it never comes in again
+    if (st.imported[f.source + "|" + f.id]) { st.imported[mark] = 1; continue; }
     st.imported[mark] = 1; n++;
     if (f.fav && !st.fav.includes(f.id)) st.fav.push(f.id);
     if (f.plays) st.plays[f.id] = (st.plays[f.id] || 0) + f.plays;

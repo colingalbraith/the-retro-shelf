@@ -103,8 +103,10 @@ function combine(journals, keyOf, at = Math.floor(Date.now() / 1000)) {
       a.plays += Math.min(num(e.plays), 1e6); a.time += Math.min(num(e.time), 1e9); a.last = Math.max(a.last, Math.min(num(e.last), soon));
       add.set(id, a);
       for (const f of FIELDS) {
-        if (!Array.isArray(e[f]) || e[f].length !== 2 || !VALID[f](e[f][0])) continue;
-        const v = [e[f][0], Math.min(num(e[f][1]), soon)], cur = set.get(f + ":" + id);
+        // a change dated after tomorrow (a computer whose clock is wrong) is left out, not kept as tomorrow's: dated
+        // tomorrow, it would be taken as newer every time, and win every change made here
+        if (!Array.isArray(e[f]) || e[f].length !== 2 || !VALID[f](e[f][0]) || num(e[f][1]) > soon) continue;
+        const v = [e[f][0], num(e[f][1])], cur = set.get(f + ":" + id);
         if (!cur || v[1] > cur[1]) set.set(f + ":" + id, v);
       }
     }
