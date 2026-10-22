@@ -49,7 +49,9 @@ function neededDirs(dirs) {
 }
 
 // a value as RetroArch's settings file holds it: in quotes, so without quotes or line breaks of its own
-const q = v => '"' + String(v).replace(/["\r\n]/g, "") + '"';
+// a value on one line of retroarch.cfg: no quotation marks, line breaks or other control characters (RetroArch would
+// cut it short there)
+const q = v => '"' + String(v).replace(/["\x00-\x1f\x7f]/g, "") + '"';
 
 /** the app's languages as RetroArch numbers them (libretro.h's RETRO_LANGUAGE_*); any other is English. RetroArch has a
     font for each in its menu, and hands the language to the emulators too (a PSP or Dreamcast's own language) */
@@ -205,7 +207,11 @@ function writeConfig(file, keys) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   // whole or not at all: a crash halfway would otherwise lose someone's RetroArch settings
   fs.writeFileSync(file + ".tmp", lines.join("\n") + "\n");
-  fs.renameSync(file + ".tmp", file);
+  // a moment's lock on Windows (an antivirus scan, RetroArch closing) gets a few tries
+  for (let i = 0; ; i++) {
+    try { fs.renameSync(file + ".tmp", file); return; }
+    catch (e) { if (i >= 4 || !["EPERM", "EBUSY", "EACCES"].includes(e.code)) throw e; Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * (i + 1)); }
+  }
 }
 
 /** a controller profile with rewind on its left trigger and fast-forward on its right one, whatever they are on that

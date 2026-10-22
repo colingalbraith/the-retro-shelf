@@ -8,7 +8,12 @@ const path = require("path");
 
 const ENT = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 const unxml = s => String(s).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-  .replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e) => e[0] === "#" ? String.fromCodePoint(e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : ENT[e.toLowerCase()] ?? m).trim();
+  .replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e) => {
+    if (e[0] !== "#") return ENT[e.toLowerCase()] ?? m;
+    // a character by its number, when there's such a character (&#99999999; isn't one)
+    const n = e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
+  }).trim();
 const tag = (block, name) => { const m = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i").exec(block); return m ? unxml(m[1]) : ""; };
 const blocks = (text, name) => [...text.matchAll(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "gi"))].map(m => m[1]);
 const yes = v => /^(true|1|yes)$/i.test(v);
