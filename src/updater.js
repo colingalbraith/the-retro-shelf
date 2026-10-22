@@ -118,6 +118,8 @@ class Updater extends EventEmitter {
     if (process.env.RETRO_SHELF_UPDATE_FEED) au.setFeedURL({ provider: "generic", url: FEED });
     // test versions are GitHub prereleases; their update file has the same name as a release's (latest.yml)
     else au.allowPrerelease = !!this.beta();
+    // a test version dropped earlier turned installing on quit off: whatever this check finds goes in on quit again
+    au.autoInstallOnAppQuit = true;
     await au.checkForUpdates();
   }
 
@@ -211,7 +213,8 @@ class Updater extends EventEmitter {
   // ---------------------------------------------------------------- installing
   /** quit now and come back as the new version */
   restart() {
-    if (this.state.status !== "ready") return;
+    // a test version, with test versions turned off since it came: it isn't put in place
+    if (this.dropUnwanted() || this.state.status !== "ready") return;
     if (process.platform === "win32" || process.platform === "linux") return this.win().quitAndInstall(true, true);
     this.relaunch = true;
     app.quit();

@@ -161,6 +161,8 @@ const CONTRAST = `(() => {
       if (["app", "shelves", "trophy", "colls"].includes(n.id) || n === document.body) return wall;
       const cs = getComputedStyle(n); if (cs.backgroundImage !== "none") return null;
       const c = rgb(cs.backgroundColor); if (c.length === 3 || c[3] > .85) return c;
+      // a see-through dark sheet over everything (a window's backdrop): it, laid over the wall, is what's behind
+      if (c[3] >= .5) return [0, 1, 2].map(i => c[i] * c[3] + wall[i] * (1 - c[3]));
     }
     return wall;
   };

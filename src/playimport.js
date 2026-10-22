@@ -35,6 +35,10 @@ function esTime(v) {
   const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/.exec(v || "");
   return m ? Math.floor(new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() / 1000) : 0;
 }
+/** a number from a list, within reason: none below 0 (a list edited by hand), none past max */
+const count = (v, max) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? Math.min(n, max) : 0; };
+/** a time no later than tomorrow (a computer whose clock was wrong) */
+const when = t => Math.min(t, Math.floor(Date.now() / 1000) + 86400);
 const isoTime = v => { const t = Date.parse(v || ""); return Number.isFinite(t) && t > 0 ? Math.floor(t / 1000) : 0; };
 
 /**
@@ -45,15 +49,15 @@ function parseList(text) {
   if (/<gameList[\s>]/i.test(text)) {
     return blocks(text, "game").map(b => {
       const r = parseFloat(tag(b, "rating")) || 0;
-      return { file: tag(b, "path"), fav: yes(tag(b, "favorite")), plays: parseInt(tag(b, "playcount"), 10) || 0, last: esTime(tag(b, "lastplayed")),
-        rating: r > 0 ? Math.max(1, Math.min(5, Math.round(r * 5))) : 0, time: parseInt(tag(b, "gametime"), 10) || 0, done: false };
+      return { file: tag(b, "path"), fav: yes(tag(b, "favorite")), plays: count(tag(b, "playcount"), 1e5), last: when(esTime(tag(b, "lastplayed"))),
+        rating: r > 0 ? Math.max(1, Math.min(5, Math.round(r * 5))) : 0, time: count(tag(b, "gametime"), 1e8), done: false };
     }).filter(g => g.file);
   }
   if (/<LaunchBox[\s>]/i.test(text)) {
     return blocks(text, "Game").map(b => {
       const r = parseInt(tag(b, "StarRating"), 10) || 0;
-      return { file: tag(b, "ApplicationPath"), platform: tag(b, "Platform"), fav: yes(tag(b, "Favorite")), plays: parseInt(tag(b, "PlayCount"), 10) || 0,
-        last: isoTime(tag(b, "LastPlayedDate")), rating: r > 0 ? Math.min(5, r) : 0, time: parseInt(tag(b, "PlayTime"), 10) || 0, done: yes(tag(b, "Completed")) };
+      return { file: tag(b, "ApplicationPath"), platform: tag(b, "Platform"), fav: yes(tag(b, "Favorite")), plays: count(tag(b, "PlayCount"), 1e5),
+        last: when(isoTime(tag(b, "LastPlayedDate"))), rating: r > 0 ? Math.min(5, r) : 0, time: count(tag(b, "PlayTime"), 1e8), done: yes(tag(b, "Completed")) };
     }).filter(g => g.file);
   }
   return null;

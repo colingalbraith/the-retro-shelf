@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.5.0-beta.5
+
+A full review of the app, with about 90 fixes. The ones you'd notice most:
+
+- **Your saves, kept safe:**
+  - Sharing saves through a cloud folder that another computer already uses keeps that computer's saves, instead of
+    replacing them with this one's.
+  - A full disk can no longer wipe your play history.
+  - Saves of games whose names start with a dot (.hack) are in backups again.
+  - A cheat file you made in RetroArch's own menu is never deleted.
+  - Restoring a backup made in another time zone no longer overwrites newer saves.
+- **GameCube and Wii saves show up:** Continue, save slots and the saves list now find them (they were in a folder
+  the app didn't look in). Same for Vectrex and Intellivision on Linux and the Steam Deck.
+- **Game Gear, Master System and SG-1000 games have their own saves,** instead of sharing one with a Genesis game of
+  the same name. Your saves move over by themselves.
+- **Multi-disc games:**
+  - Dreamcast and PC Engine games on several discs no longer vanish from the shelf.
+  - Separate discs you add become one box.
+  - A Sega CD or Saturn game with a .cue and an .iso shows once.
+- **Picking a game:** a box that comes out with the keyboard or a controller lands in the right place, never a row up
+  or off the screen. Clearing a search takes you back to where you were.
+- **Continue does what it says:** it's only offered when it will pick up where you left off. A game that fails to
+  start no longer counts as played. A RetroAchievements sign-in made in RetroArch's own menu is kept.
+- **Controllers:** buttons that open the web browser or Finder say they need a mouse, instead of leaving you stuck.
+  The Licenses window closes with Esc or any controller button. Hints name your controller's own buttons. Putting
+  saves or screenshots in the Trash takes a second press.
+- **The portable copy** keeps your play history when the USB stick comes back as another drive letter, and keeps
+  its exports in its own folder.
+- **Updates:** a test version is never installed after you turn test versions off.
+- **Looks and words:** Settings rows fit in German and Polish, 3DO boxes have their black-and-gold look, spine titles
+  are readable on every color, the recap's buttons are readable on light walls, hidden games you choose to show stand
+  faded, and the screensaver drifts again. More of the app is in your language.
+
 ## 0.5.0-beta.4
 
 - **Your screenshots on the box:** press F8 in a game, or Take a screenshot on the playing screen, and the newest one

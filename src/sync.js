@@ -9,6 +9,14 @@ const path = require("path");
 const crypto = require("crypto");
 
 const FIELDS = ["progress", "rating", "notes", "fav"];
+/** what each field may be, from another computer's journal (a shared folder anything can write to): anything else is
+    left out. null is "taken off" */
+const VALID = {
+  progress: v => v === null || ["backlog", "playing", "beaten", "complete"].includes(v),
+  rating: v => v === null || (Number.isInteger(v) && v >= 1 && v <= 5),
+  notes: v => v === null || (typeof v === "string" && v.length <= 280),
+  fav: v => typeof v === "boolean",
+};
 /** a game across computers: its console and file name */
 const gameKey = g => g.system + "/" + path.basename(g.path).toLowerCase();
 /** every game's key, by id. Two games here with the same console and file name (Disc 1.chd in two games' folders)
@@ -81,24 +89,28 @@ function readJournals(dir, machine) {
  * What the other computers add, in this computer's ids: play totals by game, their sittings (a game this computer
  * doesn't have keeps its key, so time still counts), and what they set for games, newest per field
  */
-function combine(journals, keyOf) {
+function combine(journals, keyOf, at = Math.floor(Date.now() / 1000)) {
   const idOf = new Map([...keyOf].map(([id, k]) => [k, id])), add = new Map(), sessions = [], set = new Map(), hosts = [];
-  const num = v => Number.isFinite(v) && v > 0 ? v : 0;
+  // numbers within reason: none below 0, and no time past tomorrow (a computer whose clock runs ahead doesn't win every
+  // change from then on)
+  const num = v => Number.isFinite(v) && v > 0 ? v : 0, soon = at + 86400;
   for (const { j } of journals) {
     hosts.push({ host: String(j.host || ""), at: num(j.at) });
     for (const [k, e] of Object.entries(j.games || {})) {
       const id = idOf.get(k);
       if (!id || !e || typeof e !== "object") continue;
       const a = add.get(id) || { plays: 0, time: 0, last: 0 };
-      a.plays += num(e.plays); a.time += num(e.time); a.last = Math.max(a.last, num(e.last));
+      a.plays += Math.min(num(e.plays), 1e6); a.time += Math.min(num(e.time), 1e9); a.last = Math.max(a.last, Math.min(num(e.last), soon));
       add.set(id, a);
       for (const f of FIELDS) {
-        if (!Array.isArray(e[f]) || e[f].length !== 2) continue;
-        const cur = set.get(f + ":" + id);
-        if (!cur || e[f][1] > cur[1]) set.set(f + ":" + id, e[f]);
+        if (!Array.isArray(e[f]) || e[f].length !== 2 || !VALID[f](e[f][0])) continue;
+        const v = [e[f][0], Math.min(num(e[f][1]), soon)], cur = set.get(f + ":" + id);
+        if (!cur || v[1] > cur[1]) set.set(f + ":" + id, v);
       }
     }
-    for (const s of Array.isArray(j.sessions) ? j.sessions : []) if (Array.isArray(s) && s.length === 3 && typeof s[0] === "string" && num(s[1]) && num(s[2])) sessions.push([idOf.get(s[0]) || "~" + s[0], s[1], s[2]]);
+    // sittings as this computer keeps its own: the latest 20,000, none over half a day, none starting past tomorrow
+    for (const s of (Array.isArray(j.sessions) ? j.sessions : []).slice(-20000))
+      if (Array.isArray(s) && s.length === 3 && typeof s[0] === "string" && num(s[1]) && s[1] <= soon && num(s[2])) sessions.push([idOf.get(s[0]) || "~" + s[0], s[1], Math.min(s[2], 12 * 3600)]);
   }
   sessions.sort((a, b) => a[1] - b[1]);
   return { add, sessions, set, hosts };
