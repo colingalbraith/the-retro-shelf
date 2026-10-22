@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("arcade", {
   licenses: () => ipcRenderer.invoke("licenses"),
   openUrl: url => ipcRenderer.invoke("open-url", url),
   revealGame: id => ipcRenderer.invoke("reveal-game", id),
+  revealShot: (id, name) => ipcRenderer.invoke("reveal-shot", id, String(name || "")),
   gameMenu: id => ipcRenderer.invoke("game-menu", id),
   update: what => ipcRenderer.invoke("update", what),
   backupSaves: quick => ipcRenderer.invoke("backup-saves", !!quick),

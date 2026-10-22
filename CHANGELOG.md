@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0-beta.4
+
+- **Your screenshots on the box:** press F8 in a game, or Take a screenshot on the playing screen, and the newest one
+  goes on the back of the game's box instead of the stock picture. Screenshots… in a game's options shows them all,
+  each to find in its folder or put in the Trash. They're kept in a folder for each console, in Screenshots next to
+  your games. A picture you chose for the box yourself (right-click → Change Screenshot) still comes first.
+- **Fixes:** "Playing" on the playing screen is in your language. Switches, sliders and name fields in Settings and
+  the Rename and New shelf windows now tell screen readers what they're for. Moving over from the app's old name
+  (Arcade) no longer shows an empty shelf when the games folder can't be moved: the app uses it where it is.
+
 ## 0.5.0-beta.3
 
 - **Your play follows you between computers:** with your saves in an iCloud Drive, Dropbox or OneDrive folder (Settings

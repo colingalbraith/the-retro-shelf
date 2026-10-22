@@ -8,6 +8,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import zlib from "node:zlib";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -39,6 +40,16 @@ function library(games) {
     for (const name of new Set(pick)) { const f = name.replace(/[\\/:*?"<>|]/g, "_") + ext; fs.writeFileSync(path.join(games, s.folder || system.toLowerCase(), f), ""); made.push(f); }
   }
   return made;
+}
+
+/** a picture of w×h pixels in stripes of a few colors, as a PNG (a screenshot from a game, for the box back) */
+function png(w, h) {
+  const crc = b => { let c = ~0; for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1; } return ~c >>> 0; };
+  const chunk = (type, data) => { const t = Buffer.from(type), l = Buffer.alloc(4), c = Buffer.alloc(4); l.writeUInt32BE(data.length); c.writeUInt32BE(crc(Buffer.concat([t, data]))); return Buffer.concat([l, t, data, c]); };
+  const head = Buffer.alloc(13); head.writeUInt32BE(w, 0); head.writeUInt32BE(h, 4); head[8] = 8; head[9] = 2;
+  const rows = Buffer.alloc((w * 3 + 1) * h), colors = [[92, 148, 252], [252, 252, 252], [0, 168, 0], [200, 76, 12]];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) rows.set(colors[Math.floor(y / (h / 4))], y * (w * 3 + 1) + 1 + x * 3);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", head), chunk("IDAT", zlib.deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
 }
 
 async function connect() {
@@ -120,6 +131,25 @@ const PANEL = `(() => { const out = [], vis = e => e.offsetWidth && getComputedS
   }
   if (document.documentElement.scrollWidth > innerWidth + 1) out.push("the window scrolls sideways");
   return out; })()`;
+/* for screen readers: every control that can be reached has a name to read out, every picture says what it is (or
+   alt="" when it's decoration), and no two elements share an id */
+const A11Y = `(() => { const out = new Set(), vis = e => e.getClientRects().length && getComputedStyle(e).visibility !== "hidden";
+  const root = [...document.querySelectorAll("#settings,#getg,#pick,#colls,#trophy,.over,#opts,#osk,#imp,#launch")].find(e => e.classList.contains("show")) || document.getElementById("app") || document.body;
+  const what = e => e.tagName.toLowerCase() + (e.id ? "#" + e.id : "") + (e.className && typeof e.className === "string" ? "." + e.className.trim().split(/\\s+/).join(".") : "");
+  const named = e => {
+    if ((e.getAttribute("aria-label") || "").trim() || (e.getAttribute("title") || "").trim()) return true;
+    const by = e.getAttribute("aria-labelledby"); if (by && by.split(/\\s+/).some(id => (document.getElementById(id) || {}).textContent)) return true;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.tagName)) return !!((e.id && document.querySelector('label[for="' + e.id + '"]')) || (e.closest("label") || {textContent: ""}).textContent.trim() || (e.placeholder || "").trim() || (e.type === "button" || e.type === "submit") && e.value);
+    return !!(e.textContent.trim() || [...e.querySelectorAll("img[alt]")].some(i => i.alt.trim()));
+  };
+  for (const e of root.querySelectorAll("button,a[href],input:not([type=hidden]),select,textarea,[role=button],[role=tab],[role=checkbox],[role=switch]")) {
+    if (!vis(e) || e.closest("[aria-hidden=true],[inert]")) continue;
+    if (!named(e)) out.add(what(e) + " has no name to read out");
+  }
+  for (const i of root.querySelectorAll("img")) if (vis(i) && !i.hasAttribute("alt") && !i.closest("[aria-hidden=true]")) out.add("a picture (" + what(i.parentElement) + ") says nothing about itself");
+  const ids = new Map(); for (const e of document.querySelectorAll("[id]")) ids.set(e.id, (ids.get(e.id) || 0) + 1);
+  for (const [id, n] of ids) if (n > 1) out.add("#" + id + " is the id of " + n + " elements");
+  return [...out]; })()`;
 /* text straight on the wall or a panel's own color, too faint to read: under 3:1 against what's behind it. Text over
    pictures and patterns (box art, spines, wood) is left out */
 const CONTRAST = `(() => {
@@ -171,6 +201,7 @@ const SCREENS = [
   // more than one person: who's playing, and the list of people (a long name, the hardest to fit)
   ["who", "(PEOPLE.list.length > 1 ? Promise.resolve() : api('/api/people/add', {name: 'Alexandria-Rosemary'}).then(r => { PEOPLE = r.data; })).then(() => openWho())", "closeList()"],
   ["people", "openPeople()", "closeList()"],
+  ["screenshots", "openShots(G.slice().sort((a, b) => (b.shots || 0) - (a.shots || 0))[0].id)", "closeList()"],
   ["screensaver", "UI.tv = true; startSaver()", "stopSaver(); UI.tv = false"],
   ["what-counts", "openColls('series'); setTimeout(() => openCounts(COLL.series[0].name), 700)", "closeList(); closeColls()"],
 ];
@@ -178,6 +209,12 @@ const SCREENS = [
 // --- run ---------------------------------------------------------------------------------------------------------
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "retro-shelf-ui-"));
 const made = library(path.join(home, "The Retro Shelf", "Games")), count = made.length;
+// screenshots taken in a few games (the longest names): on their box backs, and in their list
+const shots = path.join(home, "The Retro Shelf", "Screenshots");
+fs.mkdirSync(shots, { recursive: true });
+made.filter(f => !f.endsWith(".zip")).sort((a, b) => b.length - a.length).slice(0, 3).forEach((f, i) => {
+  for (let k = 0; k <= i; k++) fs.writeFileSync(path.join(shots, `${path.parse(f).name}-25100${k + 1}-20000${k}.png`), png(256, 224));
+});
 fs.mkdirSync(path.join(home, "data"), { recursive: true });
 // no downloads (the same boxes every run), no sounds, and seen as an update from 0.2.0 so What's new shows
 fs.writeFileSync(path.join(home, "data", "settings.json"), JSON.stringify({ ui: { welcomed: true, autoCovers: false, updates: false, sound: false } }));
@@ -214,6 +251,7 @@ try {
     console.log(`· box backs at ${w}×${h}: ${bad.length ? bad.length + " problems" : "ok"}`);
     for (const b of bad) problems.push(`${w}×${h}: ${b}`);
   }
+  for (const b of await p.ev(A11Y)) problems.push(`the shelves, for screen readers: ${b}`);
 
   for (const [w, h] of [[720, 520], [1600, 1000]]) {
     await p.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile: false });
@@ -222,6 +260,7 @@ try {
       await p.ev(open + "; 1"); await sleep(1300);
       const bad = await p.ev(PANEL);
       for (const b of bad) problems.push(`${name} at ${w}×${h}: ${b}`);
+      if (w === 1600) for (const b of await p.ev(A11Y)) problems.push(`${name}, for screen readers: ${b}`);
       const shot = await p.send("Page.captureScreenshot", { format: "jpeg", quality: 70 });
       fs.writeFileSync(path.join(OUT, `${name}-${w}x${h}.jpg`), Buffer.from(shot.result.data, "base64"));
       await p.ev(close + "; 1"); await sleep(400);

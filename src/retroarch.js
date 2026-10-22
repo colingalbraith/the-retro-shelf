@@ -129,6 +129,9 @@ function enforced(ra, dirs, opts) {
     savefile_directory: dirs.saves,
     savestate_directory: dirs.states,
     screenshot_directory: dirs.screenshots,
+    // screenshots (F8, the Quick Menu's Take Screenshot, or the app's button) named after the game and when, all in one
+    // folder: the app finds them by name for the back of the box, and sorts them into a folder for each console
+    input_screenshot: "f8", auto_screenshot_filename: "true", screenshots_in_content_dir: "false", sort_screenshots_by_content_enable: "false",
     system_directory: dirs.system,
     // everything else RetroArch writes stays in the app's data folder, apart from any other RetroArch install
     ...Object.fromEntries(Object.entries(PRIVATE_DIRS).map(([k, sub]) => [k, path.join(dirs.private, sub)])),

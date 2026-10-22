@@ -860,3 +860,42 @@ test("without a shared saves folder, nothing is written for other computers", ()
   assert.equal(be.writeJournalNow(), false);
   assert.ok(!fs.existsSync(path.join(home, "docs", "Saves", ".the-retro-shelf")));
 });
+
+test("screenshots taken in a game go on its box and into its console's folder, never another game's", async () => {
+  put("snes/Super Mario World (USA).sfc"); put("snes/Super Mario World 2 (USA).sfc"); put("gb/Tetris.gb"); put("nes/Tetris.nes");
+  be.scan();
+  const smw = byTitle("Super Mario World"), gb = [...be.games.values()].find(g => g.system === "Game Boy");
+  const shots = be.folders.screenshots, shot = (name, at) => { fs.mkdirSync(shots, { recursive: true }); const f = path.join(shots, name); fs.writeFileSync(f, "PNG"); fs.utimesSync(f, at, at); return f; };
+  const t0 = Math.floor(Date.now() / 1000);
+  shot("Super Mario World (USA)-251001-200000.png", t0 - 86400);    // from before: still found where it is
+  shot("Super Mario World 2 (USA)-251002-200000.png", t0 - 3600);   // a sequel's, not this game's
+  shot("Tetris-251003-200000.png", t0 - 60);
+  assert.deepEqual(be.shotsOf(smw).map(s => path.basename(s.file)), ["Super Mario World (USA)-251001-200000.png"]);
+  // a sitting: what was taken in it goes in the console's folder, and the newest is on the box
+  const rec = { id: smw.id, since: t0 - 30, alive: true };
+  shot("Super Mario World (USA)-251021-200000.png", t0 - 10);
+  assert.equal(be.sortShots(rec), 1);
+  assert.ok(fs.existsSync(path.join(shots, "SNES", "Super Mario World (USA)-251021-200000.png")));
+  assert.ok(fs.existsSync(path.join(shots, "Super Mario World (USA)-251001-200000.png")), "older ones stay");
+  const lib = be.libraryJson().games.find(g => g.id === smw.id);
+  assert.deepEqual([lib.shots, lib.shv], [2, t0 - 10]);
+  assert.equal((await be.route("GET", `/shot/${smw.id}/0`)).code, 200);
+  assert.equal((await be.route("GET", `/shot/${smw.id}/5`)).code, 404);
+  // Tetris on the Game Boy, once its sitting sorted it: not the NES Tetris's
+  assert.equal(be.sortShots({ id: gb.id, since: t0 - 120 }), 1);
+  assert.equal(be.shotsOf([...be.games.values()].find(g => g.system === "NES")).length, 0);
+  assert.equal(be.shotsOf(gb).length, 1);
+  // a picture chosen for the box wins over screenshots
+  put("snes/Super Mario World (USA).snap.png", "PNG"); be.scan();
+  const again = be.libraryJson().games.find(g => g.id === smw.id);
+  assert.deepEqual([again.shots, again.shv], [2, undefined]);
+  // to the Trash, only its own
+  const trashed = [];
+  be.trash = async p => { trashed.push(path.basename(p)); fs.rmSync(p); };
+  assert.equal((await be.route("POST", "/api/shot/trash", { id: smw.id, name: "Tetris-251003-200000.png" })).code, 404);
+  assert.equal((await be.route("POST", "/api/shot/trash", { id: smw.id, name: "Super Mario World (USA)-251001-200000.png" })).code, 200);
+  assert.deepEqual(trashed, ["Super Mario World (USA)-251001-200000.png"]);
+  assert.equal((await be.route("POST", "/api/shots", { id: smw.id })).body.shots.length, 1);
+  // nothing playing: nothing to take
+  assert.equal((await be.route("POST", "/api/shot/take", {})).code, 409);
+});

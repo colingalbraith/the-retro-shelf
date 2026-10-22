@@ -31,7 +31,7 @@ const ART = {
 const GITHUB_ART = "https://raw.githubusercontent.com/libretro-thumbnails";
 const GITHUB_API = "https://api.github.com/repos/libretro-thumbnails";
 const repoOf = thumb => thumb.replace(/ /g, "_");
-const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
+const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp" };
 const DEFAULT_UI = { accent: "#e2582b", tint: true, spine: "cover", fx: "full", sound: true, card: 170, hints: false, autoCovers: true, hidden: [], shelf: "spines",
                      fullscreen: true, resume: true, ownEmu: false, welcomed: false, showHidden: false, updates: true, beta: false, rewind: true, lessLag: true, hardcore: false,
                      picture: "auto", sort: "title", buttons: "auto", arrange: "console", wood: "walnut", wall: "dark", saver: 5, music: false, musicVol: "medium", textSize: 100, lang: "auto", ffSpeed: 3, ffTrigger: "hold" };
@@ -138,6 +138,8 @@ function cleanUi(d) {
   return out;
 }
 const safe = s => s.replace(/[\\/:*?"<>|]+/g, "_");
+/** a screenshot as RetroArch names it: the game's file name, then when (Game-251021-203015.png) */
+const SHOT = /^(.+)-(\d{6})-(\d{6})\.(png|jpe?g|bmp)$/i;
 const asList = v => !v ? [] : typeof v === "string" ? [v] : [...v];
 const now = () => Date.now() / 1000;
 function which(cmd) {
@@ -1188,6 +1190,7 @@ class Backend extends EventEmitter {
     } catch {} finally {
       // whatever else failed, a password RetroArch was handed doesn't stay behind
       try { this.cheevosAfter(rec); } catch {}
+      try { this.sortShots(rec); } catch {}
     }
     let error = "";
     if (dt < 4 && !rec.stopping) error = (rec.builtIn && ra.explain(this.files.raLog, how)) || "";
@@ -2143,6 +2146,75 @@ class Backend extends EventEmitter {
     return path.join(this.folders.states, cn, path.parse(g.path).name + ".state" + n + ".png");
   }
 
+  // ---------------------------------------------------------------- your screenshots
+  /** a console's screenshots: RetroArch names each after the game and when ("Game-251021-203015.png"), and after the
+      game they're put in a folder for its console, so two consoles' games of the same name keep their own */
+  shotDir(system) { return path.join(this.folders.screenshots, safe(system)); }
+  /** the screenshots in a folder, by game (its file name without the extension, in lowercase), newest first. Read
+      again only when the folder changes */
+  shotsIn(dir) {
+    this._shots = this._shots || new Map();
+    let mt = 0;
+    try { mt = fs.statSync(dir).mtimeMs; } catch { this._shots.delete(dir); return new Map(); }
+    const c = this._shots.get(dir);
+    if (c && c.mt === mt) return c.by;
+    const by = new Map();
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch {}
+    for (const n of names) {
+      const m = SHOT.exec(n);
+      if (!m) continue;
+      let at = 0;
+      try { at = Math.floor(fs.statSync(path.join(dir, n)).mtimeMs / 1000); } catch { continue; }
+      const k = m[1].toLowerCase();
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push({ file: path.join(dir, n), at });
+    }
+    for (const a of by.values()) a.sort((x, y) => y.at - x.at || (x.file < y.file ? 1 : -1));
+    this._shots.set(dir, { mt, by });
+    return by;
+  }
+  /** a game's screenshots, newest first: its console's folder, and older ones still loose in Screenshots */
+  shotsOf(g) {
+    const k = path.parse(g.path).name.toLowerCase();
+    return [...(this.shotsIn(this.shotDir(g.system)).get(k) || []), ...(this.shotsIn(this.folders.screenshots).get(k) || [])]
+      .sort((x, y) => y.at - x.at);
+  }
+  /** after a game: the screenshots taken in it go in its console's folder */
+  sortShots(rec) {
+    const g = this.games.get(rec.id);
+    if (!g) return 0;
+    const k = path.parse(g.path).name.toLowerCase(), dir = this.shotDir(g.system);
+    let n = 0;
+    for (const s of this.shotsIn(this.folders.screenshots).get(k) || []) {
+      if (s.at < Math.floor(rec.since) - 5) continue;
+      const to = path.join(dir, path.basename(s.file));
+      try { if (fs.existsSync(to)) continue; fs.mkdirSync(dir, { recursive: true }); fs.renameSync(s.file, to); n++; } catch {}
+    }
+    return n;
+  }
+  /** how many screenshots a game has, and when the newest was taken: it goes on the back of the box, unless a picture
+      was chosen for it (Change Screenshot, kept next to the game) */
+  shotsJson(g) {
+    const a = this.shotsOf(g), chosen = g.snap && path.dirname(g.snap) === path.dirname(g.path);
+    return a.length ? { shots: a.length, ...(chosen ? {} : { shv: a[0].at }) } : {};
+  }
+  /** take a screenshot of the game being played (built-in emulators: RetroArch takes it, as with F8) */
+  takeShot() {
+    const r = this.running;
+    if (!r || !r.alive || !r.builtIn) return [409, { error: "No game is playing in a built-in emulator." }];
+    try { r.proc.stdin.write("SCREENSHOT\n"); } catch (e) { return [500, { error: "Couldn't take a screenshot." }]; }
+    this.event("screenshot");
+    return [200, { ok: true }];
+  }
+  /** one of a game's screenshots to the Trash, never deleted for good */
+  async trashShot(id, name) {
+    const g = this.games.get(id), s = g && this.shotsOf(g).find(x => path.basename(x.file) === name);
+    if (!s) return [404, { error: "That isn't one of this game's screenshots." }];
+    try { await this.trash(s.file); } catch (e) { return [500, { error: "Couldn't move it to the Trash: " + e.message }]; }
+    return [200, { ok: true }];
+  }
+
   libraryJson() {
     // play on other computers too (with saves in a cloud folder)
     const far = this.remote().add, st = this.state, dirCache = {};
@@ -2152,7 +2224,7 @@ class Backend extends EventEmitter {
         added: g.added || 0, size: g.size || 0, file: path.basename(g.path), year: g.year || "", pub: g.pub || "", dev: g.dev || "", genre: g.genre || "", gg: pins.genreGroup(g.genre),
         sv: this.artVer(g.snap), saves: this.savesOf(g, dirCache), hidden: st.hidden.includes(g.id), named: !!st.names[g.id], opts: st.gameOpts[g.id] || null, cheats: (st.cheats[g.id] || []).length,
         progress: st.progress[g.id] || "", rating: st.rating[g.id] || 0, note: st.notes[g.id] || "",
-        ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
+        ...this.shotsJson(g), ...(st.names[g.id] ? { title: st.names[g.id] } : {}) })),
       fav: [...st.fav], systems: Object.keys(this.cfg.systems), gameChoices: GAME_CHOICES, people: this.peopleJson(),
       shelves: st.shelves.map(s => ({ name: s.name, ids: s.ids.filter(id => this.games.has(id)), wanted: s.wanted || [] })),
       // how each console's games look on the shelf: the kind of box, its short name, packaging and the color of its pile
@@ -2211,6 +2283,11 @@ class Backend extends EventEmitter {
         const g = this.games.get(pathname.slice(6));
         if (g && g.snap) return this.file(g.snap, MIME[path.extname(g.snap).toLowerCase()] || "image/png", "public, max-age=31536000, immutable");
       }
+      const sh = /^\/shot\/([0-9a-f]{12})\/(\d{1,5})$/.exec(pathname);
+      if (sh) {
+        const g = this.games.get(sh[1]), f = g && this.shotsOf(g)[+sh[2]];
+        if (f) return this.file(f.file, MIME[path.extname(f.file).toLowerCase()] || "image/png", "public, max-age=31536000, immutable");
+      }
       const sp = /^\/state\/([0-9a-f]{12})\/(auto|\d)$/.exec(pathname);
       if (sp) {
         const g = this.games.get(sp[1]), f = g && this.statePic(g, sp[2]);
@@ -2244,6 +2321,9 @@ class Backend extends EventEmitter {
       case "/api/game/rename": return j(this.rename(String(d.id || ""), d.title));
       case "/api/game/hide": return j(this.hide(String(d.id || ""), d.hidden !== false));
       case "/api/stop": await this.stop(); return j([200, { ok: true }]);
+      case "/api/shot/take": return j(this.takeShot());
+      case "/api/shots": { const g = this.games.get(String(d.id || "")); return j(g ? [200, { shots: this.shotsOf(g).map(x => ({ name: path.basename(x.file), at: x.at })) }] : [404, { error: "Unknown game." }]); }
+      case "/api/shot/trash": return j(await this.trashShot(String(d.id || ""), String(d.name || "")));
       case "/api/fav": return j(this.toggleFav(String(d.id || "")));
       case "/api/shelves": return j(this.shelfOp(d));
       case "/api/games/search": return j(this.gameSearch(d.q));
