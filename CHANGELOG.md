@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0-beta.2
+
+- **Everyone gets their own play:** Settings → Your play → People. Add the people who play on this computer, and each
+  gets their own play history, pins, favorites, shelves, recaps, RetroAchievements sign-in and saves. The games and
+  Settings stay shared. With more than one person, the app asks who's playing when it opens (or choose "Who's playing"
+  in the options). One person sees no change: everything stays where it was.
+- **Backups and moves include everyone:** a backup has everyone's saves, a moved saves folder takes them all along,
+  and a game's history follows it for everyone when it's renamed or its discs are joined into one box.
+
 ## 0.5.0-beta.1
 
 - **PlayStation 2, built in (test):** PS2 games now play with an emulator that comes with the app (LRPS2, libretro's
