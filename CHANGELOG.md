@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0-beta.1
+
+- **PlayStation 2, built in (test):** PS2 games now play with an emulator that comes with the app (LRPS2, libretro's
+  version of PCSX2), so there's nothing else to install. They still need a BIOS copied from your own PS2: drop it on
+  the window, whatever it's called, and it goes in the right place. Each game gets its own memory card in your Saves
+  folder, so its saves list and backups include it. New on Macs with Apple silicon: please tell us how it runs. If you
+  have PCSX2 installed, Settings → While you play → PlayStation 2 games lets you keep using it.
+- **More of the app in every language:** a few menu items, messages and the time card's caption were still English.
+
 ## 0.4.3
 
 - **Four more tunes for the menu music:** Bittersweet Story, Rainy Streets, Airship and Pavane by Aureolus_Omicron,

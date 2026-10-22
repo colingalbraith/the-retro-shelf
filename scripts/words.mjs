@@ -31,7 +31,9 @@ for (const re of [
   new RegExp(`\\bel\\("[a-z0-9]+", "[^"]*", ${str}\\)`, "g"),
   new RegExp(`\\[\\s*(?:"[^"]*"|\\d+|null), ${str}\\]`, "g"),
   new RegExp(`\\.(?:textContent|title) = ${str}`, "g"),
-]) for (const m of page.matchAll(re)) for (const g of m.slice(1)) if (g !== undefined) { const v = unq(g); if (/[A-Z]/.test(v[0]) || / /.test(v) || /\{\w+\}/.test(v)) add(v); }
+  // either of two, as the situation is ("Found." : "Not found. Press Detect…")
+  new RegExp(`\\? ${str} : ${str}`, "g"),
+]) for (const m of page.matchAll(re)) for (const g of m.slice(1)) if (g !== undefined) { const v = unq(g).trim(); if (/[A-Z]/.test(v[0]) || / /.test(v) || /\{\w+\}/.test(v)) add(v); }
 // the words that follow a number ("3 games"): every plural( … , "game", "games") in the page
 for (const m of page.matchAll(new RegExp(`, ${str}, ${str}\\)`, "g"))) {
   const before = page.slice(Math.max(0, m.index - 200), m.index);
@@ -85,7 +87,7 @@ for (const f of fs.readdirSync(path.join(ROOT, "src", "data", "meta"))) {
 }
 // never words, even where the code writes them: languages go by their own names, and the app's, the consoles' and
 // other makers' names stay as they are
-const fixed = new Set(["English", "Español", "Français", "Deutsch", "Italiano", "Polski", "Português", "Русский", "日本語", "한국어", "简体中文", "繁體中文", "The Retro Shelf", "THE RETRO SHELF", "English text",
+const fixed = new Set(["PCSX2", "English", "Español", "Français", "Deutsch", "Italiano", "Polski", "Português", "Русский", "日本語", "한국어", "简体中文", "繁體中文", "The Retro Shelf", "THE RETRO SHELF", "English text",
   "PlayStation", "PlayStation 2", "RetroAchievements", "RetroArch", "Limited Run Games", "PDRoms", "GOG", "Evercade", "itch.io", "Retrode",
   "GB Operator", "Homebrew Hub", "CleanRip (Wii)", "Xbox", "Nintendo", ...Object.keys(cfg.systems)]);
 for (const n of ["Español", "Français", "Deutsch", "Italiano", "Polski", "Português", "Русский", "日本語", "한국어", "简体中文", "繁體中文"]) fixed.add(n + " (beta)");
@@ -97,7 +99,7 @@ for (const n of short()) names.add(n);
 const templates = [...keys].filter(k => /\{\w+\}/.test(k)).map(k => new RegExp("^" + k.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\\?\{\w+\\?\}/g, ".+?") + "$"));
 // a sentence with blanks has to still be in the code; a line that's two entries side by side is those two
 const code = page + main + backend + read("src/pins.js") + read("src/config.json");
-const joined = k => [...keys].some(a => a !== k && /[.!?…]$/.test(a) && k.startsWith(a + " ") && keys.has(k.slice(a.length + 1)));
+const joined = k => [...keys].some(a => a !== k && /[.!?…]$/.test(a) && k.startsWith(a + " ") && (keys.has(k.slice(a.length + 1)) || templates.some(re => re.test(k.slice(a.length + 1)))));
 // written in the app's own code, so words even when a game has the same name ("Dark", "X")
 const pinsCode = read("src/pins.js");
 const inCode = k => [page, main, backend, pinsCode].some(c => c.includes(`"${k}"`) || c.includes(`>${k}<`));
